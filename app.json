@@ -1,39 +1,102 @@
 {
   "expo": {
-    "name": "CharzingApp-Expo",
+    "name": "차징",
     "slug": "CharzingApp-Expo",
     "version": "1.0.0",
+    "sdkVersion": "54.0.0",
     "orientation": "portrait",
-    "icon": "./assets/images/icon.png",
-    "scheme": "myapp",
+    "primaryLanguage": "ko",
+    "icon": "./assets/favicon/CharzingLogo2.png",
+    "scheme": "charzingapp",
     "userInterfaceStyle": "automatic",
+    "description": "직접 방문하는 전기차 배터리 진단 서비스",
+    "keywords": ["전기차", "배터리진단", "방문점검", "차량진단", "전기차점검", "배터리상태", "충전", "EV"],
     "splash": {
-      "image": "./assets/images/splash.png",
-      "resizeMode": "contain",
-      "backgroundColor": "#ffffff"
+      "backgroundColor": "#ffffff",
+      "image": "./assets/favicon/CharzingLogo2.png",
+      "resizeMode": "contain"
     },
     "assetBundlePatterns": [
       "**/*"
     ],
     "ios": {
-      "supportsTablet": true
+      "supportsTablet": true,
+      "bundleIdentifier": "com.charzingapp",
+      "jsEngine": "hermes",
+      "icon": "./assets/favicon/app-store-icon-1024x1024.png",
+      "infoPlist": {
+        "NSLocationWhenInUseUsageDescription": "이 앱은 지도를 표시하고 주변 위치 기반 기능을 위해 현재 위치 접근이 필요합니다.",
+        "NSUserNotificationUsageDescription": "예약 상태 변경 및 진단 결과 알림을 위해 푸시 알림 권한이 필요합니다.",
+        "NSUserTrackingUsageDescription": "앱 서비스 개선 및 맞춤형 콘텐츠 제공을 위해 사용자 활동 추적 권한이 필요합니다.",
+        "CFBundleURLTypes": [
+          {
+            "CFBundleURLName": "google-signin",
+            "CFBundleURLSchemes": ["com.googleusercontent.apps.91035459357-lc3tir17pmmomf793bnce1qmstns4rh7"]
+          }
+        ]
+      },
+      "config": {
+        "usesNonExemptEncryption": false,
+        "googleServicesFile": "./GoogleService-Info.plist"
+      },
+      "associatedDomains": [],
+      "appStoreUrl": "https://apps.apple.com/app/id-placeholder"
     },
     "android": {
       "adaptiveIcon": {
-        "foregroundImage": "./assets/images/adaptive-icon.png",
+        "foregroundImage": "./assets/favicon/android-chrome-192x192.png",
         "backgroundColor": "#ffffff"
+      },
+      "package": "com.charzingapp",
+      "jsEngine": "hermes",
+      "permissions": [
+        "ACCESS_FINE_LOCATION",
+        "ACCESS_COARSE_LOCATION",
+        "RECEIVE_BOOT_COMPLETED",
+        "WAKE_LOCK"
+      ],
+      "config": {
+        "primaryLanguage": "ko",
+        "googleServicesFile": "./android/app/google-services.json"
+      },
+      "softwareKeyboardLayoutMode": "pan",
+      "navigationBar": {
+        "visible": "leanback"
       }
     },
     "web": {
       "bundler": "metro",
       "output": "static",
-      "favicon": "./assets/images/favicon.png"
+      "favicon": "./assets/favicon/favicon-32x32.png"
     },
+    "privacyUrl": "https://www.notion.so/1e3f67248617802985bae5b23476bfba",
+    "supportUrl": "https://charzing.kr/support",
+    "marketingUrl": "https://charzing.kr/",
     "plugins": [
-      "expo-router"
+      "expo-dev-client",
+      "expo-apple-authentication",
+      "expo-font",
+      "expo-router",
+      "expo-web-browser",
+      [
+        "@react-native-google-signin/google-signin",
+        {
+          "iosUrlScheme": "com.googleusercontent.apps.91035459357-lc3tir17pmmomf793bnce1qmstns4rh7",
+          "androidClientId": "91035459357-lc3tir17pmmomf793bnce1qmstns4rh7.apps.googleusercontent.com"
+        }
+      ],
+      "expo-tracking-transparency"
     ],
-    "experiments": {
-      "typedRoutes": true
-    }
+    "extra": {
+      "KAKAO_REST_API_KEY": "ac56ec34dbf3f870409cf15aeefc2482",
+      "KAKAO_JAVASCRIPT_KEY": "c38ed919829dd67cffe167b91747a534",
+      "CLOUD_FUNCTION_URL": "https://us-central1-charzing-d1600.cloudfunctions.net",
+      "GOOGLE_WEB_CLIENT_ID": "91035459357-0ulua3kp7eje2bmjd76mceml113el8gd.apps.googleusercontent.com",
+      "router": {},
+      "eas": {
+        "projectId": "0a4659e9-07ec-460c-a1ce-6d6bf87b9aa7"
+      }
+    },
+    "owner": "sungminyou"
   }
 }
