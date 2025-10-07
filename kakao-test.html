@@ -1,0 +1,19 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <script src="https://dapi.kakao.com/v2/maps/sdk.js?appkey=c38ed919829dd67cffe167b91747a534&autoload=false"></script>
+</head>
+<body>
+    <div id="map" style="width:300px;height:300px;"></div>
+    <script>
+        kakao.maps.load(function() {
+            alert('성공!');
+            var container = document.getElementById('map');
+            var map = new kakao.maps.Map(container, {
+                center: new kakao.maps.LatLng(37.5665, 126.9780),
+                level: 3
+            });
+        });
+    </script>
+</body>
+</html>

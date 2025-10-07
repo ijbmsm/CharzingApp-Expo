@@ -2,19 +2,22 @@
   "expo": {
     "name": "차징",
     "slug": "CharzingApp-Expo",
-    "version": "1.0.0",
+    "version": "1.0.1",
     "sdkVersion": "54.0.0",
     "orientation": "portrait",
     "primaryLanguage": "ko",
-    "icon": "./assets/favicon/CharzingLogo2.png",
+    "icon": "./ios/app/Images.xcassets/AppIcon.appiconset/App-Icon-1024x1024@1x.png",
     "scheme": "charzingapp",
     "userInterfaceStyle": "automatic",
-    "description": "직접 방문하는 전기차 배터리 진단 서비스",
-    "keywords": ["전기차", "배터리진단", "방문점검", "차량진단", "전기차점검", "배터리상태", "충전", "EV"],
+    "description": "한국 1위 전기차 배터리 진단 전문 서비스. 중고 전기차 구매 전 전문가가 직접 방문하여 배터리 상태를 정확히 진단하고 24시간 내 상세한 리포트를 제공합니다.",
+    "keywords": ["전기차", "배터리진단", "방문점검", "차량진단", "전기차점검", "배터리상태", "충전", "EV", "중고차", "테슬라", "아이오닉", "EV6", "SOH", "배터리수명"],
+    "category": "business",
+    "githubUrl": "https://github.com/ijbmsm/CharzingApp-Expo",
     "splash": {
       "backgroundColor": "#ffffff",
-      "image": "./assets/favicon/CharzingLogo2.png",
-      "resizeMode": "contain"
+      "image": "./assets/images/splashLogo.png",
+      "resizeMode": "contain",
+      "hideExponentText": true
     },
     "assetBundlePatterns": [
       "**/*"
@@ -23,11 +26,17 @@
       "supportsTablet": true,
       "bundleIdentifier": "com.charzingapp",
       "jsEngine": "hermes",
-      "icon": "./assets/favicon/app-store-icon-1024x1024.png",
+      "icon": "./ios/app/Images.xcassets/AppIcon.appiconset/App-Icon-1024x1024@1x.png",
+      "buildNumber": "1",
+      "requireFullScreen": false,
+      "statusBarStyle": "default",
       "infoPlist": {
         "NSLocationWhenInUseUsageDescription": "이 앱은 지도를 표시하고 주변 위치 기반 기능을 위해 현재 위치 접근이 필요합니다.",
         "NSUserNotificationUsageDescription": "예약 상태 변경 및 진단 결과 알림을 위해 푸시 알림 권한이 필요합니다.",
-        "NSUserTrackingUsageDescription": "앱 서비스 개선 및 맞춤형 콘텐츠 제공을 위해 사용자 활동 추적 권한이 필요합니다.",
+        "NSCameraUsageDescription": "진단 리포트 사진 촬영을 위해 카메라 접근 권한이 필요합니다.",
+        "NSPhotoLibraryUsageDescription": "진단 관련 사진을 저장하고 불러오기 위해 사진 라이브러리 접근 권한이 필요합니다.",
+        "CFBundleDisplayName": "차징",
+        "CFBundleName": "차징",
         "CFBundleURLTypes": [
           {
             "CFBundleURLName": "google-signin",
@@ -39,21 +48,28 @@
         "usesNonExemptEncryption": false,
         "googleServicesFile": "./GoogleService-Info.plist"
       },
-      "associatedDomains": [],
+      "associatedDomains": ["applinks:charzing.kr"],
       "appStoreUrl": "https://apps.apple.com/app/id-placeholder"
     },
     "android": {
       "adaptiveIcon": {
-        "foregroundImage": "./assets/favicon/android-chrome-192x192.png",
+        "foregroundImage": "./assets/favicon/CharzingLogo2.png",
         "backgroundColor": "#ffffff"
       },
+      "icon": "./assets/favicon/CharzingLogo2.png",
       "package": "com.charzingapp",
       "jsEngine": "hermes",
+      "versionCode": 1,
+      "compileSdkVersion": 34,
+      "targetSdkVersion": 34,
       "permissions": [
         "ACCESS_FINE_LOCATION",
         "ACCESS_COARSE_LOCATION",
         "RECEIVE_BOOT_COMPLETED",
-        "WAKE_LOCK"
+        "WAKE_LOCK",
+        "CAMERA",
+        "READ_EXTERNAL_STORAGE",
+        "WRITE_EXTERNAL_STORAGE"
       ],
       "config": {
         "primaryLanguage": "ko",
@@ -62,7 +78,19 @@
       "softwareKeyboardLayoutMode": "pan",
       "navigationBar": {
         "visible": "leanback"
-      }
+      },
+      "intentFilters": [
+        {
+          "action": "VIEW",
+          "data": [
+            {
+              "scheme": "https",
+              "host": "charzing.kr"
+            }
+          ],
+          "category": ["BROWSABLE", "DEFAULT"]
+        }
+      ]
     },
     "web": {
       "bundler": "metro",
@@ -84,8 +112,7 @@
           "iosUrlScheme": "com.googleusercontent.apps.91035459357-lc3tir17pmmomf793bnce1qmstns4rh7",
           "androidClientId": "91035459357-lc3tir17pmmomf793bnce1qmstns4rh7.apps.googleusercontent.com"
         }
-      ],
-      "expo-tracking-transparency"
+      ]
     ],
     "extra": {
       "KAKAO_REST_API_KEY": "ac56ec34dbf3f870409cf15aeefc2482",
