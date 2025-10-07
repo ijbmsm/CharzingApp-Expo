@@ -740,49 +740,90 @@ export const sendPushNotification = functions
           }
 
           const userData = userDoc.data();
-
           const pushToken = userData?.pushToken;
           
-          if (!pushToken) {
-              results.push({ userId, success: false, error: 'No push token' });
-            continue;
+          let pushSuccess = false;
+          let pushError = null;
+
+          // 1. 푸시 토큰이 있으면 푸시 알림 전송
+          if (pushToken) {
+            try {
+              const message = {
+                to: pushToken,
+                sound: 'default',
+                title,
+                body,
+                data: notificationData || {},
+              };
+
+              const response = await axios.post(
+                'https://exp.host/--/api/v2/push/send',
+                message,
+                {
+                  headers: {
+                    'Accept': 'application/json',
+                    'Accept-encoding': 'gzip, deflate',
+                    'Content-Type': 'application/json',
+                  },
+                }
+              );
+
+              pushSuccess = true;
+
+              // 푸시 알림 로그 저장
+              await db.collection('notificationLogs').add({
+                userId,
+                pushToken,
+                title,
+                body,
+                data: notificationData || {},
+                response: response.data,
+                sentAt: admin.firestore.FieldValue.serverTimestamp(),
+                status: 'sent'
+              });
+
+            } catch (pushErr) {
+              console.error(`푸시 알림 전송 실패: ${userId}`, pushErr);
+              pushError = pushErr instanceof Error ? pushErr.message : '푸시 알림 전송 실패';
+            }
           }
 
-          // Expo 푸시 알림 전송
-          const message = {
-            to: pushToken,
-            sound: 'default',
-            title,
-            body,
-            data: notificationData || {},
-          };
+          // 2. 모든 사용자에게 인앱 알림 저장 (푸시 토큰 유무와 상관없이)
+          try {
+            const inAppNotification = {
+              title,
+              body,
+              category: notificationData?.category || 'announcement',
+              data: notificationData || {},
+              isRead: false,
+              createdAt: admin.firestore.FieldValue.serverTimestamp(),
+              id: `notification_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+            };
 
+            // 사용자의 inAppNotifications 컬렉션에 저장
+            await db.collection('users').doc(userId).collection('inAppNotifications').add(inAppNotification);
+            
+            results.push({
+              userId,
+              success: true,
+              pushSent: !!pushToken && pushSuccess,
+              inAppSaved: true,
+              pushError: pushError
+            });
 
-          const response = await axios.post(
-            'https://exp.host/--/api/v2/push/send',
-            message,
-            {
-              headers: {
-                'Accept': 'application/json',
-                'Accept-encoding': 'gzip, deflate',
-                'Content-Type': 'application/json',
-              },
-            }
-          );
-
-          results.push({ userId, success: true, data: response.data });
-
-          // 알림 로그 저장
-          await db.collection('notificationLogs').add({
-            userId,
-            pushToken,
-            title,
-            body,
-            data: notificationData || {},
-            response: response.data,
-            sentAt: admin.firestore.FieldValue.serverTimestamp(),
-            status: 'sent'
-          });
+          } catch (inAppError) {
+            console.error(`인앱 알림 저장 실패: ${userId}`, inAppError);
+            const errorMessage = inAppError instanceof Error ? inAppError.message : '인앱 알림 저장 실패';
+            
+            results.push({
+              userId,
+              success: false,
+              pushSent: !!pushToken && pushSuccess,
+              inAppSaved: false,
+              error: errorMessage,
+              pushError: pushError
+            });
+          }
 
         } catch (error) {
           console.error(`푸시 알림 전송 실패: ${userId}`);
@@ -891,10 +932,6 @@ export const sendReservationStatusNotification = functions
 
       const userData = userDoc.data();
       const pushToken = userData?.pushToken;
-      
-      if (!pushToken) {
-          return;
-      }
 
       // 상태별 알림 메시지
       let title = '';
@@ -921,46 +958,81 @@ export const sendReservationStatusNotification = functions
           return; // 알림을 보내지 않는 상태
       }
 
-      // 푸시 알림 전송
-      const message = {
-        to: pushToken,
-        sound: 'default',
-        title,
-        body,
-        data: {
-          type: 'reservation_status_change',
-          reservationId,
-          status: afterData.status,
-        },
-      };
 
-      const response = await axios.post(
-        'https://exp.host/--/api/v2/push/send',
-        message,
-        {
-          headers: {
-            'Accept': 'application/json',
-            'Accept-encoding': 'gzip, deflate',
-            'Content-Type': 'application/json',
-          },
+      // 1. 푸시 토큰이 있으면 푸시 알림 전송
+      if (pushToken) {
+        try {
+          const message = {
+            to: pushToken,
+            sound: 'default',
+            title,
+            body,
+            data: {
+              type: 'reservation_status_change',
+              reservationId,
+              status: afterData.status,
+              category: 'reservation',
+            },
+          };
+
+          const response = await axios.post(
+            'https://exp.host/--/api/v2/push/send',
+            message,
+            {
+              headers: {
+                'Accept': 'application/json',
+                'Accept-encoding': 'gzip, deflate',
+                'Content-Type': 'application/json',
+              },
+            }
+          );
+
+          console.log(`자동 푸시 알림 전송 성공: ${userId}`);
+
+          // 푸시 알림 로그 저장
+          await db.collection('notificationLogs').add({
+            userId,
+            pushToken,
+            title,
+            body,
+            data: message.data,
+            response: response.data,
+            sentAt: admin.firestore.FieldValue.serverTimestamp(),
+            status: 'sent',
+            trigger: 'reservation_status_change',
+            reservationId
+          });
+
+        } catch (pushErr) {
+          console.error(`자동 푸시 알림 전송 실패: ${userId}`, pushErr);
         }
-      );
+      } else {
+        console.log(`사용자 ${userId}에게 푸시 토큰이 없음, 인앱 알림만 저장`);
+      }
 
-      console.log(`자동 알림 전송: ${userId}`);
+      // 2. 모든 사용자에게 인앱 알림 저장 (푸시 토큰 유무와 상관없이)
+      try {
+        const inAppNotification = {
+          title,
+          body,
+          category: 'reservation',
+          data: {
+            type: 'reservation_status_change',
+            reservationId,
+            status: afterData.status,
+          },
+          isRead: false,
+          createdAt: admin.firestore.FieldValue.serverTimestamp(),
+          id: `notification_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+        };
 
-      // 알림 로그 저장
-      await db.collection('notificationLogs').add({
-        userId,
-        pushToken,
-        title,
-        body,
-        data: message.data,
-        response: response.data,
-        sentAt: admin.firestore.FieldValue.serverTimestamp(),
-        status: 'sent',
-        trigger: 'reservation_status_change',
-        reservationId
-      });
+        // 사용자의 inAppNotifications 컬렉션에 저장
+        await db.collection('users').doc(userId).collection('inAppNotifications').add(inAppNotification);
+        console.log(`사용자 ${userId}에게 자동 인앱 알림 저장 완료 (예약 상태 변경)`);
+
+      } catch (inAppError) {
+        console.error(`사용자 ${userId} 자동 인앱 알림 저장 실패:`, inAppError);
+      }
 
     } catch (error) {
       console.error('자동 푸시 알림 전송 실패:', error);
