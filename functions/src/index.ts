@@ -731,7 +731,7 @@ export const sendPushNotification = functions
       for (const userId of userIds) {
         try {
           
-          // 사용자의 푸시 토큰 조회
+          // 사용자의 푸시 토큰 및 알림 설정 조회
           const userDoc = await db.collection('users').doc(userId).get();
           
           if (!userDoc.exists) {
@@ -741,6 +741,25 @@ export const sendPushNotification = functions
 
           const userData = userDoc.data();
           const pushToken = userData?.pushToken;
+          
+          // 알림 설정 확인
+          const notificationSettingsDoc = await db.collection('users').doc(userId).collection('notificationSettings').doc('settings').get();
+          const notificationSettings = notificationSettingsDoc.exists ? (notificationSettingsDoc.data() || {}) : { enabled: true }; // 기본값: 활성화
+          
+          // 전체 알림이 비활성화된 경우 건너뛰기
+          if (notificationSettings.enabled === false) {
+            console.log(`사용자 ${userId}는 전체 알림이 비활성화됨, 전송 건너뛰기`);
+            results.push({ userId, success: false, error: 'Notifications disabled by user' });
+            continue;
+          }
+          
+          // 카테고리별 알림 설정 확인
+          const category = notificationData?.category || 'announcement';
+          if (notificationSettings[category] === false) {
+            console.log(`사용자 ${userId}는 ${category} 알림이 비활성화됨, 전송 건너뛰기`);
+            results.push({ userId, success: false, error: `${category} notifications disabled by user` });
+            continue;
+          }
           
           let pushSuccess = false;
           let pushError = null;
@@ -922,7 +941,7 @@ export const sendReservationStatusNotification = functions
       const userId = afterData.userId;
       const reservationId = context.params.reservationId;
       
-      // 사용자 푸시 토큰 조회
+      // 사용자 푸시 토큰 및 알림 설정 조회
       const userDoc = await db.collection('users').doc(userId).get();
       
       if (!userDoc.exists) {
@@ -932,6 +951,16 @@ export const sendReservationStatusNotification = functions
 
       const userData = userDoc.data();
       const pushToken = userData?.pushToken;
+      
+      // 알림 설정 확인
+      const notificationSettingsDoc = await db.collection('users').doc(userId).collection('notificationSettings').doc('settings').get();
+      const notificationSettings = notificationSettingsDoc.exists ? (notificationSettingsDoc.data() || {}) : { enabled: true, reservation: true }; // 기본값: 활성화
+      
+      // 전체 알림 또는 예약 알림이 비활성화된 경우 건너뛰기
+      if (notificationSettings.enabled === false || notificationSettings.reservation === false) {
+        console.log(`사용자 ${userId}는 예약 알림이 비활성화됨, 자동 알림 전송 건너뛰기`);
+        return;
+      }
 
       // 상태별 알림 메시지
       let title = '';
@@ -1158,6 +1187,27 @@ export const sendPushNotificationAdmin = functions
 
           const userData = userDoc.data();
           const pushToken = userData?.pushToken;
+          
+          // 알림 설정 확인
+          const notificationSettingsDoc = await db.collection('users').doc(userId).collection('notificationSettings').doc('settings').get();
+          const notificationSettings = notificationSettingsDoc.exists ? (notificationSettingsDoc.data() || {}) : { enabled: true }; // 기본값: 활성화
+          
+          // 전체 알림이 비활성화된 경우 건너뛰기
+          if (notificationSettings.enabled === false) {
+            console.log(`사용자 ${userId}는 전체 알림이 비활성화됨, Admin 알림 전송 건너뛰기`);
+            errors.push(`사용자 ${userId}: 알림이 비활성화됨`);
+            totalFailure++;
+            continue;
+          }
+          
+          // 카테고리별 알림 설정 확인 
+          const category = notificationData?.category || 'announcement';
+          if (notificationSettings[category] === false) {
+            console.log(`사용자 ${userId}는 ${category} 알림이 비활성화됨, Admin 알림 전송 건너뛰기`);
+            errors.push(`사용자 ${userId}: ${category} 알림이 비활성화됨`);
+            totalFailure++;
+            continue;
+          }
 
           let pushSuccess = false;
           let pushError = null;

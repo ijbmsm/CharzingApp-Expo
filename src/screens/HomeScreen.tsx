@@ -13,7 +13,7 @@ import {
   Animated,
 } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
-import { useNavigation } from '@react-navigation/native';
+import { useNavigation, useFocusEffect } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { RootStackParamList } from '../navigation/RootNavigator';
 import { Ionicons } from '@expo/vector-icons';
@@ -24,14 +24,16 @@ import VehicleSearchModal, { Vehicle } from '../components/VehicleSearchModal';
 import { useSelector } from 'react-redux';
 import { RootState } from '../store';
 import firebaseService, { DiagnosisReservation, VehicleDiagnosisReport, UserVehicle } from '../services/firebaseService';
+import { getAuth } from 'firebase/auth';
 import logger from '../services/logService';
 import analyticsService from '../services/analyticsService';
+import devLog from '../utils/devLog';
 
 type HomeScreenNavigationProp = NativeStackNavigationProp<RootStackParamList>;
 
 export default function HomeScreen() {
   const navigation = useNavigation<HomeScreenNavigationProp>();
-  const { user, isAuthenticated } = useSelector((state: RootState) => state.auth);
+  const { user, isAuthenticated, autoLoginEnabled } = useSelector((state: RootState) => state.auth);
   const insets = useSafeAreaInsets();
   
   // 메모리 누수 방지를 위한 마운트 상태 추적 (컴포넌트 레벨)
@@ -59,8 +61,15 @@ export default function HomeScreen() {
   // 컴포넌트 언마운트 시 정리 및 Analytics 화면 추적
   useEffect(() => {
     // 홈 화면 조회 추적
-    analyticsService.logScreenView('HomeScreen', 'HomeScreen').catch((error) => {
-      console.error('❌ 홈 화면 조회 추적 실패:', error);
+    analyticsService.logScreenView('HomeScreen', 'HomeScreen').catch(() => {});
+
+    // 자동로그인 상태 디버깅
+    devLog.log('🏠 HomeScreen 로드됨 - 자동로그인 상태:', {
+      autoLoginEnabled,
+      isAuthenticated,
+      userUid: user?.uid,
+      userProvider: user?.provider,
+      userDisplayName: user?.displayName
     });
 
     return () => {
@@ -84,8 +93,25 @@ export default function HomeScreen() {
     }
   };
   
-  // 현재 진행 단계
-  const currentStep = latestReservation ? getStepFromStatus(latestReservation.status) : -1;
+  // 현재 진행 단계 (3일 이상 지난 예약은 무시)
+  const currentStep = (() => {
+    if (!latestReservation) return -1;
+    
+    // 예약이 3일 이상 지났는지 확인
+    const reservationDate = latestReservation.createdAt instanceof Date 
+      ? latestReservation.createdAt 
+      : (latestReservation.createdAt as any)?.toDate?.() || new Date(latestReservation.createdAt as any);
+    
+    const threeDaysAgo = new Date();
+    threeDaysAgo.setDate(threeDaysAgo.getDate() - 3);
+    
+    // 3일 이상 지난 예약은 -1 반환 (예약 없음 상태로 처리)
+    if (reservationDate < threeDaysAgo) {
+      return -1;
+    }
+    
+    return getStepFromStatus(latestReservation.status);
+  })();
   
   // 완료된 예약에 대한 진단 리포트 조회 (메모리 누수 방지)
   const loadVehicleReport = async (reservationId: string, isMountedRef: { current: boolean }) => {
@@ -122,6 +148,16 @@ export default function HomeScreen() {
       return;
     }
 
+    // Firebase Auth currentUser 체크 (토큰 만료 감지)
+    const auth = getAuth();
+    if (!auth.currentUser) {
+      devLog.log('⚠️ Firebase Auth currentUser 없음, 차량 목록 로드 건너뜀');
+      if (isMountedRef.current) {
+        setUserVehicles([]);
+      }
+      return;
+    }
+
     if (!isMountedRef.current) return;
 
     try {
@@ -148,10 +184,30 @@ export default function HomeScreen() {
     }
   };
 
+  // 화면에 포커스될 때마다 차량 목록 새로고침
+  useFocusEffect(
+    React.useCallback(() => {
+      if (isAuthenticated && user && isMountedRef.current) {
+        loadUserVehicles(isMountedRef);
+      }
+    }, [isAuthenticated, user])
+  );
+
   // 사용자의 최신 예약 정보 로드 (메모리 누수 방지 개선)
   useEffect(() => {
     const loadLatestReservation = async () => {
       if (!isAuthenticated || !user) {
+        if (isMountedRef.current) {
+          setLatestReservation(null);
+          setVehicleReport(null);
+        }
+        return;
+      }
+
+      // Firebase Auth currentUser 체크 (토큰 만료 감지)
+      const auth = getAuth();
+      if (!auth.currentUser) {
+        devLog.log('⚠️ Firebase Auth currentUser 없음, 예약 정보 로드 건너뜀');
         if (isMountedRef.current) {
           setLatestReservation(null);
           setVehicleReport(null);
@@ -212,6 +268,16 @@ export default function HomeScreen() {
       
       // 예약 정보 새로고침
       if (isAuthenticated && user) {
+        // Firebase Auth currentUser 체크
+        const auth = getAuth();
+        if (!auth.currentUser) {
+          devLog.log('⚠️ Firebase Auth currentUser 없음, 새로고침 건너뜀');
+          if (isMountedRef.current) {
+            setRefreshing(false);
+          }
+          return;
+        }
+
         const reservationPromise = (async () => {
           try {
             const reservations = await firebaseService.getUserDiagnosisReservations(user.uid);
@@ -338,12 +404,31 @@ export default function HomeScreen() {
     );
   };
 
-  // 인증이 필요한 기능 실행 헬퍼 (로그인 화면으로 직접 이동)
+  // 인증이 필요한 기능 실행 헬퍼 (토큰 만료 감지 포함)
   const executeWithAuth = (action: () => void, feature: string) => {
     if (!isAuthenticated) {
       navigation.navigate('Login', { showBackButton: true });
       return;
     }
+    
+    // Firebase Auth 상태도 함께 확인
+    const auth = getAuth();
+    if (!auth.currentUser && user?.provider === 'apple') {
+      // Apple 토큰 만료로 추정되는 상황
+      Alert.alert(
+        '로그인 필요', 
+        'Apple 로그인 세션이 만료되었습니다.\n다시 로그인해주세요.',
+        [
+          { text: '취소', style: 'cancel' },
+          { 
+            text: '로그인', 
+            onPress: () => navigation.navigate('Login', { showBackButton: true })
+          }
+        ]
+      );
+      return;
+    }
+    
     action();
   };
 
@@ -353,7 +438,7 @@ export default function HomeScreen() {
       if (vehicleReport) {
         // Analytics: 리포트 조회 추적
         analyticsService.logReportViewed(vehicleReport.id, 'vehicle_diagnosis').catch((error) => {
-          console.error('❌ 리포트 조회 추적 실패:', error);
+          // 무시
         });
         
         navigation.navigate('VehicleDiagnosisReport', { reportId: vehicleReport.id });
@@ -380,10 +465,11 @@ export default function HomeScreen() {
     executeWithAuth(() => {
       // Analytics: 예약 시작 추적
       analyticsService.logReservationStarted('manual').catch((error) => {
-        console.error('❌ 예약 시작 추적 실패:', error);
+        // 무시
       });
       
-      navigation.navigate('DiagnosisReservation');
+      // 새로운 통합 예약 화면으로 이동
+      navigation.navigate('Reservation');
     }, '진단 예약');
   };
 
@@ -488,7 +574,7 @@ export default function HomeScreen() {
   };
 
   return (
-    <SafeAreaView style={styles.container}>
+    <SafeAreaView style={styles.container} edges={['top']}>
       <Header showLogo={true} />
 
       <ScrollView 
@@ -508,11 +594,15 @@ export default function HomeScreen() {
         <View style={styles.vehicleSection}>
           {vehiclesLoading ? (
             <View style={styles.featureCard}>
-              <View style={styles.vehicleHeader}>
-                <Text style={styles.featureTitle}>내 차량</Text>
+              <Text style={styles.featureTitle}>내 차량</Text>
+              <View style={styles.vehicleLoadingPlaceholder}>
                 <ActivityIndicator size="small" color="#4495E8" />
+                <Text style={styles.loadingText}>차량 정보를 불러오는 중...</Text>
               </View>
-              <Text style={styles.loadingText}>차량 정보를 불러오는 중...</Text>
+              <View style={styles.addMoreButton}>
+                <ActivityIndicator size="small" color="#9CA3AF" />
+                <Text style={styles.addMoreText}>로딩 중...</Text>
+              </View>
             </View>
           ) : userVehicles.length > 0 ? (
             <View style={styles.featureCard}>
@@ -528,9 +618,6 @@ export default function HomeScreen() {
                     <Text style={styles.vehicleName}>
                       {vehicle.year} {vehicle.make} {vehicle.model}
                     </Text>
-                    <Text style={styles.vehicleSpecs}>
-                      배터리: {vehicle.batteryCapacity}kWh • 주행거리: {vehicle.range}km
-                    </Text>
                   </View>
                   <Ionicons name="car-sport" size={32} color="#4495E8" />
                 </TouchableOpacity>
@@ -544,10 +631,29 @@ export default function HomeScreen() {
               </TouchableOpacity>
             </View>
           ) : (
-            <AddVehicleCard 
-              onPress={handleAddVehicleCard}
-              isAuthenticated={isAuthenticated}
-            />
+            <TouchableOpacity style={styles.featureCard} onPress={handleAddVehicleCard} activeOpacity={0.7}>
+              <Text style={styles.featureTitle}>내 차량</Text>
+              <View style={styles.addVehicleContent}>
+                <View style={styles.addVehicleIconContainer}>
+                  <Ionicons name="car-outline" size={48} color="#6B7280" />
+                  <View style={styles.addVehiclePlusBadge}>
+                    <Ionicons name="add" size={20} color="#FFFFFF" />
+                  </View>
+                </View>
+                
+                <View style={styles.addVehicleTextContainer}>
+                  <Text style={styles.addVehicleTitle}>
+                    {isAuthenticated ? '내 차량 추가' : '로그인하고 내 차량 추가하기'}
+                  </Text>
+                  <Text style={styles.addVehicleSubtitle}>
+                    {isAuthenticated 
+                      ? '차량을 등록하여 맞춤 진단을 받아보세요'
+                      : '로그인 후 차량을 등록할 수 있습니다'
+                    }
+                  </Text>
+                </View>
+              </View>
+            </TouchableOpacity>
           )}
         </View>
 
@@ -561,11 +667,11 @@ export default function HomeScreen() {
               <Text style={styles.featureDescription}>예약 정보를 불러오는 중...</Text>
             )}
             
-            {/* 예약이 없는 경우 */}
-            {!isLoading && !latestReservation && (
-              <>
-                <Text style={styles.featureDescription}>
-                   차직 직원이 방문하여 전기차 배터리 상태를 정확히 진단해드립니다.
+            {/* 예약이 없는 경우 (예약이 없거나 3일 이상 지난 경우) */}
+            {!isLoading && currentStep === -1 && (
+              <View style={styles.noReservationContainer}>
+                <Text style={styles.noReservationText}>
+                  예약이 없습니다.
                 </Text>
                 <TouchableOpacity 
                   style={styles.reserveButton}
@@ -573,10 +679,10 @@ export default function HomeScreen() {
                 >
                   <Text style={styles.reserveButtonText}>진단 예약하기</Text>
                 </TouchableOpacity>
-              </>
+              </View>
             )}
             
-            {/* 예약이 있는 경우 */}
+            {/* 예약이 있는 경우 (최근 3일 이내) */}
             {!isLoading && latestReservation && currentStep >= 0 && (
               <>
                 <Text style={styles.featureDescription}>
@@ -735,15 +841,6 @@ export default function HomeScreen() {
                       {selectedVehicle.year} {selectedVehicle.make} {selectedVehicle.model}
                     </Text>
                     
-                    <View style={styles.specRow}>
-                      <Text style={styles.specLabel}>배터리 용량</Text>
-                      <Text style={styles.specValue}>{selectedVehicle.batteryCapacity}kWh</Text>
-                    </View>
-                    
-                    <View style={styles.specRow}>
-                      <Text style={styles.specLabel}>주행 거리</Text>
-                      <Text style={styles.specValue}>{selectedVehicle.range}km</Text>
-                    </View>
                     
                     {selectedVehicle.nickname && (
                       <View style={styles.specRow}>
@@ -804,7 +901,7 @@ const styles = StyleSheet.create({
     fontWeight: 'bold',
     color: '#1F2937',
     textAlign: 'center',
-    marginBottom: 12,
+    marginBottom: 16,
   },
   welcomeSubtitle: {
     fontSize: 16,
@@ -815,8 +912,8 @@ const styles = StyleSheet.create({
   },
   vehicleSection: {
     paddingHorizontal: 0,
-    paddingTop: 20,
-    paddingBottom: 4,
+    paddingTop: 16,
+    paddingBottom: 16,
   },
   featureGrid: {
     paddingHorizontal: 0,
@@ -827,13 +924,28 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    marginBottom: 8,
+    marginBottom: 16,
+  },
+  vehicleLoadingContent: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingVertical: 32,
+    minHeight: 100, // 최소 컨텐츠 높이 보장
+  },
+  vehicleLoadingPlaceholder: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingVertical: 16,
+    borderBottomWidth: 1,
+    borderBottomColor: '#F3F4F6',
   },
   loadingText: {
     fontSize: 14,
     color: '#6B7280',
     textAlign: 'center',
-    marginTop: 8,
+    marginTop: 12,
   },
   vehicleItem: {
     flexDirection: 'row',
@@ -850,7 +962,7 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: '600',
     color: '#1F2937',
-    marginBottom: 4,
+    marginBottom: 16,
   },
   vehicleSpecs: {
     fontSize: 13,
@@ -861,7 +973,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     paddingVertical: 12,
-    marginTop: 8,
+    marginTop: 16,
     backgroundColor: '#F0F8FF',
     borderRadius: 8,
     borderWidth: 1,
@@ -887,7 +999,8 @@ const styles = StyleSheet.create({
     shadowRadius: 3.84,
     elevation: 5,
     marginHorizontal: 16,
-    marginBottom: 20,
+    marginBottom: 0,
+    minHeight: 150, // 최소 높이 설정
   },
   featureIcon: {
     width: 60,
@@ -905,7 +1018,7 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: 'bold',
     color: '#1F2937',
-    marginBottom: 8,
+    marginBottom: 16,
     
   },
   featureDescription: {
@@ -914,9 +1027,21 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     lineHeight: 30,
   },
+  noReservationContainer: {
+    paddingTop: 32,
+    paddingBottom: 16,
+    alignItems: 'center',
+  },
+  noReservationText: {
+    fontSize: 16,
+    color: '#6B7280',
+    textAlign: 'center',
+    marginBottom: 16,
+    fontWeight: '500',
+  },
   actionSection: {
     paddingHorizontal: 16,
-    paddingTop: 16,
+    paddingTop: 0,
     flexDirection: 'row',
     gap: 12,
   },
@@ -984,11 +1109,11 @@ const styles = StyleSheet.create({
     fontSize: 12,
     color: '#4495E8',
     textAlign: 'center',
-    marginTop: 8,
+    marginTop: 16,
     fontWeight: '500',
   },
   reportButtonContainer: {
-    marginTop: 12,
+    marginTop: 16,
     width: '100%',
   },
   reportButton: {
@@ -1086,7 +1211,7 @@ const styles = StyleSheet.create({
     backgroundColor: '#F8FAFC',
     borderRadius: 12,
     padding: 20,
-    marginBottom: 20,
+    marginBottom: 16,
   },
   vehicleIconContainer: {
     alignItems: 'center',
@@ -1158,5 +1283,45 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: '600',
     color: '#EF4444',
+  },
+  // 차량 추가 컨텐츠 (차량 없을 때)
+  addVehicleContent: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingVertical: 8,
+  },
+  addVehicleIconContainer: {
+    position: 'relative',
+    marginBottom: 16,
+  },
+  addVehiclePlusBadge: {
+    position: 'absolute',
+    top: -8,
+    right: -8,
+    backgroundColor: '#4495E8',
+    borderRadius: 12,
+    width: 24,
+    height: 24,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 2,
+    borderColor: '#FFFFFF',
+  },
+  addVehicleTextContainer: {
+    alignItems: 'center',
+  },
+  addVehicleTitle: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#1F2937',
+    marginBottom: 4,
+    textAlign: 'center',
+  },
+  addVehicleSubtitle: {
+    fontSize: 11,
+    color: '#6B7280',
+    lineHeight: 14,
+    textAlign: 'center',
   },
 });

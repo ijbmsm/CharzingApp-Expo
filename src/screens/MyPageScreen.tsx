@@ -19,8 +19,10 @@ import { logout, updateUserProfile } from '../store/slices/authSlice';
 import Header from '../components/Header';
 // 카카오 로그인 서비스 제거됨
 import firebaseService from '../services/firebaseService';
+import authPersistenceService from '../services/authPersistenceService';
 import { RootStackParamList } from '../navigation/RootNavigator';
 import { Ionicons } from '@expo/vector-icons';
+import devLog from '../utils/devLog';
 
 type NavigationProp = StackNavigationProp<RootStackParamList>;
 
@@ -38,7 +40,7 @@ const AuthenticatedMyPage: React.FC<{
   
   // 편집 관련 상태
   const [showEditModal, setShowEditModal] = useState(false);
-  const [editingField, setEditingField] = useState<'displayName' | 'realName' | null>(null);
+  const [editingField, setEditingField] = useState<'realName' | null>(null);
   const [editValue, setEditValue] = useState('');
   const [updating, setUpdating] = useState(false);
 
@@ -49,7 +51,7 @@ const AuthenticatedMyPage: React.FC<{
       const profile = await firebaseService.getUserProfile(user.uid);
       setFirebaseUser(profile);
     } catch (error) {
-      console.error('사용자 프로필 로드 실패:', error);
+      devLog.error('사용자 프로필 로드 실패:', error);
     } finally {
       setProfileLoading(false);
     }
@@ -60,10 +62,8 @@ const AuthenticatedMyPage: React.FC<{
   }, [loadUserProfile]);
 
   // 편집 시작 함수
-  const startEdit = (field: 'displayName' | 'realName') => {
-    const currentValue = field === 'displayName' 
-      ? displayUser?.displayName || ''
-      : displayUser?.realName || '';
+  const startEdit = (field: 'realName') => {
+    const currentValue = displayUser?.realName || '';
     
     setEditingField(field);
     setEditValue(currentValue);
@@ -84,9 +84,7 @@ const AuthenticatedMyPage: React.FC<{
       };
       
       // 필드에 따라 업데이트
-      if (editingField === 'displayName') {
-        updateData.displayName = editValue.trim() || '사용자';
-      } else if (editingField === 'realName') {
+      if (editingField === 'realName') {
         updateData.realName = editValue.trim();
       }
       
@@ -106,7 +104,7 @@ const AuthenticatedMyPage: React.FC<{
       Alert.alert('성공', '프로필이 업데이트되었습니다.');
       
     } catch (error) {
-      console.error('프로필 업데이트 실패:', error);
+      devLog.error('프로필 업데이트 실패:', error);
       Alert.alert('오류', '프로필 업데이트에 실패했습니다.');
     } finally {
       setUpdating(false);
@@ -123,7 +121,7 @@ const AuthenticatedMyPage: React.FC<{
   const displayUser = firebaseUser || user;
 
   return (
-    <SafeAreaView style={styles.container}>
+    <SafeAreaView style={styles.container} edges={['top']}>
       <Header title="마이페이지" showLogo={false} />
       <ScrollView 
         style={styles.content}
@@ -155,18 +153,6 @@ const AuthenticatedMyPage: React.FC<{
             </View>
           )}
           
-          {/* 닉네임 (displayName) */}
-          <View style={styles.nameRow}>
-            <Text style={[styles.userName, { fontSize: displayUser?.realName ? 14 : 18 }]}>
-              {displayUser?.realName ? '닉네임: ' : ''}{displayUser?.displayName || '사용자'}{displayUser?.realName ? '' : '님'}
-            </Text>
-            <TouchableOpacity 
-              style={styles.editButton}
-              onPress={() => startEdit('displayName')}
-            >
-              <Ionicons name="pencil" size={16} color="#666" />
-            </TouchableOpacity>
-          </View>
           
           
           {displayUser?.email && (
@@ -226,14 +212,14 @@ const AuthenticatedMyPage: React.FC<{
         <View style={styles.modalOverlay}>
           <View style={styles.modalContent}>
             <Text style={styles.modalTitle}>
-              {editingField === 'displayName' ? '닉네임 수정' : '실명 수정'}
+              실명 수정
             </Text>
             
             <TextInput
               style={styles.modalInput}
               value={editValue}
               onChangeText={setEditValue}
-              placeholder={editingField === 'displayName' ? '닉네임을 입력하세요' : '실명을 입력하세요'}
+              placeholder="실명을 입력하세요"
               autoFocus={true}
               maxLength={20}
             />
@@ -283,11 +269,13 @@ const MyPageScreen: React.FC = () => {
           style: 'destructive',
           onPress: async () => {
             try {
-              console.log('회원탈퇴 시작...');
+              devLog.log('회원탈퇴 시작...');
               
               // Firebase Auth 로그아웃 먼저 처리
               await firebaseService.signOut();
-              console.log('계정 삭제 처리 완료');
+              // 커스텀 persistence 데이터 삭제
+              await authPersistenceService.clearAuthState();
+              devLog.log('계정 삭제 처리 완료');
               
               // Redux 상태 초기화
               dispatch(logout());
@@ -298,7 +286,7 @@ const MyPageScreen: React.FC = () => {
                 [{ text: '확인' }]
               );
             } catch (error) {
-              console.error('회원탈퇴 오류:', error);
+              devLog.error('회원탈퇴 오류:', error);
               Alert.alert(
                 '탈퇴 실패',
                 '회원탈퇴 중 오류가 발생했습니다. 다시 시도해주세요.',
@@ -327,10 +315,15 @@ const MyPageScreen: React.FC = () => {
             try {
               // Firebase Auth 로그아웃 먼저 처리
               await firebaseService.signOut();
+              // 커스텀 persistence 데이터 삭제
+              await authPersistenceService.clearAuthState();
               // Redux 상태 초기화
               dispatch(logout());
+              devLog.log('✅ 로그아웃 완료 (Firebase Auth + 커스텀 persistence 삭제)');
             } catch (error) {
-              console.error('로그아웃 오류:', error);
+              devLog.error('로그아웃 오류:', error);
+              // 오류가 있어도 커스텀 persistence 삭제 시도
+              await authPersistenceService.clearAuthState();
               dispatch(logout()); // 오류가 있어도 앱에서는 로그아웃
             }
           },
@@ -341,27 +334,24 @@ const MyPageScreen: React.FC = () => {
 
   if (!isAuthenticated) {
     return (
-      <SafeAreaView style={styles.container}>
+      <SafeAreaView style={styles.container} edges={['top']}>
         <Header title="마이페이지" showLogo={false} />
         <ScrollView 
           style={styles.content}
           contentContainerStyle={{ flexGrow: 1 }}
         >
           <View style={styles.profileSection}>
-            <View style={styles.avatar}>
-              <Text style={styles.avatarText}>👤</Text>
-            </View>
-            <Text style={styles.userName}>로그인이 필요합니다</Text>
-            <Text style={styles.userEmail}>
-              소셜 계정으로 로그인해주세요
+            <Text style={styles.loginTitle}>로그인이 필요합니다</Text>
+            <Text style={styles.loginSubtitle}>
+              소셜 계정으로 간편하게 로그인하세요
             </Text>
             
             <TouchableOpacity 
               style={styles.loginButton}
               onPress={() => navigation.navigate('Login', { showBackButton: true })}
             >
-              <Ionicons name="log-in-outline" size={20} color="#FFFFFF" />
-              <Text style={styles.loginButtonText}>로그인</Text>
+              <Ionicons name="log-in-outline" size={22} color="#FFFFFF" />
+              <Text style={styles.loginButtonText}>로그인하기</Text>
             </TouchableOpacity>
           </View>
           
@@ -397,33 +387,51 @@ const styles = StyleSheet.create({
   },
   profileSection: {
     backgroundColor: '#FFFFFF',
-    padding: 24,
+    paddingVertical: 48,
+    paddingHorizontal: 32,
     alignItems: 'center',
     borderBottomWidth: 1,
     borderBottomColor: '#E5E7EB',
   },
   avatar: {
-    width: 80,
-    height: 80,
-    borderRadius: 40,
-    backgroundColor: '#F3F4F6',
+    width: 96,
+    height: 96,
+    borderRadius: 48,
+    backgroundColor: '#F8FAFC',
     alignItems: 'center',
     justifyContent: 'center',
-    marginBottom: 16,
+    marginBottom: 24,
+    borderWidth: 3,
+    borderColor: '#E2E8F0',
   },
   avatarText: {
-    fontSize: 32,
+    fontSize: 40,
+    opacity: 0.7,
   },
   avatarImage: {
-    width: 80,
-    height: 80,
-    borderRadius: 40,
+    width: 96,
+    height: 96,
+    borderRadius: 48,
   },
   userName: {
     fontSize: 20,
     fontWeight: 'bold',
     color: '#1F2937',
     marginBottom: 4,
+  },
+  loginTitle: {
+    fontSize: 24,
+    fontWeight: '700',
+    color: '#1F2937',
+    marginBottom: 8,
+    textAlign: 'center',
+  },
+  loginSubtitle: {
+    fontSize: 16,
+    color: '#6B7280',
+    marginBottom: 32,
+    textAlign: 'center',
+    lineHeight: 22,
   },
   userEmail: {
     fontSize: 14,
@@ -473,17 +481,27 @@ const styles = StyleSheet.create({
   loginButton: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#FEE500',
-    paddingHorizontal: 24,
-    paddingVertical: 12,
-    borderRadius: 8,
-    gap: 8,
-    marginTop: 16,
+    justifyContent: 'center',
+    backgroundColor: '#3B82F6',
+    paddingHorizontal: 32,
+    paddingVertical: 16,
+    borderRadius: 12,
+    gap: 10,
+    marginTop: 0,
+    shadowColor: '#3B82F6',
+    shadowOffset: {
+      width: 0,
+      height: 4,
+    },
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
+    elevation: 8,
   },
   loginButtonText: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: '#3C1E1E',
+    fontSize: 18,
+    fontWeight: '700',
+    color: '#FFFFFF',
+    letterSpacing: 0.5,
   },
   disabledMenuItem: {
     opacity: 0.5,

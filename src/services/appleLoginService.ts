@@ -1,8 +1,9 @@
 import * as AppleAuthentication from 'expo-apple-authentication';
 import { OAuthProvider, signInWithCredential, signInWithCustomToken, User } from 'firebase/auth';
-import { auth } from '../firebase/config';
+import { getAuthInstance } from '../firebase/config';
 import Constants from 'expo-constants';
 import firebaseService from './firebaseService';
+import devLog from '../utils/devLog';
 
 interface AppleAuthResult {
   success: boolean;
@@ -31,7 +32,7 @@ class AppleLoginService {
         ],
       });
 
-      console.log('🍎 Apple Sign-In credential:', {
+      devLog.log('🍎 Apple Sign-In credential:', {
         user: credential.user,
         email: credential.email,
         fullName: credential.fullName,
@@ -51,25 +52,34 @@ class AppleLoginService {
       });
 
       // Firebase Apple Sign-In 직접 로그인 (세션 유지)
-      const userCredential = await signInWithCredential(auth, firebaseCredential);
+      devLog.log('🔗 Firebase signInWithCredential 시작...');
+      const userCredential = await signInWithCredential(getAuthInstance(), firebaseCredential);
       const firebaseUser = userCredential.user;
       const isNewUser = (userCredential as any).additionalUserInfo?.isNewUser;
 
-      console.log('🔥 Firebase Apple Sign-In successful:', {
+      devLog.log('🔥 Firebase Apple Sign-In successful:', {
         uid: firebaseUser.uid,
         email: firebaseUser.email,
         displayName: firebaseUser.displayName,
         isNewUser: isNewUser
       });
 
+      // 세션 저장 확인
+      const auth = getAuthInstance();
+      devLog.log('🔍 Firebase Auth 세션 확인:', {
+        currentUserUid: auth.currentUser?.uid,
+        isCurrentUserSame: auth.currentUser?.uid === firebaseUser.uid,
+        authReady: !!auth.currentUser
+      });
+
       // 🔑 ID Token 강제 갱신 (Callable Functions 인증을 위해)
-      console.log('🔄 ID Token 강제 갱신 중...');
+      devLog.log('🔄 ID Token 강제 갱신 중...');
       const newIdToken = await firebaseUser.getIdToken(true);
-      console.log('✅ 새 ID Token 발급 완료, 길이:', newIdToken.length);
+      devLog.log('✅ 새 ID Token 발급 완료, 길이:', newIdToken.length);
 
       // Firestore에 사용자 정보 저장 또는 업데이트
       try {
-        console.log('📝 Firestore 사용자 프로필 저장/업데이트 중...');
+        devLog.log('📝 Firestore 사용자 프로필 저장/업데이트 중...');
         
         // 기존 사용자 정보 확인
         const existingProfile = await firebaseService.getUserProfile(firebaseUser.uid);
@@ -78,10 +88,15 @@ class AppleLoginService {
           // 신규 사용자 - 전체 프로필 생성
           // Apple에서 제공하는 이름 정보 활용
           let displayName = 'Apple 사용자';
+          let realName = '';
+          
           if (credential.fullName) {
             const { givenName, familyName } = credential.fullName;
             if (givenName || familyName) {
-              displayName = [familyName, givenName].filter(Boolean).join(' ');
+              // Apple에서는 보통 서구식 이름 순서 (이름 성)이므로 한국식으로 조정
+              const fullNameParts = [familyName, givenName].filter(Boolean);
+              displayName = fullNameParts.join(' ');
+              realName = fullNameParts.join(' ');
             }
           } else if (firebaseUser.email) {
             // 이메일에서 이름 추출
@@ -95,23 +110,24 @@ class AppleLoginService {
             uid: firebaseUser.uid,
             email: firebaseUser.email || credential.email || '',
             displayName: displayName,
+            realName: realName || displayName, // realName이 없으면 displayName 사용
             provider: 'apple',
             photoURL: firebaseUser.photoURL || '',
             appleId: firebaseUser.uid,
             isRegistrationComplete: false,
           });
-          console.log('✅ 신규 사용자 문서 생성 완료:', firebaseUser.uid, 'displayName:', displayName);
+          devLog.log('✅ 신규 사용자 문서 생성 완료:', firebaseUser.uid, 'displayName:', displayName, 'realName:', realName);
         } else {
           // 기존 사용자 - 로그인 시간만 업데이트
-          console.log('✅ 기존 사용자 확인, displayName:', existingProfile.displayName);
+          devLog.log('✅ 기존 사용자 확인, displayName:', existingProfile.displayName);
           // 마지막 로그인 시간 업데이트
           await firebaseService.updateUserLastLogin(firebaseUser.uid);
         }
       } catch (error) {
-        console.log('⚠️ Firestore 사용자 정보 처리 에러:', error);
+        devLog.log('⚠️ Firestore 사용자 정보 처리 에러:', error);
       }
 
-      console.log('✅ Apple 로그인 및 Firebase Auth 세션 유지 완료');
+      devLog.log('✅ Apple 로그인 및 Firebase Auth 세션 유지 완료');
 
       return {
         success: true,
@@ -120,7 +136,12 @@ class AppleLoginService {
       };
 
     } catch (error: any) {
-      console.error('❌ Apple Sign-In error:', error);
+      devLog.error('❌ Apple Sign-In error:', error);
+      devLog.error('❌ Error details:', {
+        code: error.code,
+        message: error.message,
+        stack: error.stack?.substring(0, 200)
+      });
 
       // 사용자가 취소한 경우
       if (error.code === 'ERR_REQUEST_CANCELED') {
@@ -147,10 +168,10 @@ class AppleLoginService {
 
   async logout(): Promise<void> {
     try {
-      await auth.signOut();
-      console.log('🍎 Apple Sign-Out completed');
+      await getAuthInstance().signOut();
+      devLog.log('🍎 Apple Sign-Out completed');
     } catch (error) {
-      console.error('❌ Apple Sign-Out error:', error);
+      devLog.error('❌ Apple Sign-Out error:', error);
       throw error;
     }
   }
@@ -159,11 +180,11 @@ class AppleLoginService {
   async revokeAccess(): Promise<boolean> {
     try {
       await (AppleAuthentication as any).revokeAsync();
-      await auth.signOut();
-      console.log('🍎 Apple account access revoked');
+      await getAuthInstance().signOut();
+      devLog.log('🍎 Apple account access revoked');
       return true;
     } catch (error) {
-      console.error('❌ Apple access revoke error:', error);
+      devLog.error('❌ Apple access revoke error:', error);
       return false;
     }
   }

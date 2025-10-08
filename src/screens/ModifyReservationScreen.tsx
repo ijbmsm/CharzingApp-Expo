@@ -30,7 +30,7 @@ const ModifyReservationScreen: React.FC = () => {
   const { reservation } = route.params;
 
   const [loading, setLoading] = useState(false);
-  const [step, setStep] = useState(1); // 1: 위치, 2: 날짜/시간, 3: 확인
+  const [step, setStep] = useState(1); // 1: 위치, 2: 날짜/시간, 3: 차량/서비스/연락처, 4: 확인
   
   // 위치 관련 상태
   const [userLocation, setUserLocation] = useState({
@@ -47,6 +47,19 @@ const ModifyReservationScreen: React.FC = () => {
   const [timeSlots, setTimeSlots] = useState<{ id: string; time: string; available: boolean; }[]>([]);
   const [isLoadingTimeSlots, setIsLoadingTimeSlots] = useState(false);
 
+  // 차량 정보 상태
+  const [vehicleBrand, setVehicleBrand] = useState('');
+  const [vehicleModel, setVehicleModel] = useState('');
+  const [vehicleYear, setVehicleYear] = useState('');
+
+  // 서비스 정보 상태
+  const [serviceType, setServiceType] = useState('');
+  const [servicePrice, setServicePrice] = useState(0);
+
+  // 연락처 정보 상태
+  const [userName, setUserName] = useState('');
+  const [userPhone, setUserPhone] = useState('');
+
   // 초기값 설정
   useEffect(() => {
     if (reservation) {
@@ -57,6 +70,19 @@ const ModifyReservationScreen: React.FC = () => {
       setUserAddress(reservation.address);
       setDetailAddress(reservation.detailAddress || '');
       setNotes(((reservation as any).notes as string) || '');
+
+      // 차량 정보 설정
+      setVehicleBrand(((reservation as any).vehicleBrand as string) || '');
+      setVehicleModel(((reservation as any).vehicleModel as string) || '');
+      setVehicleYear(((reservation as any).vehicleYear as string) || '');
+
+      // 서비스 정보 설정
+      setServiceType(((reservation as any).serviceType as string) || '');
+      setServicePrice(((reservation as any).servicePrice as number) || 0);
+
+      // 연락처 정보 설정
+      setUserName(((reservation as any).userName as string) || '');
+      setUserPhone(((reservation as any).userPhone as string) || '');
 
       // 기존 예약 날짜 설정 (개선된 로직)
       console.log('🔧 기존 예약 날짜 파싱 시작');
@@ -197,12 +223,39 @@ const ModifyReservationScreen: React.FC = () => {
         return;
       }
       setStep(3);
+    } else if (step === 3) {
+      // 차량/서비스/연락처 정보 검증
+      if (!vehicleBrand.trim() || !vehicleModel.trim() || !vehicleYear.trim()) {
+        Alert.alert('알림', '차량 정보를 모두 입력해주세요.');
+        return;
+      }
+      if (!serviceType.trim()) {
+        Alert.alert('알림', '서비스 유형을 선택해주세요.');
+        return;
+      }
+      if (!userName.trim() || !userPhone.trim()) {
+        Alert.alert('알림', '연락처 정보를 모두 입력해주세요.');
+        return;
+      }
+      setStep(4);
     }
   };
 
   const handlePrevStep = () => {
     if (step > 1) {
       setStep(step - 1);
+    }
+  };
+
+  // 전화번호 포맷팅
+  const formatPhoneNumber = (phone: string): string => {
+    const numbers = phone.replace(/[^0-9]/g, '');
+    if (numbers.length <= 3) {
+      return numbers;
+    } else if (numbers.length <= 7) {
+      return `${numbers.slice(0, 3)}-${numbers.slice(3)}`;
+    } else {
+      return `${numbers.slice(0, 3)}-${numbers.slice(3, 7)}-${numbers.slice(7, 11)}`;
     }
   };
 
@@ -272,6 +325,14 @@ const ModifyReservationScreen: React.FC = () => {
         longitude: userLocation.longitude,
         requestedDate: requestedDateTime,
         notes: notes.trim() || undefined,
+        // 새로 추가된 필드들
+        vehicleBrand: vehicleBrand.trim() || undefined,
+        vehicleModel: vehicleModel.trim() || undefined,
+        vehicleYear: vehicleYear.trim() || undefined,
+        serviceType: serviceType.trim() || undefined,
+        servicePrice: servicePrice || undefined,
+        userName: userName.trim() || undefined,
+        userPhone: userPhone.replace(/[^0-9]/g, '') || undefined,
       };
 
       console.log('📝 수정 데이터:', updateData);
@@ -384,6 +445,97 @@ const ModifyReservationScreen: React.FC = () => {
       case 3:
         return (
           <View style={styles.stepContent}>
+            <Text style={styles.stepTitle}>추가 정보 수정</Text>
+            
+            {/* 차량 정보 */}
+            <View style={styles.section}>
+              <Text style={styles.sectionTitle}>차량 정보</Text>
+              <View style={styles.inputGroup}>
+                <Text style={styles.inputLabel}>브랜드</Text>
+                <TextInput
+                  style={styles.textInput}
+                  placeholder="차량 브랜드 (예: 현대, 기아, BMW)"
+                  value={vehicleBrand}
+                  onChangeText={setVehicleBrand}
+                />
+              </View>
+              <View style={styles.inputGroup}>
+                <Text style={styles.inputLabel}>모델</Text>
+                <TextInput
+                  style={styles.textInput}
+                  placeholder="차량 모델 (예: 소나타, K5, 320i)"
+                  value={vehicleModel}
+                  onChangeText={setVehicleModel}
+                />
+              </View>
+              <View style={styles.inputGroup}>
+                <Text style={styles.inputLabel}>연식</Text>
+                <TextInput
+                  style={styles.textInput}
+                  placeholder="연식 (예: 2023)"
+                  value={vehicleYear}
+                  onChangeText={setVehicleYear}
+                  keyboardType="numeric"
+                />
+              </View>
+            </View>
+
+            {/* 서비스 정보 */}
+            <View style={styles.section}>
+              <Text style={styles.sectionTitle}>서비스 정보</Text>
+              <View style={styles.inputGroup}>
+                <Text style={styles.inputLabel}>서비스 유형</Text>
+                <TextInput
+                  style={styles.textInput}
+                  placeholder="서비스 유형 (예: 방문 진단, 종합 점검)"
+                  value={serviceType}
+                  onChangeText={setServiceType}
+                />
+              </View>
+              <View style={styles.inputGroup}>
+                <Text style={styles.inputLabel}>예상 비용 (원)</Text>
+                <TextInput
+                  style={styles.textInput}
+                  placeholder="예상 비용 (예: 50000)"
+                  value={servicePrice.toString()}
+                  onChangeText={(text) => setServicePrice(parseInt(text) || 0)}
+                  keyboardType="numeric"
+                />
+              </View>
+            </View>
+
+            {/* 연락처 정보 */}
+            <View style={styles.section}>
+              <Text style={styles.sectionTitle}>연락처 정보</Text>
+              <View style={styles.inputGroup}>
+                <Text style={styles.inputLabel}>이름</Text>
+                <TextInput
+                  style={styles.textInput}
+                  placeholder="이름"
+                  value={userName}
+                  onChangeText={setUserName}
+                />
+              </View>
+              <View style={styles.inputGroup}>
+                <Text style={styles.inputLabel}>전화번호</Text>
+                <TextInput
+                  style={styles.textInput}
+                  placeholder="010-0000-0000"
+                  value={userPhone}
+                  onChangeText={(text) => {
+                    const formatted = formatPhoneNumber(text);
+                    setUserPhone(formatted);
+                  }}
+                  keyboardType="phone-pad"
+                  maxLength={13}
+                />
+              </View>
+            </View>
+          </View>
+        );
+      case 4:
+        return (
+          <View style={styles.stepContent}>
             <Text style={styles.stepTitle}>수정 내용 확인</Text>
             <Text style={styles.stepDescription}>
               아래 내용으로 예약을 수정하시겠습니까?
@@ -438,7 +590,7 @@ const ModifyReservationScreen: React.FC = () => {
       <ScrollView style={styles.content} contentContainerStyle={{ flexGrow: 1 }}>
         {/* 진행 단계 표시 */}
         <View style={styles.progressContainer}>
-          {[1, 2, 3].map((stepNumber) => (
+          {[1, 2, 3, 4].map((stepNumber) => (
             <View key={stepNumber} style={styles.progressStep}>
               <View style={[
                 styles.progressCircle,
@@ -664,6 +816,36 @@ const styles = StyleSheet.create({
   },
   disabledButton: {
     opacity: 0.6,
+  },
+  section: {
+    backgroundColor: '#FFFFFF',
+    borderRadius: 12,
+    padding: 16,
+    marginBottom: 16,
+  },
+  sectionTitle: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    color: '#1F2937',
+    marginBottom: 16,
+  },
+  inputGroup: {
+    marginBottom: 16,
+  },
+  inputLabel: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#374151',
+    marginBottom: 8,
+  },
+  textInput: {
+    borderWidth: 1,
+    borderColor: '#D1D5DB',
+    borderRadius: 8,
+    padding: 12,
+    fontSize: 16,
+    color: '#1F2937',
+    backgroundColor: '#FFFFFF',
   },
 });
 

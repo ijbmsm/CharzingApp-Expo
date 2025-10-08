@@ -31,7 +31,7 @@ const DiagnosticScreen: React.FC = () => {
   };
 
   return (
-    <SafeAreaView style={styles.container}>
+    <SafeAreaView style={styles.container} edges={['top']}>
       <Header title="진단 예약" showLogo={false} />
       <ScrollView 
         style={styles.content}

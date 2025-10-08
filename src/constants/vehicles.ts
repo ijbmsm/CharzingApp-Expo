@@ -403,3 +403,70 @@ export const getModelById = (brandId: string, modelId: string): VehicleModel | u
   const models = getModelsByBrand(brandId);
   return models.find(model => model.id === modelId);
 };
+
+// 서비스 타입 정의 (웹과 동일한 구조)
+export interface ReservationType {
+  id: 'standard' | 'premium';
+  name: string;
+  price: number;
+  description: string;
+  features: string[];
+}
+
+export const RESERVATION_TYPES: ReservationType[] = [
+  {
+    id: 'standard',
+    name: '스탠다드',
+    price: 70000,
+    description: '여러 차량 비교가 필요할 때 경제적인 선택',
+    features: [
+      'OBD2 단자를 통한 진단',
+      '공식 서비스 센터 측정 방식',
+      'BMS 정보 기반 배터리 상태 분석',
+      '자체 배터리 리포트 제공',
+      '1의 자리 단위 SOH 제공(예, 93%)',
+      '배터리 외 기본 항목 진단 제공'
+    ]
+  },
+  {
+    id: 'premium',
+    name: '프리미엄',
+    price: 150000,
+    description: '정확한 배터리 성능 분석이 필요할 때',
+    features: [
+      'OBD2 단자를 통한 진단',
+      '독립 실제 측정을 통한 진단',
+      'TUV 독일 인증 받은 장비 및 기술',
+      '소수점 첫째 자리 SOH 제공(예, 93.7%)',
+      '성능 보증 배터리 리포트 제공',
+      '배터리 센서, BMS 점검 포함',
+      '배터리 외 기본 항목 진단 제공'
+    ]
+  }
+];
+
+// 예약 인터페이스 정의 (웹과 동일한 구조)
+export interface ReservationFormData {
+  // 차량 정보
+  vehicleBrand: string;
+  vehicleModel: string;
+  vehicleYear: string;
+  
+  // 서비스 정보
+  serviceType: string;
+  servicePrice: number;
+  
+  // 위치 정보
+  address: string;
+  detailAddress?: string;
+  latitude: number;
+  longitude: number;
+  
+  // 예약 정보
+  requestedDate: Date;
+  
+  // 연락처 정보
+  userName: string;
+  userPhone: string;
+  notes?: string;
+}

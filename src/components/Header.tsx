@@ -10,7 +10,14 @@ import {
 import { Ionicons } from '@expo/vector-icons';
 import { useSelector } from 'react-redux';
 import { RootState } from '../store';
+import { useNavigation, NavigationProp } from '@react-navigation/native';
 import NotificationModal from './NotificationModal';
+
+// Navigation types
+type RootStackParamList = {
+  Login: { showBackButton?: boolean; message?: string } | undefined;
+  // Add other screens as needed
+};
 
 interface HeaderProps {
   title?: string;
@@ -29,8 +36,19 @@ const Header: React.FC<HeaderProps> = ({
   onLogoPress,
   onBackPress,
 }) => {
+  const navigation = useNavigation<NavigationProp<RootStackParamList>>();
   const [isNotificationModalVisible, setIsNotificationModalVisible] = useState(false);
   const { unreadCount } = useSelector((state: RootState) => state.notification);
+  const { isAuthenticated } = useSelector((state: RootState) => state.auth);
+
+  const handleNotificationPress = () => {
+    if (!isAuthenticated) {
+      navigation.navigate('Login');
+      return;
+    }
+    setIsNotificationModalVisible(true);
+  };
+
   return (
     <SafeAreaView style={styles.container}>
       <View style={styles.header}>
@@ -54,11 +72,11 @@ const Header: React.FC<HeaderProps> = ({
 
         {showNotification && (
           <TouchableOpacity
-            onPress={() => setIsNotificationModalVisible(true)}
+            onPress={handleNotificationPress}
             style={styles.notificationButton}
           >
             <Ionicons name="notifications-outline" size={24} color="#1F2937" />
-            {unreadCount > 0 && (
+            {isAuthenticated && unreadCount > 0 && (
               <View style={styles.badge}>
                 <Text style={styles.badgeText}>
                   {unreadCount > 99 ? '99+' : unreadCount.toString()}

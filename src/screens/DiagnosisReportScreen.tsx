@@ -16,6 +16,7 @@ import { MaterialCommunityIcons, Ionicons } from '@expo/vector-icons';
 import Header from '../components/Header';
 import LoadingSpinner from '../components/LoadingSpinner';
 import firebaseService, { DiagnosisReport } from '../services/firebaseService';
+import devLog from '../utils/devLog';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'DiagnosisReport'>;
 
@@ -49,7 +50,7 @@ const DiagnosisReportScreen: React.FC<Props> = ({navigation, route}) => {
       
       setReport(reportData);
     } catch (error) {
-      console.error('리포트 로드 실패:', error);
+      devLog.error('리포트 로드 실패:', error);
       Alert.alert('오류', '리포트를 불러올 수 없습니다.');
       navigation.goBack();
     } finally {
@@ -66,7 +67,7 @@ const DiagnosisReportScreen: React.FC<Props> = ({navigation, route}) => {
         Alert.alert('오류', '파일을 열 수 없습니다.');
       }
     } catch (error) {
-      console.error('파일 열기 실패:', error);
+      devLog.error('파일 열기 실패:', error);
       Alert.alert('오류', '파일을 열 수 없습니다.');
     }
   };

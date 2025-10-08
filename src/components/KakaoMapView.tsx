@@ -3,6 +3,7 @@ import { StyleSheet, View, Text, ActivityIndicator, TouchableOpacity } from 'rea
 // 📦 WebView는 HTML 기반 지도를 앱 화면에 띄워주는 도구입니다.
 import { WebView } from 'react-native-webview';
 import Constants from 'expo-constants';
+import devLog from '../utils/devLog';
 
 // 💡 KakaoMapView 컴포넌트가 받을 수 있는 props
 type KakaoMapViewProps = {
@@ -39,7 +40,7 @@ function KakaoMapView({
       
       // 지도 로딩 완료 메시지 처리
       if (message === 'MAP_LOADED') {
-        console.log('🗺️ 지도 로딩 완료');
+        devLog.log('🗺️ 지도 로딩 완료');
         setIsLoading(false);
         setHasError(false);
         return;
@@ -47,7 +48,7 @@ function KakaoMapView({
       
       // 지도 로딩 실패 메시지 처리
       if (message.startsWith('MAP_ERROR:')) {
-        console.error('🗺️ 지도 로딩 실패:', message);
+        devLog.error('🗺️ 지도 로딩 실패:', message);
         setIsLoading(false);
         setHasError(true);
         setErrorMessage(message.replace('MAP_ERROR:', ''));
@@ -64,7 +65,7 @@ function KakaoMapView({
       // 일반 로그 메시지인 경우 (중요한 것만 출력)
       if (typeof message === 'string' && !message.startsWith('{')) {
         if (message.includes('MAP_LOADED') || message.includes('ERROR') || message.includes('오류')) {
-          console.log('🗺️ Kakao Map:', message);
+          devLog.log('🗺️ Kakao Map:', message);
         }
         return;
       }
@@ -72,17 +73,17 @@ function KakaoMapView({
       // JSON 메시지인 경우 (지도 클릭 등)
       const data = JSON.parse(message);
       if (data.type === 'mapClick' && onMapClick) {
-        console.log('🖱️ 지도 클릭:', data.latitude, data.longitude);
+        devLog.log('🖱️ 지도 클릭:', data.latitude, data.longitude);
         onMapClick(data.latitude, data.longitude);
       }
     } catch (error) {
-      console.log('🗺️ Kakao Map:', event.nativeEvent.data);
+      devLog.log('🗺️ Kakao Map:', event.nativeEvent.data);
     }
   };
 
   // 재시도 함수
   const handleRetry = () => {
-    console.log('🔄 지도 재시도 시작:', retryCount + 1);
+    devLog.log('🔄 지도 재시도 시작:', retryCount + 1);
     setIsRetrying(true);
     setRetryCount(prev => prev + 1);
     setHasError(false);
@@ -122,15 +123,15 @@ function KakaoMapView({
           }
 
           window.onload = function() {
-            console.log("🗺️ Window onload 이벤트");
+            devLog.log("🗺️ Window onload 이벤트");
 
             // kakao.maps.load 안에서 실행
             kakao.maps.load(function () {
-              console.log("🗺️ kakao.maps.load 함수 실행");
+              devLog.log("🗺️ kakao.maps.load 함수 실행");
 
               var container = document.getElementById('map');
               if (!container) {
-                console.error("지도 컨테이너를 찾을 수 없습니다");
+                devLog.error("지도 컨테이너를 찾을 수 없습니다");
                 sendMessage('MAP_ERROR:지도 컨테이너를 찾을 수 없습니다');
                 return;
               }
@@ -167,10 +168,10 @@ function KakaoMapView({
                   }));
                 });
 
-                console.log("🗺️ 지도 생성 완료");
+                devLog.log("🗺️ 지도 생성 완료");
                 sendMessage('MAP_LOADED');
               } catch (e) {
-                console.error("지도 생성 중 오류:", e);
+                devLog.error("지도 생성 중 오류:", e);
                 sendMessage('MAP_ERROR:지도 생성 중 오류: ' + e.message);
               }
             });
@@ -195,13 +196,13 @@ function KakaoMapView({
           // WebView 로드는 성공했지만 지도는 아직 로딩 중일 수 있음
         }}
         onError={(e) => {
-          console.error("❌ WebView error: ", e.nativeEvent);
+          devLog.error("❌ WebView error: ", e.nativeEvent);
           setIsLoading(false);
           setHasError(true);
           setErrorMessage('WebView 로딩 실패');
         }}
         onHttpError={(e) => {
-          console.error("❌ WebView HTTP error: ", e.nativeEvent);
+          devLog.error("❌ WebView HTTP error: ", e.nativeEvent);
           setIsLoading(false);
           setHasError(true);
           setErrorMessage('네트워크 오류');

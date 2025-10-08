@@ -95,8 +95,11 @@ const ReservationDetailScreen: React.FC = () => {
       return;
     }
 
-    // 예약 수정 화면으로 이동
-    navigation.navigate('ModifyReservation', { reservation: currentReservation });
+    // 예약 수정 화면으로 이동 (ReservationScreen을 수정 모드로 사용)
+    navigation.navigate('Reservation', { 
+      editMode: true, 
+      existingReservation: currentReservation 
+    });
   };
 
   const handleCancelReservation = () => {
@@ -200,7 +203,7 @@ const ReservationDetailScreen: React.FC = () => {
   };
 
   return (
-    <SafeAreaView style={styles.container}>
+    <SafeAreaView style={styles.container} edges={['top']}>
       <Header 
         title="예약 상세" 
         showLogo={false} 
@@ -248,38 +251,96 @@ const ReservationDetailScreen: React.FC = () => {
           )}
         </View>
 
-        {/* 예약 정보 */}
+
+        {/* 예약 상세 정보 */}
         <View style={styles.section}>
-          <Text style={styles.sectionTitle}>예약 정보</Text>
+          <Text style={styles.sectionTitle}>예약 상세</Text>
           
-          <View style={styles.infoRow}>
-            <Ionicons name="calendar-outline" size={20} color="#6B7280" />
-            <View style={styles.infoContent}>
-              <Text style={styles.infoLabel}>예약 일시</Text>
-              <Text style={styles.infoValue}>{formatDate(currentReservation.requestedDate)}</Text>
-            </View>
+          <View style={styles.kakaoRow}>
+            <Text style={styles.kakaoLabel}>서비스 종류</Text>
+            <Text style={styles.kakaoValue}>
+              {(() => {
+                const serviceType = currentReservation.serviceType || '스탠다드';
+                const servicePrice = currentReservation.servicePrice;
+                
+                if (servicePrice === 70000) {
+                  return '스탠다드';
+                } else if (servicePrice === 150000) {
+                  return '프리미엄';
+                } else if (serviceType.includes('프리미엄')) {
+                  return '프리미엄';
+                }
+                return '스탠다드';
+              })()}
+            </Text>
           </View>
           
-          <View style={styles.infoRow}>
-            <Ionicons name="location-outline" size={20} color="#6B7280" />
-            <View style={styles.infoContent}>
-              <Text style={styles.infoLabel}>방문 주소</Text>
-              <Text style={styles.infoValue}>
-                {currentReservation.address}
-                {currentReservation.detailAddress && `\n${currentReservation.detailAddress}`}
+          <View style={styles.kakaoRow}>
+            <Text style={styles.kakaoLabel}>방문 일시</Text>
+            <Text style={styles.kakaoValue}>{formatDate(currentReservation.requestedDate)}</Text>
+          </View>
+          
+          <View style={styles.kakaoRow}>
+            <Text style={styles.kakaoLabel}>방문 주소</Text>
+            <Text style={[styles.kakaoValue, styles.addressText]} numberOfLines={1}>
+              {currentReservation.address}{currentReservation.detailAddress && ` ${currentReservation.detailAddress}`}
+            </Text>
+          </View>
+
+          {(currentReservation.vehicleBrand || currentReservation.vehicleModel) && (
+            <View style={styles.kakaoRow}>
+              <Text style={styles.kakaoLabel}>차량</Text>
+              <Text style={styles.kakaoValue}>
+                {currentReservation.vehicleBrand} {currentReservation.vehicleModel}
+                {currentReservation.vehicleYear && ` (${currentReservation.vehicleYear}년)`}
               </Text>
             </View>
-          </View>
-          
+          )}
+
           {currentReservation.userName && (
-            <View style={styles.infoRow}>
-              <Ionicons name="person-outline" size={20} color="#6B7280" />
-              <View style={styles.infoContent}>
-                <Text style={styles.infoLabel}>예약자</Text>
-                <Text style={styles.infoValue}>{currentReservation.userName}</Text>
-              </View>
+            <View style={styles.kakaoRow}>
+              <Text style={styles.kakaoLabel}>예약자</Text>
+              <Text style={styles.kakaoValue}>{currentReservation.userName}</Text>
             </View>
           )}
+          
+          <View style={styles.kakaoRow}>
+            <Text style={styles.kakaoLabel}>전화번호</Text>
+            <Text style={styles.kakaoValue}>{currentReservation.userPhone || '-'}</Text>
+          </View>
+          
+          {currentReservation.notes && (
+            <View style={styles.kakaoRow}>
+              <Text style={styles.kakaoLabel}>요청사항</Text>
+              <Text style={[styles.kakaoValue, styles.notesText]} numberOfLines={1}>
+                {currentReservation.notes}
+              </Text>
+            </View>
+          )}
+
+          <View style={styles.kakaoRow}>
+            <Text style={styles.kakaoLabel}>신청일</Text>
+            <Text style={styles.kakaoValue}>{formatDate(currentReservation.createdAt)}</Text>
+          </View>
+          
+
+          <View style={[styles.kakaoRow, styles.totalRow]}>
+            <Text style={[styles.kakaoLabel, styles.totalLabel]}>결제 금액</Text>
+            <Text style={styles.totalAmount}>
+              {(() => {
+                const servicePrice = currentReservation.servicePrice;
+                if (servicePrice) {
+                  return servicePrice.toLocaleString() + '원';
+                }
+                
+                const serviceType = currentReservation.serviceType || '스탠다드';
+                if (serviceType.includes('프리미엄')) {
+                  return '150,000원';
+                }
+                return '70,000원';
+              })()}
+            </Text>
+          </View>
         </View>
 
         {/* 관리자 메모 */}
@@ -292,66 +353,44 @@ const ReservationDetailScreen: React.FC = () => {
           </View>
         )}
 
-        {/* 예약 내역 */}
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>예약 내역</Text>
-          
-          <View style={styles.historyRow}>
-            <Text style={styles.historyLabel}>신청일</Text>
-            <Text style={styles.historyValue}>{formatDate(currentReservation.createdAt)}</Text>
-          </View>
-          
-          <View style={styles.historyRow}>
-            <Text style={styles.historyLabel}>마지막 업데이트</Text>
-            <Text style={styles.historyValue}>{formatDate(currentReservation.updatedAt)}</Text>
-          </View>
-        </View>
 
-        {/* 수정/취소 버튼 */}
-        {(() => {
-          const permission = getModifyPermission();
-          return (permission.canModify || permission.canCancel) && (
-            <View style={styles.section}>
-              <Text style={styles.sectionTitle}>예약 관리</Text>
+      </ScrollView>
+
+      {/* 하단 네비게이션 바 스타일 버튼 */}
+      {(() => {
+        const permission = getModifyPermission();
+        return (permission.canModify || permission.canCancel) && (
+          <SafeAreaView style={styles.bottomSafeArea} edges={['bottom']}>
+            <View style={styles.bottomActionBar}>
+              {permission.canModify && (
+                <TouchableOpacity
+                  style={[styles.bottomButton, styles.bottomModifyButton]}
+                  onPress={handleModifyReservation}
+                  activeOpacity={0.8}
+                >
+                  <Ionicons name="create-outline" size={24} color="#4495E8" />
+                  <Text style={[styles.bottomButtonText, styles.bottomModifyText]}>
+                    예약 수정
+                  </Text>
+                </TouchableOpacity>
+              )}
               
-              <View style={styles.buttonContainer}>
-                {permission.canModify && (
-                  <TouchableOpacity
-                    style={[styles.actionButton, styles.modifyButton]}
-                    onPress={handleModifyReservation}
-                    activeOpacity={0.8}
-                  >
-                    <Ionicons name="create-outline" size={20} color="#4495E8" />
-                    <Text style={[styles.actionButtonText, styles.modifyButtonText]}>
-                      예약 수정
-                    </Text>
-                  </TouchableOpacity>
-                )}
-                
-                {permission.canCancel && (
-                  <TouchableOpacity
-                    style={[styles.actionButton, styles.cancelButton]}
-                    onPress={handleCancelReservation}
-                    activeOpacity={0.8}
-                  >
-                    <Ionicons name="close-outline" size={20} color="#EF4444" />
-                    <Text style={[styles.actionButtonText, styles.cancelButtonText]}>
-                      예약 취소
-                    </Text>
-                  </TouchableOpacity>
-                )}
-              </View>
-              
-              {permission.reason && (
-                <View style={styles.restrictionContainer}>
-                  <Ionicons name="information-circle-outline" size={16} color="#9CA3AF" />
-                  <Text style={styles.restrictionText}>{permission.reason}</Text>
-                </View>
+              {permission.canCancel && (
+                <TouchableOpacity
+                  style={[styles.bottomButton, styles.bottomCancelButton]}
+                  onPress={handleCancelReservation}
+                  activeOpacity={0.8}
+                >
+                  <Ionicons name="close-outline" size={24} color="#EF4444" />
+                  <Text style={[styles.bottomButtonText, styles.bottomCancelText]}>
+                    예약 취소
+                  </Text>
+                </TouchableOpacity>
               )}
             </View>
-          );
-        })()}
-      </ScrollView>
+          </SafeAreaView>
+        );
+      })()}
 
     </SafeAreaView>
   );
@@ -556,6 +595,61 @@ const styles = StyleSheet.create({
   cancelButtonText: {
     color: '#EF4444',
   },
+  priceValue: {
+    fontWeight: '600',
+    color: '#4495E8',
+  },
+  kakaoCard: {
+    backgroundColor: '#FFFFFF',
+    borderRadius: 12,
+    padding: 20,
+    marginBottom: 8,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 3.84,
+    elevation: 5,
+  },
+  kakaoRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'flex-start',
+    paddingVertical: 4,
+  },
+  kakaoLabel: {
+    fontSize: 14,
+    color: '#1F2937',
+    fontWeight: '400',
+    width: 80,
+    flexShrink: 0,
+  },
+  kakaoValue: {
+    fontSize: 14,
+    color: '#1F2937',
+    flex: 1,
+    textAlign: 'right',
+    fontWeight: '500',
+  },
+  totalRow: {
+    borderTopWidth: 1,
+    borderTopColor: '#F3F4F6',
+    paddingTop: 16,
+    marginTop: 8,
+  },
+  totalLabel: {
+    fontSize: 17,
+    fontWeight: '600',
+    color: '#1F2937',
+  },
+  totalAmount: {
+    fontSize: 18,
+    fontWeight: '700',
+    color: '#2563EB',
+  },
+  addressText: {
+    fontSize: 15,
+    lineHeight: 22,
+  },
   restrictionContainer: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -572,6 +666,43 @@ const styles = StyleSheet.create({
     fontSize: 13,
     color: '#6B7280',
     lineHeight: 18,
+  },
+  // 하단 네비게이션 바 스타일
+  bottomSafeArea: {
+    backgroundColor: '#FFFFFF',
+  },
+  bottomActionBar: {
+    flexDirection: 'row',
+    backgroundColor: '#FFFFFF',
+    paddingHorizontal: 20,
+    borderTopWidth: 1,
+    borderTopColor: '#F3F4F6',
+  },
+  bottomButton: {
+    flex: 1,
+    flexDirection: 'column',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 16,
+    paddingHorizontal: 16,
+    marginHorizontal: 6,
+    gap: 6,
+  },
+  bottomModifyButton: {
+    backgroundColor: 'transparent',
+  },
+  bottomCancelButton: {
+    backgroundColor: 'transparent',
+  },
+  bottomButtonText: {
+    fontSize: 12,
+    fontWeight: '500',
+  },
+  bottomModifyText: {
+    color: '#4495E8',
+  },
+  bottomCancelText: {
+    color: '#EF4444',
   },
 });
 

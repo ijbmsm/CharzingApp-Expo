@@ -57,8 +57,6 @@ const LocationAddressSection: React.FC<LocationAddressSectionProps> = ({
   }, [mode, animationValue]);
   return (
     <View style={styles.container}>
-      <Text style={styles.sectionTitle}>진단 위치</Text>
-      
       {/* Summary 모드 */}
       {mode === 'summary' && (
         <View style={styles.summaryCard}>
@@ -74,13 +72,13 @@ const LocationAddressSection: React.FC<LocationAddressSectionProps> = ({
 
       {/* Full 모드 */}
       {mode === 'full' && (
-        <View style={styles.fullCard}>
+        <View style={styles.fullSection}>
           {/* 상단 주소 표시 */}
           <View style={styles.cardHeader}>
-            <Ionicons name="location-outline" size={20} color="#4495E8" />
+            <Ionicons name="location-outline" size={20} color="#9CA3AF" />
             <View style={styles.summaryText}>
               <Text style={styles.summaryMain}>
-                {userAddress || "지도에서 위치를 선택하거나 주소를 입력해주세요"}
+                {userAddress || "주소를 입력해주세요"}
               </Text>
               {detailAddress && (
                 <Text style={styles.summaryDetail}>{detailAddress}</Text>
@@ -123,7 +121,7 @@ const LocationAddressSection: React.FC<LocationAddressSectionProps> = ({
 const styles = StyleSheet.create({
   // 공통 컨테이너
   container: {
-    padding: 16,
+    paddingHorizontal: 8,
   },
   // Summary mode styles
   summaryCard: {
@@ -146,9 +144,9 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   summaryMain: {
-    fontSize: 16,
+    fontSize: 14,
     color: '#1F2937',
-    fontWeight: '500',
+    fontWeight: '400',
   },
   summaryDetail: {
     fontSize: 14,
@@ -157,22 +155,13 @@ const styles = StyleSheet.create({
   },
 
   // Full mode styles
-  fullCard: {
-    backgroundColor: '#FFFFFF',
-    borderRadius: 12,
-    padding: 16,
-    shadowColor: '#000',
-    shadowOffset: {
-      width: 0,
-      height: 2,
-    },
-    shadowOpacity: 0.1,
-    shadowRadius: 3.84,
-    elevation: 5,
+  fullSection: {
+    // 카드 스타일 제거, 단순한 섹션으로
   },
   cardHeader: {
+    paddingTop: 10,
     flexDirection: 'row',
-    alignItems: 'flex-start',
+    alignItems: 'center',
     marginBottom: 16,
   },
   mapHeader: {

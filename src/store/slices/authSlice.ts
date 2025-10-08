@@ -4,6 +4,7 @@ interface User {
   uid: string;
   email?: string | undefined;
   displayName?: string | undefined;
+  realName?: string | undefined; // 실명
   photoURL?: string | undefined;
   kakaoId?: string; // 카카오 로그인용 (선택사항)
   googleId?: string; // Google 로그인용 (선택사항)

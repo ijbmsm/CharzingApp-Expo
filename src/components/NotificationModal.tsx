@@ -14,6 +14,8 @@ import { useSelector, useDispatch } from 'react-redux';
 import { RootState } from '../store';
 import { markAsRead, markAllAsRead, removeNotification } from '../store/slices/notificationSlice';
 import { InAppNotification } from '../store/slices/notificationSlice';
+import notificationService from '../services/notificationService';
+import devLog from '../utils/devLog';
 
 interface NotificationModalProps {
   visible: boolean;
@@ -26,17 +28,45 @@ const NotificationModal: React.FC<NotificationModalProps> = ({
 }) => {
   const dispatch = useDispatch();
   const { notifications, unreadCount } = useSelector((state: RootState) => state.notification);
+  const { user } = useSelector((state: RootState) => state.auth);
 
-  const handleMarkAsRead = (notificationId: string) => {
-    dispatch(markAsRead(notificationId));
+  const handleMarkAsRead = async (notificationId: string) => {
+    if (!user?.uid) return;
+    
+    try {
+      // Firebase와 Redux 모두 업데이트
+      await notificationService.markInAppNotificationAsRead(user.uid, notificationId);
+    } catch (error) {
+      devLog.error('알림 읽음 처리 실패:', error);
+      // 에러 발생 시 Redux만 업데이트
+      dispatch(markAsRead(notificationId));
+    }
   };
 
-  const handleMarkAllAsRead = () => {
-    dispatch(markAllAsRead());
+  const handleMarkAllAsRead = async () => {
+    if (!user?.uid) return;
+    
+    try {
+      // Firebase와 Redux 모두 업데이트
+      await notificationService.markAllInAppNotificationsAsRead(user.uid);
+    } catch (error) {
+      devLog.error('모든 알림 읽음 처리 실패:', error);
+      // 에러 발생 시 Redux만 업데이트
+      dispatch(markAllAsRead());
+    }
   };
 
-  const handleRemoveNotification = (notificationId: string) => {
-    dispatch(removeNotification(notificationId));
+  const handleRemoveNotification = async (notificationId: string) => {
+    if (!user?.uid) return;
+    
+    try {
+      // Firebase와 Redux 모두 업데이트
+      await notificationService.removeInAppNotification(user.uid, notificationId);
+    } catch (error) {
+      devLog.error('알림 삭제 실패:', error);
+      // 에러 발생 시 Redux만 업데이트
+      dispatch(removeNotification(notificationId));
+    }
   };
 
   const formatDate = (date: Date) => {

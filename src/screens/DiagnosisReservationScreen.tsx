@@ -17,13 +17,31 @@ import * as Location from 'expo-location';
 import Constants from 'expo-constants';
 import Header from '../components/Header';
 import LocationAddressSection from '../components/LocationAddressSection';
-import DateTimeSection from '../components/DateTimeSection';
-import { useNavigation, CommonActions } from '@react-navigation/native';
+import { useNavigation, useRoute, RouteProp, CommonActions } from '@react-navigation/native';
 import { useSelector } from 'react-redux';
 import { RootState } from '../store';
-import firebaseService from '../services/firebaseService';
 import { useLoading } from '../contexts/LoadingContext';
+import firebaseService from '../services/firebaseService';
 import analyticsService from '../services/analyticsService';
+import DateTimeSection from '../components/DateTimeSection';
+import devLog from '../utils/devLog';
+
+// 네비게이션 파라미터 타입 정의
+type RootStackParamList = {
+  DiagnosisReservation: {
+    vehicleData?: {
+      vehicleBrand: string;
+      vehicleModel: string;
+      vehicleYear: string;
+    };
+    serviceData?: {
+      serviceType: string;
+      servicePrice: number;
+    };
+  } | undefined;
+};
+
+type DiagnosisReservationRouteProp = RouteProp<RootStackParamList, 'DiagnosisReservation'>;
 
 interface TimeSlot {
   id: string;
@@ -41,8 +59,31 @@ interface CalendarDay {
 
 const DiagnosisReservationScreen: React.FC = () => {
   const navigation = useNavigation<any>();
+  const route = useRoute<DiagnosisReservationRouteProp>();
   const { user, isAuthenticated } = useSelector((state: RootState) => state.auth);
   const { showLoading, hideLoading } = useLoading();
+  
+  // 이전 화면에서 전달받은 차량 및 서비스 정보 (파라미터가 없으면 새로운 플로우로 리다이렉트)
+  const params = route.params;
+  
+  useEffect(() => {
+    // 모든 경우에 새로운 예약 플로우로 리다이렉트
+    devLog.log('🔄 기존 예약 화면에서 새로운 통합 예약 화면으로 리다이렉트');
+    navigation.replace('Reservation');
+    return;
+  }, [navigation]);
+  
+  // 파라미터가 없으면 로딩 표시
+  if (!params || !params.vehicleData || !params.serviceData) {
+    return (
+      <View style={[styles.container, styles.loadingContainer]}>
+        <ActivityIndicator size="large" color="#2196f3" />
+        <Text style={styles.loadingText}>새로운 예약 화면으로 이동 중...</Text>
+      </View>
+    );
+  }
+  
+  const { vehicleData, serviceData } = params;
   
   // 위치 및 주소 상태
   const [userLocation, setUserLocation] = useState<{
@@ -69,8 +110,8 @@ const DiagnosisReservationScreen: React.FC = () => {
 
   useEffect(() => {
     // 진단 예약 화면 조회 추적
-    analyticsService.logScreenView('DiagnosisReservationScreen', 'DiagnosisReservationScreen').catch((error) => {
-      console.error('❌ 진단 예약 화면 조회 추적 실패:', error);
+    analyticsService.logScreenView('DiagnosisReservationScreen', 'DiagnosisReservationScreen').catch((error: any) => {
+      devLog.error('❌ 진단 예약 화면 조회 추적 실패:', error);
     });
 
     checkPendingReservations();
@@ -84,7 +125,7 @@ const DiagnosisReservationScreen: React.FC = () => {
       if (!user?.uid) return;
       
       const reservations = await firebaseService.getUserDiagnosisReservations(user.uid);
-      const pendingReservations = reservations.filter(r => 
+      const pendingReservations = reservations.filter((r: any) => 
         r.status === 'pending' || r.status === 'confirmed'
       );
       
@@ -100,7 +141,7 @@ const DiagnosisReservationScreen: React.FC = () => {
         );
       }
     } catch (error) {
-      console.error('예약 확인 실패:', error);
+      devLog.error('예약 확인 실패:', error);
     }
   };
 
@@ -116,7 +157,7 @@ const DiagnosisReservationScreen: React.FC = () => {
   // 현재 위치 가져오기 (권한 요청 포함)
   const getCurrentLocation = async () => {
     try {
-      console.log('🌍 위치 권한 및 정보 요청 시작...');
+      devLog.log('🌍 위치 권한 및 정보 요청 시작...');
       
       // 먼저 위치 권한 요청
       const { status } = await Location.requestForegroundPermissionsAsync();
@@ -138,10 +179,10 @@ const DiagnosisReservationScreen: React.FC = () => {
       });
       
       let { latitude, longitude } = location.coords;
-      console.log('📍 현재 위치:', { latitude, longitude });
+      devLog.log('📍 현재 위치:', { latitude, longitude });
       
       if (!isKoreanCoordinates(latitude, longitude)) {
-        console.log('🌏 한국 밖 위치 감지, 서울로 변경');
+        devLog.log('🌏 한국 밖 위치 감지, 서울로 변경');
         latitude = 37.5665;
         longitude = 126.9780;
         // 사용자에게 알림 없이 조용히 서울로 설정
@@ -151,7 +192,7 @@ const DiagnosisReservationScreen: React.FC = () => {
       await handleMapLocationSelect(latitude, longitude, false);
       
     } catch (error) {
-      console.error('위치 가져오기 실패:', error);
+      devLog.error('위치 가져오기 실패:', error);
       
       // 위치 서비스 실패 시 기본값으로 서울 설정
       const defaultLocation = { latitude: 37.5665, longitude: 126.9780 };
@@ -201,7 +242,7 @@ const DiagnosisReservationScreen: React.FC = () => {
         throw new Error('주소 변환 실패');
       }
     } catch (error) {
-      console.error('주소 가져오기 실패:', error);
+      devLog.error('주소 가져오기 실패:', error);
       if (showAlert) {
         Alert.alert('오류', '주소를 가져올 수 없습니다. 직접 입력해주세요.');
       }
@@ -278,7 +319,7 @@ const DiagnosisReservationScreen: React.FC = () => {
       
       return timeSlots;
     } catch (error) {
-      console.error('시간 슬롯 생성 실패:', error);
+      devLog.error('시간 슬롯 생성 실패:', error);
       // 오류 시 기본 시간 슬롯 반환
       return [];
     }
@@ -291,7 +332,7 @@ const DiagnosisReservationScreen: React.FC = () => {
       const slots = await generateTimeSlots(date);
       setTimeSlots(slots);
     } catch (error) {
-      console.error('시간 슬롯 로드 실패:', error);
+      devLog.error('시간 슬롯 로드 실패:', error);
       setTimeSlots([]);
     } finally {
       setIsLoadingTimeSlots(false);
@@ -330,7 +371,7 @@ const DiagnosisReservationScreen: React.FC = () => {
       
       return false;
     } catch (error) {
-      console.error('날짜 가용성 확인 실패:', error);
+      devLog.error('날짜 가용성 확인 실패:', error);
       return false;
     }
   };
@@ -416,15 +457,23 @@ const DiagnosisReservationScreen: React.FC = () => {
       const reservationData = {
         userId: user?.uid || '',
         userName: user?.displayName || user?.email || '사용자',
+        userPhone: '',  // 진단 예약에서는 전화번호를 받지 않으므로 빈 문자열
         address: userAddress,
         detailAddress: detailAddress || '',
         latitude: userLocation?.latitude || 37.5665,
         longitude: userLocation?.longitude || 126.9780,
+        vehicleBrand: '기타', // 진단 예약에서는 차량 정보를 받지 않으므로 기본값
+        vehicleModel: '기타',
+        vehicleYear: '2020',
+        serviceType: '방문 배터리 진단 및 상담',
+        servicePrice: 0, // 진단 예약은 무료
         status: 'pending' as const,
         requestedDate: requestedDateTime,
+        notes: '',
+        source: 'app' as const,
       };
       
-      console.log('📝 예약 데이터:', reservationData);
+      devLog.log('📝 예약 데이터:', reservationData);
       
       await firebaseService.createDiagnosisReservation(reservationData);
       
@@ -434,8 +483,8 @@ const DiagnosisReservationScreen: React.FC = () => {
         address: userAddress,
         selectedDate: selectedDate,
         selectedTime: selectedTime.time,
-      }).catch((error) => {
-        console.error('❌ 예약 완료 추적 실패:', error);
+      }).catch((error: any) => {
+        devLog.error('❌ 예약 완료 추적 실패:', error);
       });
       
       Alert.alert(
@@ -459,7 +508,7 @@ const DiagnosisReservationScreen: React.FC = () => {
         ]
       );
     } catch (error) {
-      console.error('❌ 예약 생성 실패:', error);
+      devLog.error('❌ 예약 생성 실패:', error);
       Alert.alert(
         '예약 실패',
         '예약 처리 중 오류가 발생했습니다. 다시 시도해주세요.',
@@ -561,7 +610,7 @@ const DiagnosisReservationScreen: React.FC = () => {
               disabled={isSubmitting}
             >
               {isSubmitting ? (
-                <View style={styles.loadingContainer}>
+                <View style={styles.buttonLoadingContainer}>
                   <ActivityIndicator color="#FFFFFF" size="small" />
                   <Text style={styles.buttonText}>예약 처리 중...</Text>
                 </View>
@@ -692,7 +741,7 @@ const styles = StyleSheet.create({
   disabledButtonText: {
     color: '#6B7280',
   },
-  loadingContainer: {
+  buttonLoadingContainer: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 8,
@@ -818,6 +867,16 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: 'bold',
     color: '#FFFFFF',
+  },
+  loadingContainer: {
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  loadingText: {
+    marginTop: 16,
+    fontSize: 16,
+    color: '#666',
+    textAlign: 'center',
   },
 });
 

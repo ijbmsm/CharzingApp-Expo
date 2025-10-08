@@ -17,29 +17,34 @@ import DiagnosisReportListScreen from '../screens/DiagnosisReportListScreen';
 import MyPageScreen from '../screens/MyPageScreen';
 import MyReservationsScreen from '../screens/MyReservationsScreen';
 import ReservationDetailScreen from '../screens/ReservationDetailScreen';
-import ModifyReservationScreen from '../screens/ModifyReservationScreen';
 import SettingsScreen from '../screens/SettingsScreen';
 import LoginScreen from '../screens/LoginScreen';
 import SplashScreen from '../screens/SplashScreen';
 import SignupCompleteScreen from '../screens/SignupCompleteScreen';
 
+// 새로운 예약 플로우 화면들
+import ReservationScreen from '../screens/ReservationScreen';
+
 // Types
 export type RootStackParamList = {
   Main: undefined;
   Login: { showBackButton?: boolean; message?: string };
-  DiagnosisReservation: undefined;
+  DiagnosisReservation: {
+    vehicleData?: {
+      vehicleBrand: string;
+      vehicleModel: string;
+      vehicleYear: string;
+    };
+    serviceData?: {
+      serviceType: string;
+      servicePrice: number;
+    };
+  } | undefined;
   DiagnosisReportList: undefined;
   DiagnosisReport: {reportId?: string};
   VehicleDiagnosisReport: {reportId: string};
   MyReservations: undefined;
   ReservationDetail: {
-    reservation: Omit<import('../services/firebaseService').DiagnosisReservation, 'requestedDate' | 'createdAt' | 'updatedAt'> & {
-      requestedDate: string | Date | any;
-      createdAt: string | Date | any;
-      updatedAt: string | Date | any;
-    };
-  };
-  ModifyReservation: {
     reservation: Omit<import('../services/firebaseService').DiagnosisReservation, 'requestedDate' | 'createdAt' | 'updatedAt'> & {
       requestedDate: string | Date | any;
       createdAt: string | Date | any;
@@ -64,6 +69,22 @@ export type RootStackParamList = {
       photoURL?: string;
       googleId: string;
       provider: 'google';
+    };
+  };
+  // 새로운 예약 플로우 화면들
+  Reservation: {
+    editMode?: boolean;
+    existingReservation?: Omit<import('../services/firebaseService').DiagnosisReservation, 'requestedDate' | 'createdAt' | 'updatedAt'> & {
+      requestedDate: string | Date | any;
+      createdAt: string | Date | any;
+      updatedAt: string | Date | any;
+    };
+  } | undefined;
+  ModifyReservation: {
+    reservation: Omit<import('../services/firebaseService').DiagnosisReservation, 'requestedDate' | 'createdAt' | 'updatedAt'> & {
+      requestedDate: string | Date | any;
+      createdAt: string | Date | any;
+      updatedAt: string | Date | any;
     };
   };
 };
@@ -105,7 +126,7 @@ function MainTabs() {
           backgroundColor: '#FFFFFF',
           borderTopWidth: 1,
           borderTopColor: '#E5E7EB',
-          paddingBottom: Platform.OS === 'android' ? insets.bottom + 8 : insets.bottom > 0 ? insets.bottom : 8,
+          paddingBottom: Math.max(insets.bottom, 8),
           paddingTop: 8,
           elevation: 10,
           shadowOpacity: 0.1,
@@ -271,7 +292,6 @@ export default function RootNavigator() {
         <Stack.Screen name="VehicleDiagnosisReport" component={VehicleDiagnosisReportScreen} />
         <Stack.Screen name="MyReservations" component={MyReservationsScreen} />
         <Stack.Screen name="ReservationDetail" component={ReservationDetailScreen} />
-        <Stack.Screen name="ModifyReservation" component={ModifyReservationScreen} />
         <Stack.Screen 
           name="Settings" 
           component={SettingsScreen}
@@ -313,6 +333,12 @@ export default function RootNavigator() {
               };
             },
           }}
+        />
+        
+        {/* 새로운 예약 플로우 화면들 */}
+        <Stack.Screen 
+          name="Reservation" 
+          component={ReservationScreen}
         />
       </Stack.Navigator>
     </NavigationContainer>

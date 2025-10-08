@@ -15,6 +15,7 @@ import { RootState } from '../store';
 import Header from '../components/Header';
 import { Ionicons } from '@expo/vector-icons';
 import notificationService, { NotificationSettings } from '../services/notificationService';
+import devLog from '../utils/devLog';
 
 const SettingsScreen: React.FC = () => {
   const navigation = useNavigation();
@@ -33,50 +34,32 @@ const SettingsScreen: React.FC = () => {
   }, [isAuthenticated, user]); // 인증 상태나 사용자가 변경되면 설정 다시 로드
 
   const loadSettings = async () => {
-    console.log('🔍 SettingsScreen: loadSettings 시작', { 
-      isAuthenticated, 
-      userUid: user?.uid 
-    });
-
     if (!isAuthenticated || !user) {
-      console.log('❌ SettingsScreen: 인증되지 않은 상태로 설정 로드 건너뜀');
       setIsLoading(false);
       return;
     }
 
     try {
-      console.log('📥 SettingsScreen: notificationService.getNotificationSettings 호출 중...');
       const settings = await notificationService.getNotificationSettings(user.uid);
-      console.log('✅ SettingsScreen: 설정 로드 성공:', settings);
       setNotificationSettings(settings);
     } catch (error) {
-      console.error('❌ SettingsScreen: 설정 불러오기 실패:', error);
+      devLog.error('❌ SettingsScreen: 설정 불러오기 실패:', error);
     } finally {
       setIsLoading(false);
     }
   };
 
   const saveSettings = async (newSettings: NotificationSettings) => {
-    console.log('🔧 SettingsScreen: saveSettings 호출됨', { 
-      isAuthenticated, 
-      userUid: user?.uid, 
-      newSettings 
-    });
-
     if (!isAuthenticated || !user) {
-      console.log('❌ SettingsScreen: 인증되지 않은 사용자');
       Alert.alert('오류', '로그인이 필요합니다.');
       return;
     }
 
     try {
-      console.log('📤 SettingsScreen: notificationService.saveNotificationSettings 호출 중...');
       await notificationService.saveNotificationSettings(user.uid, newSettings);
-      console.log('✅ SettingsScreen: 설정 저장 성공, 로컬 상태 업데이트 중...');
       setNotificationSettings(newSettings);
-      console.log('✅ SettingsScreen: 모든 저장 과정 완료');
     } catch (error) {
-      console.error('❌ SettingsScreen: 설정 저장 실패:', error);
+      devLog.error('❌ SettingsScreen: 설정 저장 실패:', error);
       Alert.alert('오류', '설정을 저장할 수 없습니다.');
     }
   };
@@ -106,7 +89,6 @@ const SettingsScreen: React.FC = () => {
         Alert.alert('오류', `${title} 링크를 열 수 없습니다.`);
       }
     } catch (error) {
-      console.error('링크 열기 실패:', error);
       Alert.alert('오류', `${title} 링크를 열 수 없습니다.`);
     }
   };
@@ -266,72 +248,6 @@ const SettingsScreen: React.FC = () => {
           </TouchableOpacity>
         </View>
 
-        {/* 개발자 테스트 섹션 */}
-        {isAuthenticated && user && (
-          <View style={styles.section}>
-            <View style={styles.sectionHeader}>
-              <Ionicons name="flask-outline" size={20} color="#F59E0B" />
-              <Text style={styles.sectionTitle}>개발자 테스트</Text>
-            </View>
-            
-            {/* 인앱 알림 테스트 */}
-            <TouchableOpacity 
-              style={styles.linkItem}
-              onPress={() => {
-                notificationService.addInAppNotification(
-                  '테스트 인앱 알림',
-                  '이것은 직접 추가된 인앱 알림입니다.',
-                  'announcement'
-                );
-                Alert.alert('성공', '인앱 알림이 추가되었습니다. 상단 알림 벨을 확인해보세요.');
-              }}
-            >
-              <View style={styles.linkInfo}>
-                <Text style={styles.linkTitle}>인앱 알림 테스트</Text>
-                <Text style={styles.linkDescription}>직접 인앱 알림 추가</Text>
-              </View>
-              <Ionicons name="notifications" size={20} color="#9CA3AF" />
-            </TouchableOpacity>
-
-            {/* 푸시→인앱 변환 테스트 */}
-            <TouchableOpacity 
-              style={styles.linkItem}
-              onPress={() => {
-                notificationService.testPushNotificationToInApp(
-                  '테스트 푸시 알림',
-                  '이것은 푸시 알림을 인앱 알림으로 변환하는 테스트입니다.',
-                  'report'
-                );
-                Alert.alert('성공', '푸시 알림 변환 테스트가 실행되었습니다. 상단 알림 벨을 확인해보세요.');
-              }}
-            >
-              <View style={styles.linkInfo}>
-                <Text style={styles.linkTitle}>푸시→인앱 변환 테스트</Text>
-                <Text style={styles.linkDescription}>푸시 알림 처리 로직 테스트</Text>
-              </View>
-              <Ionicons name="refresh" size={20} color="#9CA3AF" />
-            </TouchableOpacity>
-
-            {/* 로컬 알림 테스트 */}
-            <TouchableOpacity 
-              style={[styles.linkItem, { borderBottomWidth: 0 }]}
-              onPress={() => {
-                notificationService.scheduleLocalNotification(
-                  '테스트 로컬 알림',
-                  '5초 후에 표시되는 로컬 알림입니다.',
-                  5
-                );
-                Alert.alert('성공', '5초 후에 로컬 알림이 표시됩니다.');
-              }}
-            >
-              <View style={styles.linkInfo}>
-                <Text style={styles.linkTitle}>로컬 알림 테스트</Text>
-                <Text style={styles.linkDescription}>5초 후 로컬 알림 발송</Text>
-              </View>
-              <Ionicons name="timer" size={20} color="#9CA3AF" />
-            </TouchableOpacity>
-          </View>
-        )}
         
         {/* 설정 정보 */}
         <View style={styles.infoSection}>

@@ -13,6 +13,7 @@ import {
 } from "react-native";
 import { Ionicons } from '@expo/vector-icons';
 import Constants from 'expo-constants';
+import devLog from '../utils/devLog';
 
 type AddressSearchProps = {
   onAddressSelect?: (address: string, zonecode: string) => void;
@@ -69,7 +70,7 @@ export default function AddressSearch({
 
     setIsLoading(true);
     try {
-      console.log('📍 주소 검색 시작:', query);
+      devLog.log('📍 주소 검색 시작:', query);
       
       // 주소 검색과 키워드 검색을 병렬로 실행
       const [addressResponse, keywordResponse] = await Promise.all([
@@ -104,8 +105,8 @@ export default function AddressSearch({
       const addressData: KakaoLocalResponse = await addressResponse.json();
       const keywordData: KakaoLocalResponse = await keywordResponse.json();
       
-      console.log('📍 주소 검색 결과:', addressData.documents.length, '건');
-      console.log('📍 키워드 검색 결과:', keywordData.documents.length, '건');
+      devLog.log('📍 주소 검색 결과:', addressData.documents.length, '건');
+      devLog.log('📍 키워드 검색 결과:', keywordData.documents.length, '건');
       
       // 결과 합치기 (중복 제거)
       const allResults: AddressResult[] = [];
@@ -138,7 +139,7 @@ export default function AddressSearch({
       setSearchResults(allResults.slice(0, 15)); // 최대 15개만 표시
       
     } catch (error) {
-      console.error('📍 주소 검색 오류:', error);
+      devLog.error('📍 주소 검색 오류:', error);
       Alert.alert('검색 오류', '주소 검색 중 오류가 발생했습니다.');
       setSearchResults([]);
     } finally {
@@ -161,7 +162,7 @@ export default function AddressSearch({
     const selectedAddress = address.road_address_name || address.address_name;
     const zonecode = ''; // 카카오 API에서는 우편번호를 제공하지 않음
     
-    console.log('📍 주소 선택됨:', selectedAddress);
+    devLog.log('📍 주소 선택됨:', selectedAddress);
     
     // 모달 닫기
     setModalVisible(false);

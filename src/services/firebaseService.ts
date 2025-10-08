@@ -22,8 +22,9 @@ import { getStorage, ref, uploadBytes, getDownloadURL } from 'firebase/storage';
 // import { getFunctions, httpsCallable } from 'firebase/functions'; // Removed to fix Metro bundler issues
 import axios from 'axios';
 import Constants from 'expo-constants';
-import app from '../firebase/config';
+import { getDb, getAuthInstance, getStorageInstance } from '../firebase/config';
 import logger from './logService';
+import devLog from '../utils/devLog';
 
 export interface UserProfile {
   uid: string;
@@ -58,18 +59,25 @@ export interface UserVehicle {
 
 export interface DiagnosisReservation {
   id: string;
-  userId: string;
-  userName?: string;
+  userId?: string;              // Optional for web compatibility (웹은 자동생성 사용자 ID)
+  userName: string;             // Required (웹과 동일)
+  userPhone: string;            // Required (웹과 동일)
   address: string;
   detailAddress?: string;
   latitude: number;
   longitude: number;
+  vehicleBrand: string;         // Required (웹과 동일)
+  vehicleModel: string;         // Required (웹과 동일)
+  vehicleYear: string;          // Required (웹과 동일)
+  serviceType: string;          // Required (웹과 동일)
+  servicePrice: number;         // Required (웹과 동일)
   status: 'pending' | 'confirmed' | 'in_progress' | 'completed' | 'cancelled';
   requestedDate: Date | FieldValue;
   notes?: string;
   adminNotes?: string;
   createdAt: Date | FieldValue;
   updatedAt: Date | FieldValue;
+  source?: 'web' | 'app';       // 예약 출처 구분 (웹과 동일)
 }
 
 export interface DiagnosisReportFile {
@@ -147,16 +155,41 @@ export interface ScheduleSettings {
 }
 
 class FirebaseService {
-  private db = getFirestore(app);
-  private auth = getAuth(app);
-  private storage = getStorage(app);
-  // private functions = getFunctions(app, 'us-central1'); // Removed to fix Metro bundler issues
   private readonly CLOUD_FUNCTION_URL: string;
-  private usersCollectionRef = collection(this.db, 'users');
-  private diagnosisReservationsRef = collection(this.db, 'diagnosisReservations');
-  private diagnosisReportsRef = collection(this.db, 'diagnosisReports');
-  private vehicleDiagnosisReportsRef = collection(this.db, 'vehicleDiagnosisReports');
-  private settingsRef = collection(this.db, 'settings');
+
+  // Firebase 인스턴스들을 getter로 지연 로딩
+  private get db() {
+    return getDb();
+  }
+
+  private get auth() {
+    return getAuthInstance();
+  }
+
+  private get storage() {
+    return getStorageInstance();
+  }
+
+  // 컬렉션 참조들도 getter로 변경
+  private get usersCollectionRef() {
+    return collection(this.db, 'users');
+  }
+
+  private get diagnosisReservationsRef() {
+    return collection(this.db, 'diagnosisReservations');
+  }
+
+  private get diagnosisReportsRef() {
+    return collection(this.db, 'diagnosisReports');
+  }
+
+  private get vehicleDiagnosisReportsRef() {
+    return collection(this.db, 'vehicleDiagnosisReports');
+  }
+
+  private get settingsRef() {
+    return collection(this.db, 'settings');
+  }
 
   constructor() {
     this.CLOUD_FUNCTION_URL = Constants.expoConfig?.extra?.CLOUD_FUNCTION_URL || 
@@ -184,7 +217,7 @@ class FirebaseService {
    */
   async callCloudFunction(functionName: string, data: any = {}): Promise<any> {
     try {
-      console.log(`🌩️ Cloud Function 직접 호출: ${functionName}`);
+      devLog.log(`🌩️ Cloud Function 직접 호출: ${functionName}`);
       
       // 인증된 사용자인지 확인
       const currentUser = this.auth.currentUser;
@@ -207,10 +240,10 @@ class FirebaseService {
         }
       );
       
-      console.log(`✅ Cloud Function 호출 성공: ${functionName}`);
+      devLog.log(`✅ Cloud Function 호출 성공: ${functionName}`);
       return response.data;
     } catch (error: any) {
-      console.error(`❌ Cloud Function 호출 실패 (${functionName}):`, error);
+      devLog.error(`❌ Cloud Function 호출 실패 (${functionName}):`, error);
       throw error;
     }
   }
@@ -421,10 +454,10 @@ class FirebaseService {
         
         const userDocRef = doc(this.db, 'users', uid);
         await updateDoc(userDocRef, updateData);
-        console.log('✅ 기존 사용자 문서 업데이트 완료:', uid);
+        devLog.log('✅ 기존 사용자 문서 업데이트 완료:', uid);
       }
     } catch (error) {
-      console.error('❌ 사용자 문서 upsert 실패:', error);
+      devLog.error('❌ 사용자 문서 upsert 실패:', error);
       throw error;
     }
   }
@@ -443,9 +476,9 @@ class FirebaseService {
         updatedAt: serverTimestamp(),
       });
       
-      console.log('회원가입 완료 처리:', uid);
+      devLog.log('회원가입 완료 처리:', uid);
     } catch (error) {
-      console.error('회원가입 완료 처리 실패:', error);
+      devLog.error('회원가입 완료 처리 실패:', error);
       throw error;
     }
   }
@@ -480,7 +513,7 @@ class FirebaseService {
       
       return null;
     } catch (error) {
-      console.error('사용자 프로필 조회 실패:', error);
+      devLog.error('사용자 프로필 조회 실패:', error);
       throw error;
     }
   }
@@ -495,9 +528,9 @@ class FirebaseService {
         lastLoginAt: serverTimestamp(),
         updatedAt: serverTimestamp(),
       });
-      console.log('✅ 마지막 로그인 시간 업데이트:', uid);
+      devLog.log('✅ 마지막 로그인 시간 업데이트:', uid);
     } catch (error) {
-      console.error('❌ 마지막 로그인 시간 업데이트 실패:', error);
+      devLog.error('❌ 마지막 로그인 시간 업데이트 실패:', error);
     }
   }
 
@@ -539,7 +572,7 @@ class FirebaseService {
       
       return null;
     } catch (error) {
-      console.error('카카오 ID로 사용자 검색 실패:', error);
+      devLog.error('카카오 ID로 사용자 검색 실패:', error);
       throw error;
     }
   }
@@ -551,9 +584,9 @@ class FirebaseService {
     try {
       const userDocRef = doc(this.db, 'users', uid);
       await deleteDoc(userDocRef);
-      console.log('사용자 프로필 삭제 완료:', uid);
+      devLog.log('사용자 프로필 삭제 완료:', uid);
     } catch (error) {
-      console.error('사용자 프로필 삭제 실패:', error);
+      devLog.error('사용자 프로필 삭제 실패:', error);
       throw error;
     }
   }
@@ -564,9 +597,9 @@ class FirebaseService {
   async signInWithCustomToken(token: string): Promise<void> {
     try {
       await signInWithCustomToken(this.auth, token);
-      console.log('Firebase 커스텀 토큰 로그인 완료');
+      devLog.log('Firebase 커스텀 토큰 로그인 완료');
     } catch (error) {
-      console.error('Firebase 커스텀 토큰 로그인 실패:', error);
+      devLog.error('Firebase 커스텀 토큰 로그인 실패:', error);
       throw error;
     }
   }
@@ -579,14 +612,14 @@ class FirebaseService {
       const currentUser = this.auth.currentUser;
       if (currentUser) {
         await signOut(this.auth);
-        console.log('Firebase 로그아웃 완료');
+        devLog.log('Firebase 로그아웃 완료');
       } else {
-        console.log('Firebase에 로그인된 사용자가 없음 - 로그아웃 스킵');
+        devLog.log('Firebase에 로그인된 사용자가 없음 - 로그아웃 스킵');
       }
     } catch (error) {
-      console.error('Firebase 로그아웃 실패:', error);
+      devLog.error('Firebase 로그아웃 실패:', error);
       // Firebase 로그아웃 실패해도 앱 상태는 로그아웃으로 처리
-      console.log('Firebase 로그아웃 실패했지만 앱 로그아웃은 계속 진행');
+      devLog.log('Firebase 로그아웃 실패했지만 앱 로그아웃은 계속 진행');
     }
   }
 
@@ -602,23 +635,23 @@ class FirebaseService {
    */
   async deleteUserAccount(uid: string): Promise<void> {
     try {
-      console.log('사용자 계정 삭제 시작:', uid);
+      devLog.log('사용자 계정 삭제 시작:', uid);
       
       // 1. Firestore에서 사용자 문서 삭제
       const userDocRef = doc(this.db, 'users', uid);
       await deleteDoc(userDocRef);
-      console.log('Firestore 사용자 문서 삭제 완료:', uid);
+      devLog.log('Firestore 사용자 문서 삭제 완료:', uid);
       
       // 2. Firebase Auth에서 사용자 삭제 (로그인되어 있는 경우)
       const currentUser = this.auth.currentUser;
       if (currentUser && currentUser.uid === uid) {
         await currentUser.delete();
-        console.log('Firebase Auth 사용자 삭제 완료:', uid);
+        devLog.log('Firebase Auth 사용자 삭제 완료:', uid);
       }
       
-      console.log('✅ 사용자 계정 삭제 완료:', uid);
+      devLog.log('✅ 사용자 계정 삭제 완료:', uid);
     } catch (error) {
-      console.error('❌ 사용자 계정 삭제 실패:', error);
+      devLog.error('❌ 사용자 계정 삭제 실패:', error);
       throw error;
     }
   }
@@ -628,7 +661,7 @@ class FirebaseService {
    */
   async testAuth(): Promise<any> {
     try {
-      console.log('🧪 인증 상태 테스트 시작...');
+      devLog.log('🧪 인증 상태 테스트 시작...');
       
       // 인증 상태 확인
       const currentUser = this.auth.currentUser;
@@ -636,16 +669,16 @@ class FirebaseService {
         throw new Error('사용자가 로그인되지 않았습니다.');
       }
       
-      console.log('👤 현재 인증된 사용자:', {
+      devLog.log('👤 현재 인증된 사용자:', {
         uid: currentUser.uid,
         email: currentUser.email,
         displayName: currentUser.displayName
       });
       
       // 토큰 강제 갱신
-      console.log('🔄 인증 토큰 강제 갱신...');
+      devLog.log('🔄 인증 토큰 강제 갱신...');
       const idToken = await currentUser.getIdToken(true);
-      console.log('✅ 갱신된 토큰 길이:', idToken.length);
+      devLog.log('✅ 갱신된 토큰 길이:', idToken.length);
       
       if (!idToken) {
         throw new Error('인증 토큰 갱신에 실패했습니다. 다시 로그인해주세요.');
@@ -665,10 +698,10 @@ class FirebaseService {
       );
       
       const result = response.data;
-      console.log('✅ 인증 테스트 결과:', result);
+      devLog.log('✅ 인증 테스트 결과:', result);
       return result;
     } catch (error: any) {
-      console.error('❌ 인증 테스트 실패:', error);
+      devLog.error('❌ 인증 테스트 실패:', error);
       throw error;
     }
   }
@@ -678,7 +711,7 @@ class FirebaseService {
    */
   async createDiagnosisReservation(reservationData: Omit<DiagnosisReservation, 'id' | 'createdAt' | 'updatedAt'>): Promise<string> {
     try {
-      console.log('🌩️ 강화된 Custom Token으로 Firebase Functions 호출:', reservationData);
+      devLog.log('🌩️ 강화된 Custom Token으로 Firebase Functions 호출:', reservationData);
       
       // 인증 상태 확인
       const currentUser = this.auth.currentUser;
@@ -686,7 +719,7 @@ class FirebaseService {
         throw new Error('사용자가 로그인되지 않았습니다.');
       }
       
-      console.log('👤 현재 인증된 사용자:', {
+      devLog.log('👤 현재 인증된 사용자:', {
         uid: currentUser.uid,
         email: currentUser.email,
         isAnonymous: currentUser.isAnonymous,
@@ -696,26 +729,26 @@ class FirebaseService {
       // 인증 토큰 새로고침 및 검증
       try {
         const idToken = await currentUser.getIdToken(true);
-        console.log('🔑 강화된 인증 토큰 새로고침 완료, 토큰 길이:', idToken.length);
+        devLog.log('🔑 강화된 인증 토큰 새로고침 완료, 토큰 길이:', idToken.length);
         
         // 토큰을 디코딩해서 claims 확인 (디버깅용)
         try {
           const tokenPayload = JSON.parse(atob(idToken?.split('.')[1] || ''));
-          console.log('🔍 토큰 Claims 확인:', {
+          devLog.log('🔍 토큰 Claims 확인:', {
             provider: tokenPayload.provider || 'N/A',
             kakaoId: tokenPayload.kakaoId || 'N/A',
             canCreateReservation: tokenPayload.canCreateReservation || 'N/A',
             role: tokenPayload.role || 'N/A'
           });
         } catch (decodeError) {
-          console.log('⚠️ 토큰 디코딩 실패 (정상적일 수 있음)');
+          devLog.log('⚠️ 토큰 디코딩 실패 (정상적일 수 있음)');
         }
         
         if (!idToken || idToken.length < 100) {
           throw new Error('유효하지 않은 인증 토큰');
         }
       } catch (tokenError: any) {
-        console.error('❌ 인증 토큰 새로고침 실패:', tokenError.message);
+        devLog.error('❌ 인증 토큰 새로고침 실패:', tokenError.message);
         throw new Error('인증 토큰 갱신에 실패했습니다. 다시 로그인해주세요.');
       }
       
@@ -742,7 +775,7 @@ class FirebaseService {
       return data.reservationId;
     } catch (error: any) {
       logger.reservation('create_failed', undefined, 'error', this.auth.currentUser?.uid, { error: error.message });
-      console.error('🔍 에러 상세 정보:', {
+      devLog.error('🔍 에러 상세 정보:', {
         code: error.code,
         message: error.message,
         details: error.details,
@@ -752,7 +785,7 @@ class FirebaseService {
       
       // 인증 오류 시 재시도 또는 폴백
       if (error.code === 'functions/unauthenticated') {
-        console.error('🚨 강화된 토큰에도 인증 오류 발생 - 로그 확인 필요');
+        devLog.error('🚨 강화된 토큰에도 인증 오류 발생 - 로그 확인 필요');
         throw new Error('인증이 만료되었습니다. 다시 로그인해주세요.');
       }
       
@@ -765,7 +798,7 @@ class FirebaseService {
    */
   async getUserDiagnosisReservations(userId: string): Promise<DiagnosisReservation[]> {
     try {
-      console.log('📱 클라이언트에서 사용자 진단 예약 목록 조회:', userId);
+      devLog.log('📱 클라이언트에서 사용자 진단 예약 목록 조회:', userId);
       
       // 현재 로그인한 사용자만 자신의 예약을 조회할 수 있도록 체크
       if (!this.auth.currentUser || this.auth.currentUser.uid !== userId) {
@@ -805,7 +838,7 @@ class FirebaseService {
    */
   async updateDiagnosisReservationStatus(reservationId: string, status: DiagnosisReservation['status'], adminNotes?: string): Promise<void> {
     try {
-      console.log('진단 예약 상태 업데이트:', reservationId, status);
+      devLog.log('진단 예약 상태 업데이트:', reservationId, status);
       
       const reservationRef = doc(this.db, 'diagnosisReservations', reservationId);
       
@@ -820,9 +853,9 @@ class FirebaseService {
       
       await updateDoc(reservationRef, updateData);
       
-      console.log('✅ 진단 예약 상태 업데이트 완료:', reservationId, status);
+      devLog.log('✅ 진단 예약 상태 업데이트 완료:', reservationId, status);
     } catch (error) {
-      console.error('❌ 진단 예약 상태 업데이트 실패:', error);
+      devLog.error('❌ 진단 예약 상태 업데이트 실패:', error);
       throw error;
     }
   }
@@ -832,13 +865,13 @@ class FirebaseService {
    */
   async cancelDiagnosisReservation(reservationId: string, reason?: string): Promise<void> {
     try {
-      console.log('진단 예약 취소:', reservationId);
+      devLog.log('진단 예약 취소:', reservationId);
       
       await this.updateDiagnosisReservationStatus(reservationId, 'cancelled', reason);
       
-      console.log('✅ 진단 예약 취소 완료:', reservationId);
+      devLog.log('✅ 진단 예약 취소 완료:', reservationId);
     } catch (error) {
-      console.error('❌ 진단 예약 취소 실패:', error);
+      devLog.error('❌ 진단 예약 취소 실패:', error);
       throw error;
     }
   }
@@ -908,21 +941,23 @@ class FirebaseService {
   async updateDiagnosisReservation(
     reservationId: string, 
     updateData: Partial<Pick<DiagnosisReservation, 
-      'address' | 'detailAddress' | 'latitude' | 'longitude' | 'requestedDate' | 'notes'
+      'address' | 'detailAddress' | 'latitude' | 'longitude' | 'requestedDate' | 'notes' |
+      'vehicleBrand' | 'vehicleModel' | 'vehicleYear' | 'serviceType' | 'servicePrice' |
+      'userName' | 'userPhone'
     >>
   ): Promise<void> {
     try {
-      console.log('🔧 진단 예약 수정 시작:', reservationId);
-      console.log('📝 수정 데이터:', JSON.stringify(updateData, null, 2));
+      devLog.log('🔧 진단 예약 수정 시작:', reservationId);
+      devLog.log('📝 수정 데이터:', JSON.stringify(updateData, null, 2));
       
       // requestedDate 로깅 강화
       if (updateData.requestedDate) {
-        console.log('🕐 수정할 날짜/시간:');
-        console.log('  - 원본 값:', updateData.requestedDate);
-        console.log('  - 타입:', typeof updateData.requestedDate);
-        console.log('  - Date 객체 여부:', updateData.requestedDate instanceof Date);
-        console.log('  - ISO 문자열:', updateData.requestedDate instanceof Date ? updateData.requestedDate.toISOString() : 'N/A');
-        console.log('  - 로컬 문자열:', updateData.requestedDate instanceof Date ? updateData.requestedDate.toLocaleString('ko-KR') : 'N/A');
+        devLog.log('🕐 수정할 날짜/시간:');
+        devLog.log('  - 원본 값:', updateData.requestedDate);
+        devLog.log('  - 타입:', typeof updateData.requestedDate);
+        devLog.log('  - Date 객체 여부:', updateData.requestedDate instanceof Date);
+        devLog.log('  - ISO 문자열:', updateData.requestedDate instanceof Date ? updateData.requestedDate.toISOString() : 'N/A');
+        devLog.log('  - 로컬 문자열:', updateData.requestedDate instanceof Date ? updateData.requestedDate.toLocaleString('ko-KR') : 'N/A');
       }
       
       const reservationRef = doc(this.diagnosisReservationsRef, reservationId);
@@ -941,13 +976,13 @@ class FirebaseService {
         updatedAt: serverTimestamp(),
       };
       
-      console.log('🚀 Firebase로 전송할 최종 데이터:', JSON.stringify(finalUpdateData, null, 2));
+      devLog.log('🚀 Firebase로 전송할 최종 데이터:', JSON.stringify(finalUpdateData, null, 2));
       
       await updateDoc(reservationRef, finalUpdateData);
       
-      console.log('✅ 진단 예약 수정 완료:', reservationId);
+      devLog.log('✅ 진단 예약 수정 완료:', reservationId);
     } catch (error) {
-      console.error('❌ 진단 예약 수정 실패:', error);
+      devLog.error('❌ 진단 예약 수정 실패:', error);
       throw error;
     }
   }
@@ -969,7 +1004,7 @@ class FirebaseService {
     createdAt: Date;
   }): Promise<string> {
     try {
-      console.log('📄 진단 리포트 업로드 시작:', reportData.title);
+      devLog.log('📄 진단 리포트 업로드 시작:', reportData.title);
       
       const reportId = doc(this.diagnosisReportsRef).id;
       
@@ -999,9 +1034,9 @@ class FirebaseService {
             size: file.size,
           });
           
-          console.log('✅ 파일 업로드 완료:', file.name);
+          devLog.log('✅ 파일 업로드 완료:', file.name);
         } catch (fileError) {
-          console.error('❌ 파일 업로드 실패:', file.name, fileError);
+          devLog.error('❌ 파일 업로드 실패:', file.name, fileError);
           throw new Error(`파일 업로드 실패: ${file.name}`);
         }
       }
@@ -1021,10 +1056,10 @@ class FirebaseService {
         updatedAt: now,
       });
       
-      console.log('✅ 진단 리포트 업로드 완료:', reportId);
+      devLog.log('✅ 진단 리포트 업로드 완료:', reportId);
       return reportId;
     } catch (error) {
-      console.error('❌ 진단 리포트 업로드 실패:', error);
+      devLog.error('❌ 진단 리포트 업로드 실패:', error);
       throw error;
     }
   }
@@ -1034,7 +1069,7 @@ class FirebaseService {
    */
   async getUserDiagnosisReports(userId: string): Promise<DiagnosisReport[]> {
     try {
-      console.log('📄 사용자 진단 리포트 목록 조회:', userId);
+      devLog.log('📄 사용자 진단 리포트 목록 조회:', userId);
       
       const q = query(
         this.diagnosisReportsRef,
@@ -1065,10 +1100,10 @@ class FirebaseService {
         return dateB.getTime() - dateA.getTime();
       });
       
-      console.log('✅ 진단 리포트 목록 조회 완료:', reports.length, '개');
+      devLog.log('✅ 진단 리포트 목록 조회 완료:', reports.length, '개');
       return reports;
     } catch (error) {
-      console.error('❌ 진단 리포트 목록 조회 실패:', error);
+      devLog.error('❌ 진단 리포트 목록 조회 실패:', error);
       throw error;
     }
   }
@@ -1078,13 +1113,13 @@ class FirebaseService {
    */
   async getDiagnosisReport(reportId: string): Promise<DiagnosisReport | null> {
     try {
-      console.log('📄 진단 리포트 상세 조회:', reportId);
+      devLog.log('📄 진단 리포트 상세 조회:', reportId);
       
       const reportDocRef = doc(this.diagnosisReportsRef, reportId);
       const reportDoc = await getDoc(reportDocRef);
       
       if (!reportDoc.exists()) {
-        console.log('진단 리포트를 찾을 수 없음:', reportId);
+        devLog.log('진단 리포트를 찾을 수 없음:', reportId);
         return null;
       }
       
@@ -1100,10 +1135,10 @@ class FirebaseService {
         updatedAt: data.updatedAt?.toDate() || new Date(),
       };
       
-      console.log('✅ 진단 리포트 상세 조회 완료:', report.title);
+      devLog.log('✅ 진단 리포트 상세 조회 완료:', report.title);
       return report;
     } catch (error) {
-      console.error('❌ 진단 리포트 상세 조회 실패:', error);
+      devLog.error('❌ 진단 리포트 상세 조회 실패:', error);
       throw error;
     }
   }
@@ -1120,7 +1155,7 @@ class FirebaseService {
         return this.scheduleSettingsCache;
       }
       
-      console.log('📅 스케줄 설정 조회 중...');
+      devLog.log('📅 스케줄 설정 조회 중...');
       
       const docSnap = await getDoc(doc(this.settingsRef, 'schedule'));
       
@@ -1128,7 +1163,7 @@ class FirebaseService {
       
       if (docSnap.exists()) {
         settings = docSnap.data() as ScheduleSettings;
-        console.log('✅ 스케줄 설정 조회 완료');
+        devLog.log('✅ 스케줄 설정 조회 완료');
       } else {
         // 기본 스케줄 설정
         settings = {
@@ -1139,7 +1174,7 @@ class FirebaseService {
           },
           unavailableSlots: [],
         };
-        console.log('📅 기본 스케줄 설정 반환');
+        devLog.log('📅 기본 스케줄 설정 반환');
       }
       
       // 캐시에 저장
@@ -1148,7 +1183,7 @@ class FirebaseService {
       
       return settings;
     } catch (error) {
-      console.error('❌ 스케줄 설정 조회 실패:', error);
+      devLog.error('❌ 스케줄 설정 조회 실패:', error);
       throw error;
     }
   }
@@ -1210,13 +1245,13 @@ class FirebaseService {
       
       // 예약이 있으면 사용 불가
       if (conflictingReservations.length > 0) {
-        console.log(`🚫 시간 슬롯 ${timeSlot} 이미 예약됨:`, conflictingReservations.length, '건');
+        devLog.log(`🚫 시간 슬롯 ${timeSlot} 이미 예약됨:`, conflictingReservations.length, '건');
         return false;
       }
       
       return true;
     } catch (error) {
-      console.error('❌ 시간 슬롯 가용성 확인 실패:', error);
+      devLog.error('❌ 시간 슬롯 가용성 확인 실패:', error);
       return false;
     }
   }
@@ -1257,7 +1292,7 @@ class FirebaseService {
       
       return allSlots;
     } catch (error) {
-      console.error('❌ 가용 시간 슬롯 조회 실패:', error);
+      devLog.error('❌ 가용 시간 슬롯 조회 실패:', error);
       return [];
     }
   }
@@ -1290,7 +1325,7 @@ class FirebaseService {
       }
       return null;
     } catch (error) {
-      console.error('❌ 차량 진단 리포트 조회 실패:', error);
+      devLog.error('❌ 차량 진단 리포트 조회 실패:', error);
       throw error;
     }
   }
@@ -1327,7 +1362,7 @@ class FirebaseService {
         } as VehicleDiagnosisReport;
       });
     } catch (error) {
-      console.error('❌ 사용자 차량 진단 리포트 조회 실패:', error);
+      devLog.error('❌ 사용자 차량 진단 리포트 조회 실패:', error);
       throw error;
     }
   }
@@ -1367,7 +1402,7 @@ class FirebaseService {
       }
       return null;
     } catch (error) {
-      console.error('❌ 예약별 차량 진단 리포트 조회 실패:', error);
+      devLog.error('❌ 예약별 차량 진단 리포트 조회 실패:', error);
       throw error;
     }
   }
@@ -1382,16 +1417,16 @@ class FirebaseService {
       const currentUser = auth.currentUser;
       
       if (!currentUser) {
-        console.log('⚠️ 인증된 사용자가 없어 푸시 토큰 저장 건너뜀');
+        devLog.log('⚠️ 인증된 사용자가 없어 푸시 토큰 저장 건너뜀');
         return;
       }
       
       // ID 토큰 갱신 (Functions 호출 전 필수)
       try {
         await currentUser.getIdToken(true);
-        console.log('✅ 푸시 토큰 저장을 위한 ID Token 갱신 완료');
+        devLog.log('✅ 푸시 토큰 저장을 위한 ID Token 갱신 완료');
       } catch (tokenError) {
-        console.log('⚠️ ID Token 갱신 실패, 기존 토큰으로 시도:', tokenError);
+        devLog.log('⚠️ ID Token 갱신 실패, 기존 토큰으로 시도:', tokenError);
       }
       
       const response = await axios.post(
@@ -1407,12 +1442,12 @@ class FirebaseService {
       );
       
       if (response.data.success) {
-        console.log('✅ 사용자 푸시 토큰 저장 완료:', userId);
+        devLog.log('✅ 사용자 푸시 토큰 저장 완료:', userId);
       } else {
         throw new Error(response.data.error || '푸시 토큰 저장 실패');
       }
     } catch (error) {
-      console.error('❌ 사용자 푸시 토큰 저장 실패:', error);
+      devLog.error('❌ 사용자 푸시 토큰 저장 실패:', error);
       // 에러를 throw하지 않고 로그만 남김 (앱 중단 방지)
       // throw error;
     }
@@ -1441,13 +1476,13 @@ class FirebaseService {
       );
       
       if (response.data.success) {
-        console.log('✅ 푸시 알림 전송 완료:', response.data.message);
+        devLog.log('✅ 푸시 알림 전송 완료:', response.data.message);
         return response.data;
       } else {
         throw new Error(response.data.error || '푸시 알림 전송 실패');
       }
     } catch (error) {
-      console.error('❌ 푸시 알림 전송 실패:', error);
+      devLog.error('❌ 푸시 알림 전송 실패:', error);
       throw error;
     }
   }
@@ -1470,13 +1505,13 @@ class FirebaseService {
       );
       
       if (response.data.success) {
-        console.log('✅ 사용자 목록 조회 완료:', response.data.message);
+        devLog.log('✅ 사용자 목록 조회 완료:', response.data.message);
         return response.data;
       } else {
         throw new Error(response.data.error || '사용자 목록 조회 실패');
       }
     } catch (error) {
-      console.error('❌ 사용자 목록 조회 실패:', error);
+      devLog.error('❌ 사용자 목록 조회 실패:', error);
       throw error;
     }
   }
@@ -1492,9 +1527,9 @@ class FirebaseService {
         notificationSettings: settings,
         updatedAt: serverTimestamp(),
       }, { merge: true });
-      console.log('✅ 사용자 알림 설정 저장 완료:', userId);
+      devLog.log('✅ 사용자 알림 설정 저장 완료:', userId);
     } catch (error) {
-      console.error('❌ 사용자 알림 설정 저장 실패:', error);
+      devLog.error('❌ 사용자 알림 설정 저장 실패:', error);
       throw error;
     }
   }
@@ -1513,7 +1548,7 @@ class FirebaseService {
       }
       return null;
     } catch (error) {
-      console.error('❌ 사용자 알림 설정 조회 실패:', error);
+      devLog.error('❌ 사용자 알림 설정 조회 실패:', error);
       throw error;
     }
   }
@@ -1532,7 +1567,7 @@ class FirebaseService {
       }
       return null;
     } catch (error) {
-      console.error('❌ 사용자 푸시 토큰 조회 실패:', error);
+      devLog.error('❌ 사용자 푸시 토큰 조회 실패:', error);
       throw error;
     }
   }
@@ -1544,7 +1579,7 @@ class FirebaseService {
    */
   async addUserVehicle(vehicleData: Omit<UserVehicle, 'id' | 'createdAt' | 'updatedAt'>): Promise<string> {
     try {
-      console.log('📱 클라이언트에서 사용자 차량 추가 시작:', vehicleData);
+      devLog.log('📱 클라이언트에서 사용자 차량 추가 시작:', vehicleData);
       
       // 현재 로그인한 사용자만 차량을 추가할 수 있도록 체크
       if (!this.auth.currentUser || this.auth.currentUser.uid !== vehicleData.userId) {
@@ -1584,15 +1619,15 @@ class FirebaseService {
    */
   async getUserVehicles(userId: string): Promise<UserVehicle[]> {
     try {
-      console.log('📱 클라이언트에서 사용자 차량 목록 조회 시작:', userId);
+      devLog.log('📱 클라이언트에서 사용자 차량 목록 조회 시작:', userId);
       
       // 현재 로그인한 사용자만 자신의 차량을 조회할 수 있도록 체크
       if (!this.auth.currentUser || this.auth.currentUser.uid !== userId) {
-        console.log('❌ 접근 권한 없음. currentUser:', this.auth.currentUser?.uid, 'requestedUserId:', userId);
+        devLog.log('❌ 접근 권한 없음. currentUser:', this.auth.currentUser?.uid, 'requestedUserId:', userId);
         throw new Error('접근 권한이 없습니다.');
       }
 
-      console.log('🔍 Firestore 쿼리 생성 중...');
+      devLog.log('🔍 Firestore 쿼리 생성 중...');
       const vehiclesRef = collection(this.db, 'userVehicles');
       const q = query(
         vehiclesRef, 
@@ -1600,9 +1635,9 @@ class FirebaseService {
         where('isActive', '==', true)
       );
       
-      console.log('📤 Firestore 쿼리 실행 중...');
+      devLog.log('📤 Firestore 쿼리 실행 중...');
       const querySnapshot = await getDocs(q);
-      console.log('📥 Firestore 쿼리 결과:', querySnapshot.size, '개 문서');
+      devLog.log('📥 Firestore 쿼리 결과:', querySnapshot.size, '개 문서');
       
       const vehicles = querySnapshot.docs.map(doc => {
         const data = doc.data();
@@ -1627,7 +1662,7 @@ class FirebaseService {
    */
   async getUserActiveVehicle(userId: string): Promise<UserVehicle | null> {
     try {
-      console.log('🌩️ Cloud Function으로 사용자 활성 차량 조회:', userId);
+      devLog.log('🌩️ Cloud Function으로 사용자 활성 차량 조회:', userId);
       
       const response = await axios.post(
         `${this.CLOUD_FUNCTION_URL}/getUserActiveVehicle`,
@@ -1645,10 +1680,10 @@ class FirebaseService {
         throw new Error(response.data.error || '사용자 활성 차량 조회 실패');
       }
 
-      console.log('✅ Cloud Function 사용자 활성 차량 조회 완료');
+      devLog.log('✅ Cloud Function 사용자 활성 차량 조회 완료');
       return response.data.activeVehicle;
     } catch (error: any) {
-      console.error('❌ Cloud Function 사용자 활성 차량 조회 실패:', error);
+      devLog.error('❌ Cloud Function 사용자 활성 차량 조회 실패:', error);
       throw error;
     }
   }
@@ -1671,7 +1706,7 @@ class FirebaseService {
       
       await Promise.all(updatePromises);
     } catch (error) {
-      console.error('❌ 차량 비활성화 실패:', error);
+      devLog.error('❌ 차량 비활성화 실패:', error);
       throw error;
     }
   }
@@ -1684,7 +1719,7 @@ class FirebaseService {
     updateData: Partial<Pick<UserVehicle, 'nickname' | 'isActive' | 'make' | 'model' | 'year' | 'batteryCapacity' | 'range'>>
   ): Promise<void> {
     try {
-      console.log('🚗 차량 정보 업데이트:', vehicleId, updateData);
+      devLog.log('🚗 차량 정보 업데이트:', vehicleId, updateData);
       
       // 활성 차량으로 설정하는 경우, 기존 활성 차량 비활성화
       if (updateData.isActive === true) {
@@ -1709,9 +1744,9 @@ class FirebaseService {
         updatedAt: serverTimestamp(),
       });
       
-      console.log('✅ 차량 정보 업데이트 완료:', vehicleId);
+      devLog.log('✅ 차량 정보 업데이트 완료:', vehicleId);
     } catch (error) {
-      console.error('❌ 차량 정보 업데이트 실패:', error);
+      devLog.error('❌ 차량 정보 업데이트 실패:', error);
       throw error;
     }
   }
@@ -1721,14 +1756,14 @@ class FirebaseService {
    */
   async deleteUserVehicle(vehicleId: string): Promise<void> {
     try {
-      console.log('🚗 사용자 차량 삭제:', vehicleId);
+      devLog.log('🚗 사용자 차량 삭제:', vehicleId);
       
       const vehicleRef = doc(this.db, 'userVehicles', vehicleId);
       await deleteDoc(vehicleRef);
       
-      console.log('✅ 사용자 차량 삭제 완료:', vehicleId);
+      devLog.log('✅ 사용자 차량 삭제 완료:', vehicleId);
     } catch (error) {
-      console.error('❌ 사용자 차량 삭제 실패:', error);
+      devLog.error('❌ 사용자 차량 삭제 실패:', error);
       throw error;
     }
   }

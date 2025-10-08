@@ -5,13 +5,10 @@
     "version": "1.0.1",
     "sdkVersion": "54.0.0",
     "orientation": "portrait",
-    "primaryLanguage": "ko",
     "icon": "./ios/app/Images.xcassets/AppIcon.appiconset/App-Icon-1024x1024@1x.png",
     "scheme": "charzingapp",
     "userInterfaceStyle": "automatic",
     "description": "한국 1위 전기차 배터리 진단 전문 서비스. 중고 전기차 구매 전 전문가가 직접 방문하여 배터리 상태를 정확히 진단하고 24시간 내 상세한 리포트를 제공합니다.",
-    "keywords": ["전기차", "배터리진단", "방문점검", "차량진단", "전기차점검", "배터리상태", "충전", "EV", "중고차", "테슬라", "아이오닉", "EV6", "SOH", "배터리수명"],
-    "category": "business",
     "githubUrl": "https://github.com/ijbmsm/CharzingApp-Expo",
     "splash": {
       "backgroundColor": "#ffffff",
@@ -29,7 +26,6 @@
       "icon": "./ios/app/Images.xcassets/AppIcon.appiconset/App-Icon-1024x1024@1x.png",
       "buildNumber": "1",
       "requireFullScreen": false,
-      "statusBarStyle": "default",
       "infoPlist": {
         "NSLocationWhenInUseUsageDescription": "이 앱은 지도를 표시하고 주변 위치 기반 기능을 위해 현재 위치 접근이 필요합니다.",
         "NSUserNotificationUsageDescription": "예약 상태 변경 및 진단 결과 알림을 위해 푸시 알림 권한이 필요합니다.",
@@ -41,15 +37,17 @@
           {
             "CFBundleURLName": "google-signin",
             "CFBundleURLSchemes": ["com.googleusercontent.apps.91035459357-lc3tir17pmmomf793bnce1qmstns4rh7"]
+          },
+          {
+            "CFBundleURLName": "bundleidentifier",
+            "CFBundleURLSchemes": ["com.charzingapp"]
           }
         ]
       },
       "config": {
-        "usesNonExemptEncryption": false,
-        "googleServicesFile": "./GoogleService-Info.plist"
+        "usesNonExemptEncryption": false
       },
       "associatedDomains": ["applinks:charzing.kr"],
-      "appStoreUrl": "https://apps.apple.com/app/id-placeholder"
     },
     "android": {
       "adaptiveIcon": {
@@ -60,8 +58,6 @@
       "package": "com.charzingapp",
       "jsEngine": "hermes",
       "versionCode": 1,
-      "compileSdkVersion": 34,
-      "targetSdkVersion": 34,
       "permissions": [
         "ACCESS_FINE_LOCATION",
         "ACCESS_COARSE_LOCATION",
@@ -71,14 +67,7 @@
         "READ_EXTERNAL_STORAGE",
         "WRITE_EXTERNAL_STORAGE"
       ],
-      "config": {
-        "primaryLanguage": "ko",
-        "googleServicesFile": "./android/app/google-services.json"
-      },
       "softwareKeyboardLayoutMode": "pan",
-      "navigationBar": {
-        "visible": "leanback"
-      },
       "intentFilters": [
         {
           "action": "VIEW",
@@ -97,9 +86,6 @@
       "output": "static",
       "favicon": "./assets/favicon/favicon-32x32.png"
     },
-    "privacyUrl": "https://www.notion.so/1e3f67248617802985bae5b23476bfba",
-    "supportUrl": "https://charzing.kr/support",
-    "marketingUrl": "https://charzing.kr/",
     "plugins": [
       "expo-dev-client",
       "expo-apple-authentication",

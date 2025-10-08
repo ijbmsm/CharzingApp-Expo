@@ -224,23 +224,40 @@ const MyReservationsScreen: React.FC = () => {
           </View>
         )}
         
-        <View style={styles.cardContent}>
-          <View style={styles.addressContainer}>
-            <Ionicons name="location-outline" size={16} color="#6B7280" />
-            <Text style={styles.addressText} numberOfLines={2}>
-              {item.address}
-              {item.detailAddress && ` ${item.detailAddress}`}
-            </Text>
+        {/* 영수증 스타일 정보 카드 */}
+        <View style={styles.receiptCard}>
+          <View style={styles.receiptRow}>
+            <Text style={styles.receiptLabel}>서비스</Text>
+            <Text style={styles.receiptValue}>{item.serviceType || '-'}</Text>
           </View>
           
-          {item.adminNotes && (
-            <View style={styles.notesContainer}>
-              <Ionicons name="document-text-outline" size={16} color="#6B7280" />
-              <Text style={styles.notesText} numberOfLines={2}>
-                {item.adminNotes}
+          <View style={styles.receiptRow}>
+            <Text style={styles.receiptLabel}>예약자</Text>
+            <Text style={styles.receiptValue}>{item.userName || '-'}</Text>
+          </View>
+          
+          {(item.vehicleBrand || item.vehicleModel) && (
+            <View style={styles.receiptRow}>
+              <Text style={styles.receiptLabel}>차량</Text>
+              <Text style={styles.receiptValue}>
+                {item.vehicleBrand} {item.vehicleModel} {item.vehicleYear && `(${item.vehicleYear})`}
               </Text>
             </View>
           )}
+          
+          {item.servicePrice && (
+            <View style={[styles.receiptRow, styles.priceRow]}>
+              <Text style={[styles.receiptLabel, styles.priceLabel]}>금액</Text>
+              <Text style={styles.priceValue}>{item.servicePrice.toLocaleString()}원</Text>
+            </View>
+          )}
+          
+          <View style={styles.receiptRow}>
+            <Text style={styles.receiptLabel}>주소</Text>
+            <Text style={[styles.receiptValue, styles.addressValue]} numberOfLines={2}>
+              {item.address}{item.detailAddress && ` ${item.detailAddress}`}
+            </Text>
+          </View>
         </View>
         
         <View style={styles.cardFooter}>
@@ -385,20 +402,52 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     color: '#1F2937',
   },
-  cardContent: {
+  receiptCard: {
+    backgroundColor: '#F9FAFB',
+    borderRadius: 8,
+    padding: 12,
     marginBottom: 12,
+    borderWidth: 1,
+    borderColor: '#E5E7EB',
   },
-  addressContainer: {
+  receiptRow: {
     flexDirection: 'row',
+    justifyContent: 'space-between',
     alignItems: 'flex-start',
-    marginBottom: 8,
+    paddingVertical: 4,
   },
-  addressText: {
+  receiptLabel: {
+    fontSize: 12,
+    color: '#6B7280',
+    fontWeight: '500',
+    width: 50,
+    flexShrink: 0,
+  },
+  receiptValue: {
+    fontSize: 12,
+    color: '#1F2937',
     flex: 1,
-    fontSize: 14,
-    color: '#374151',
-    marginLeft: 6,
-    lineHeight: 20,
+    textAlign: 'right',
+    fontWeight: '400',
+  },
+  priceRow: {
+    borderTopWidth: 1,
+    borderTopColor: '#E5E7EB',
+    paddingTop: 8,
+    marginTop: 4,
+  },
+  priceLabel: {
+    fontWeight: '600',
+    color: '#1F2937',
+  },
+  priceValue: {
+    fontSize: 13,
+    fontWeight: '700',
+    color: '#4495E8',
+  },
+  addressValue: {
+    fontSize: 11,
+    lineHeight: 14,
   },
   notesContainer: {
     flexDirection: 'row',
