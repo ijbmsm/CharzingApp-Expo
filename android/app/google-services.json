@@ -30,6 +30,14 @@
           }
         },
         {
+          "client_id": "91035459357-u1j77pagfknhjvbn661d9p62u27ldrin.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.charzingapp",
+            "certificate_hash": "c13637213d747390bf0bcf4bff34e75285e2f35a"
+          }
+        },
+        {
           "client_id": "91035459357-0ulua3kp7eje2bmjd76mceml113el8gd.apps.googleusercontent.com",
           "client_type": 3
         }

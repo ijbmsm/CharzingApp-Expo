@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useCallback } from 'react';
 import {
   View,
   Text,
@@ -17,6 +17,7 @@ import { setUser, setLoading, setAutoLoginEnabled } from '../store/slices/authSl
 import { RootState } from '../store';
 import appleLoginService from '../services/appleLoginService';
 import googleLoginService from '../services/googleLoginService';
+import kakaoLoginService from '../services/kakaoLoginService';
 import firebaseService from '../services/firebaseService';
 import { useLoading } from '../contexts/LoadingContext';
 import { Ionicons } from '@expo/vector-icons';
@@ -46,10 +47,64 @@ export default function LoginScreen() {
   // 카카오 로그인 초기화는 App.tsx에서 이미 처리됨
 
 
-  // 카카오 로그인 (App Store 심사용 임시 비활성화)
-  const handleKakaoLogin = async () => {
-    Alert.alert('준비 중', '카카오 로그인은 App Store 심사를 위해 임시 비활성화되었습니다.');
-  };
+  // 카카오 로그인 (useCallback으로 최적화)
+  const handleKakaoLogin = useCallback(async () => {
+    logger.auth('login_attempt', 'kakao');
+    showLoading('카카오 로그인 중...');
+    dispatch(setLoading(true));
+
+    try {
+      // 카카오 로그인 서비스 초기화 및 실행
+      await kakaoLoginService.initialize();
+      const result = await kakaoLoginService.login();
+      
+      if (result.success && result.user) {
+        const firebaseUser = result.user;
+        
+        const kakaoUser = {
+          uid: firebaseUser.uid,
+          email: firebaseUser.email || undefined,
+          displayName: firebaseUser.displayName || '카카오 사용자',
+          photoURL: firebaseUser.photoURL || undefined,
+          kakaoId: firebaseUser.uid.replace('kakao_', ''), // Firebase UID에서 카카오 ID 추출
+          provider: 'kakao' as const,
+        };
+
+        logger.auth('login_success', 'kakao', true, undefined, firebaseUser.uid);
+
+        if (result.needsRegistration) {
+          // 신규 사용자 - 추가 정보 입력 화면으로 이동
+          logger.userAction('navigate_to_signup_complete', firebaseUser.uid, { provider: 'kakao' });
+          navigation.navigate('SignupComplete', { kakaoUser: kakaoUser });
+        } else {
+          // 기존 사용자 - 바로 로그인 완료
+          logger.userAction('login_complete', firebaseUser.uid, { provider: 'kakao', isExistingUser: true });
+          dispatch(setUser(kakaoUser));
+          
+          // 로그인 완료 후 이전 화면으로 돌아가기
+          logger.userAction('navigate_back_after_login', firebaseUser.uid);
+          if (navigation.canGoBack()) {
+            navigation.goBack();
+          } else {
+            navigation.dispatch(
+              CommonActions.reset({
+                index: 0,
+                routes: [{ name: 'Main' }],
+              })
+            );
+          }
+        }
+      } else {
+        Alert.alert('로그인 실패', result.error || '알 수 없는 오류가 발생했습니다.');
+      }
+    } catch (error) {
+      logger.auth('login_attempt', 'kakao', false, error);
+      Alert.alert('로그인 실패', '카카오 로그인 중 오류가 발생했습니다.');
+    } finally {
+      hideLoading();
+      dispatch(setLoading(false));
+    }
+  }, [showLoading, hideLoading, dispatch, navigation, logger]);
 
 
   const handleBackPress = () => {
@@ -58,7 +113,7 @@ export default function LoginScreen() {
     }
   };
 
-  const handleGoogleLogin = async () => {
+  const handleGoogleLogin = useCallback(async () => {
     logger.auth('login_attempt', 'google');
     showLoading('Google 로그인 중...');
     dispatch(setLoading(true));
@@ -112,9 +167,9 @@ export default function LoginScreen() {
       hideLoading();
       dispatch(setLoading(false));
     }
-  };
+  }, [showLoading, hideLoading, dispatch, navigation, logger]);
 
-  const handleAppleLogin = async () => {
+  const handleAppleLogin = useCallback(async () => {
     logger.auth('login_attempt', 'apple');
     showLoading('Apple 로그인 중...');
     dispatch(setLoading(true));
@@ -182,7 +237,7 @@ export default function LoginScreen() {
       hideLoading();
       dispatch(setLoading(false));
     }
-  };
+  }, [showLoading, hideLoading, dispatch, navigation, logger]);
 
   const handleSkipLogin = () => {
     if (navigation.canGoBack()) {
@@ -223,13 +278,8 @@ export default function LoginScreen() {
 
         {/* 소셜 로그인 버튼들 */}
         <View style={styles.socialButtonsContainer}>
-          {/* 
-          임시로 App Store 심사용 주석처리
-          카카오, 구글 로그인 작동 문제로 일시적 비활성화
-          */}
-          
-          {/* 카카오로 시작하기 - App Store 심사용 임시 숨김 */}
-          {/* <TouchableOpacity 
+          {/* 카카오로 시작하기 - 제일 상단에 배치 */}
+          <TouchableOpacity 
             style={[styles.socialButton, styles.kakaoButton]}
             onPress={handleKakaoLogin}
           >
@@ -241,7 +291,7 @@ export default function LoginScreen() {
             <Text style={[styles.socialButtonText, styles.kakaoButtonText]}>
               카카오로 시작하기
             </Text>
-          </TouchableOpacity> */}
+          </TouchableOpacity>
 
           {/* iOS: Apple + Google, Android: Google만 */}
           {Platform.OS === 'ios' ? (

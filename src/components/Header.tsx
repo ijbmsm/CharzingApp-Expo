@@ -43,9 +43,14 @@ const Header: React.FC<HeaderProps> = ({
 
   const handleNotificationPress = () => {
     if (!isAuthenticated) {
-      navigation.navigate('Login');
+      navigation.navigate('Login', { 
+        showBackButton: true,
+        message: '알림을 확인하려면 로그인이 필요합니다.'
+      });
       return;
     }
+    
+    // 실시간 리스너가 동작 중이므로 별도 새로고침 불필요
     setIsNotificationModalVisible(true);
   };
 

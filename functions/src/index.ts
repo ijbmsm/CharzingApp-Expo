@@ -19,7 +19,277 @@ const corsHandler = cors({
 // Firestore 인스턴스
 const db = admin.firestore();
 
-// 카카오 로그인 함수 제거됨 (App Store 심사용)
+/**
+ * 카카오 로그인용 HTTP 함수 (인증 없이 호출 가능)
+ */
+export const kakaoLoginHttp = functions
+  .region('us-central1')
+  .runWith({
+    memory: '512MB',
+    timeoutSeconds: 60,
+  })
+  .https.onRequest(async (req, res) => {
+    try {
+      // CORS 헤더 설정
+      res.set('Access-Control-Allow-Origin', '*');
+      res.set('Access-Control-Allow-Methods', 'POST');
+      res.set('Access-Control-Allow-Headers', 'Content-Type');
+
+      // OPTIONS 요청 처리 (CORS preflight)
+      if (req.method === 'OPTIONS') {
+        res.status(204).send('');
+        return;
+      }
+
+      // POST 요청만 허용
+      if (req.method !== 'POST') {
+        res.status(405).json({ error: 'Method not allowed' });
+        return;
+      }
+
+      console.log('🟡 Kakao Login HTTP 요청 받음');
+      console.log('🔍 Request body:', req.body);
+      
+      const { kakaoAccessToken, userInfo } = req.body;
+
+      if (!kakaoAccessToken || !userInfo) {
+        res.status(400).json({
+          success: false,
+          error: '카카오 액세스 토큰과 사용자 정보가 필요합니다.'
+        });
+        return;
+      }
+
+      // 카카오 액세스 토큰 검증 (선택적)
+      try {
+        // 카카오 API를 통한 토큰 검증
+        const response = await axios.get('https://kapi.kakao.com/v1/user/access_token_info', {
+          headers: {
+            Authorization: `Bearer ${kakaoAccessToken}`,
+          },
+        });
+        
+        console.log('✅ 카카오 액세스 토큰 검증 완료:', response.data);
+      } catch (error) {
+        console.error('❌ 카카오 액세스 토큰 검증 실패:', error);
+        res.status(400).json({
+          success: false,
+          error: '카카오 액세스 토큰이 유효하지 않습니다.'
+        });
+        return;
+      }
+
+      // Firebase UID 생성 (Kakao ID 기반)
+      const firebaseUID = `kakao_${userInfo.id}`;
+      const userDocRef = db.collection('users').doc(firebaseUID);
+      const userDoc = await userDocRef.get();
+      const isNewUser = !userDoc.exists;
+      
+      console.log('🔍 사용자 존재 여부:', isNewUser ? '신규 사용자' : '기존 사용자', 'UID:', firebaseUID);
+
+      // 사용자 정보 저장/업데이트
+      const userData = {
+        kakaoId: userInfo.id,
+        email: userInfo.email,
+        displayName: userInfo.nickname || userInfo.email?.split('@')[0] || '카카오 사용자',
+        photoURL: userInfo.profileImageUrl,
+        provider: 'kakao',
+        lastLoginAt: admin.firestore.FieldValue.serverTimestamp(),
+        updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+      };
+
+      if (isNewUser) {
+        await userDocRef.set({
+          ...userData,
+          createdAt: admin.firestore.FieldValue.serverTimestamp(),
+          isRegistrationComplete: false,
+        });
+        console.log('✅ 신규 카카오 사용자 생성:', firebaseUID);
+      } else {
+        await userDocRef.update(userData);
+        console.log('✅ 기존 카카오 사용자 정보 업데이트:', firebaseUID);
+      }
+
+      // Firebase Custom Token 생성
+      console.log('🔥 Kakao Custom Token 생성 중... Firebase UID:', firebaseUID);
+      
+      const customClaims = {
+        provider: 'kakao',
+        kakaoId: userInfo.id,
+        email: userInfo.email || null,
+        displayName: userData.displayName,
+        isVerified: true,
+        role: 'user',
+        canCreateReservation: true,
+        tokenVersion: Date.now()
+      };
+      
+      const customToken = await admin.auth().createCustomToken(firebaseUID, customClaims);
+      console.log('✅ Kakao Custom Token 생성 완료 (강화된 claims 포함)');
+
+      // 응답
+      res.status(200).json({
+        success: true,
+        customToken,
+        userInfo: {
+          id: firebaseUID,
+          email: userInfo.email,
+          displayName: userData.displayName,
+          photoURL: userInfo.profileImageUrl,
+        },
+        isExistingUser: !isNewUser,
+      });
+
+    } catch (error: any) {
+      console.error('❌ Kakao Login 실패:', error);
+      
+      res.status(500).json({
+        success: false,
+        error: '카카오 로그인 처리 중 오류가 발생했습니다.'
+      });
+    }
+  });
+
+/**
+ * 카카오 로그인용 Callable 함수 (기존 호환성)
+ */
+export const kakaoLogin = functions
+  .region('us-central1')
+  .runWith({
+    memory: '512MB',
+    timeoutSeconds: 60,
+  })
+  .https.onCall(async (data, context) => {
+    try {
+      console.log('🟡 Kakao Login Callable 요청 받음');
+      
+      const { kakaoAccessToken, userInfo } = data;
+      if (!kakaoAccessToken || !userInfo) {
+        throw new functions.https.HttpsError(
+          'invalid-argument',
+          '카카오 액세스 토큰과 사용자 정보가 필요합니다.'
+        );
+      }
+
+      // HTTP 함수로 리다이렉트
+      const axios = require('axios');
+      const response = await axios.post(
+        'https://us-central1-charzing-d1600.cloudfunctions.net/kakaoLoginHttp',
+        { kakaoAccessToken, userInfo },
+        {
+          headers: { 'Content-Type': 'application/json' },
+          timeout: 15000,
+        }
+      );
+
+      return response.data;
+    } catch (error: any) {
+      console.error('❌ Kakao Login Callable 실패:', error);
+      throw new functions.https.HttpsError(
+        'internal',
+        '카카오 로그인 처리 중 오류가 발생했습니다.'
+      );
+    }
+  });
+
+/**
+ * 카카오 로그인을 위한 Firebase 커스텀 토큰 생성 (기존 함수 - 호환성 유지)
+ * @deprecated 새로운 kakaoLogin 함수를 사용하세요
+ */
+export const createKakaoCustomToken = functions
+  .region('us-central1')
+  .https.onCall(async (data, context) => {
+    try {
+      const { kakaoId, email, displayName, photoURL } = data;
+
+      // 입력 데이터 검증
+      if (!kakaoId) {
+        throw new functions.https.HttpsError(
+          'invalid-argument',
+          '카카오 ID가 필요합니다.'
+        );
+      }
+
+      // 카카오 ID를 기반으로 고유한 UID 생성
+      const uid = `kakao_${kakaoId}`;
+
+      // 사용자 정보 설정
+      const userRecord = {
+        uid,
+        email: email || undefined,
+        displayName: displayName || '카카오 사용자',
+        photoURL: photoURL || undefined,
+        emailVerified: false,
+        disabled: false,
+      };
+
+      // Firebase Auth에서 사용자 확인/생성
+      let user;
+      try {
+        user = await admin.auth().getUser(uid);
+        // 기존 사용자 정보 업데이트
+        user = await admin.auth().updateUser(uid, {
+          email: userRecord.email,
+          displayName: userRecord.displayName,
+          photoURL: userRecord.photoURL,
+        });
+      } catch (error: any) {
+        if (error.code === 'auth/user-not-found') {
+          // 신규 사용자 생성
+          user = await admin.auth().createUser(userRecord);
+        } else {
+          throw error;
+        }
+      }
+
+      // 커스텀 토큰 생성
+      const customToken = await admin.auth().createCustomToken(uid, {
+        provider: 'kakao',
+        kakaoId: kakaoId,
+        email: email,
+        displayName: displayName,
+      });
+
+      // Firestore에 사용자 정보 저장/업데이트 (선택사항)
+      try {
+        await db.collection('users').doc(uid).set({
+          uid,
+          email: email || null,
+          displayName: displayName || '카카오 사용자',
+          photoURL: photoURL || null,
+          provider: 'kakao',
+          kakaoId: kakaoId,
+          createdAt: admin.firestore.FieldValue.serverTimestamp(),
+          updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+        }, { merge: true });
+      } catch (firestoreError) {
+        console.warn('Firestore 사용자 정보 저장 실패:', firestoreError);
+        // Firestore 저장 실패는 치명적이지 않으므로 계속 진행
+      }
+
+      return {
+        success: true,
+        customToken,
+        uid: user.uid,
+        isNewUser: !user.metadata?.creationTime || 
+                   user.metadata.creationTime === user.metadata.lastSignInTime,
+        message: '카카오 커스텀 토큰 생성 성공'
+      };
+
+    } catch (error: any) {
+      console.error('카카오 커스텀 토큰 생성 실패:', error);
+      
+      if (error instanceof functions.https.HttpsError) {
+        throw error;
+      }
+      
+      throw new functions.https.HttpsError(
+        'internal',
+        '카카오 로그인 처리 중 오류가 발생했습니다.',
+        error.message
+      );
+    }
+  });
 
 /**
  * 사용자 프로필 업데이트 (웹과 앱 공통)
@@ -432,7 +702,14 @@ export const createDiagnosisReservation = functions
           latitude, 
           longitude, 
           requestedDate, 
-          notes 
+          notes,
+          serviceType,
+          servicePrice,
+          vehicleBrand,
+          vehicleModel,
+          vehicleYear,
+          userName,
+          userPhone
         } = req.body;
 
         console.log('📅 진단 예약 생성 요청:', uid);
@@ -473,8 +750,8 @@ export const createDiagnosisReservation = functions
         // 예약 데이터 생성
         const reservationData = {
           userId: uid,
-          userName: userData?.displayName || '사용자',
-          userPhone: userData?.phoneNumber || null,
+          userName: userName || userData?.displayName || '사용자',
+          userPhone: userPhone || userData?.phoneNumber || null,
           address,
           detailAddress: detailAddress || '',
           latitude: Number(latitude),
@@ -482,7 +759,11 @@ export const createDiagnosisReservation = functions
           status: 'pending',
           requestedDate: admin.firestore.Timestamp.fromDate(requestedDateTime),
           estimatedDuration: '약 30분',
-          serviceType: '방문 배터리 진단 및 상담',
+          serviceType: serviceType || '방문 배터리 진단 및 상담',
+          servicePrice: servicePrice || 100000,
+          vehicleBrand: vehicleBrand || '',
+          vehicleModel: vehicleModel || '',
+          vehicleYear: vehicleYear || '',
           notes: notes || '',
           adminNotes: '',
           createdAt: admin.firestore.FieldValue.serverTimestamp(),

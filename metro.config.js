@@ -15,4 +15,18 @@ config.resolver.alias = {
   'react/jsx-runtime': 'react/jsx-runtime.js',
 };
 
+// Metro 서버 커스터마이즈
+config.server = {
+  ...config.server,
+  enhanceMiddleware: (middleware, server) => {
+    return (req, res, next) => {
+      // 브랜딩 정보 출력
+      if (req.url === '/') {
+        console.log('🚗 차징 앱 번들링 중...');
+      }
+      return middleware(req, res, next);
+    };
+  },
+};
+
 module.exports = config;

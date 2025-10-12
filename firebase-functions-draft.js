@@ -174,13 +174,3 @@ exports.createCustomTokenFromGoogle = functions.https.onRequest(async (req, res)
     });
   }
 });
-
-// 설정 방법:
-// 1. Firebase Console > Authentication > Sign-in method > Google 활성화
-// 2. Firebase Console > Project Settings > General > Your apps > Web app
-// 3. Web SDK configuration에서 Client ID 복사하여 환경변수 설정
-// 
-// firebase functions:config:set google.web_client_id="YOUR_GOOGLE_WEB_CLIENT_ID"
-// 
-// 또는 .env 파일에:
-// GOOGLE_WEB_CLIENT_ID=YOUR_GOOGLE_WEB_CLIENT_ID

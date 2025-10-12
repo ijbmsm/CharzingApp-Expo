@@ -10,9 +10,11 @@ import {
   Modal,
   TextInput,
   FlatList,
+  KeyboardAvoidingView,
+  Platform,
 } from 'react-native';
 import { MotiView } from 'moti';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { Calendar, LocaleConfig } from 'react-native-calendars';
 import * as Location from 'expo-location';
@@ -86,6 +88,7 @@ const ReservationScreen: React.FC = () => {
   const route = useRoute<any>();
   const { user, isAuthenticated } = useSelector((state: RootState) => state.auth);
   const { showLoading, hideLoading } = useLoading();
+  const insets = useSafeAreaInsets();
 
   // 수정 모드 및 기존 예약 데이터
   const editMode = route.params?.editMode || false;
@@ -760,7 +763,12 @@ const ReservationScreen: React.FC = () => {
         onBackPress={handlePrevious}
       />
 
-      <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
+      <KeyboardAvoidingView 
+        style={{ flex: 1 }}
+        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+        keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 20}
+      >
+        <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
 
         {/* 1단계: 차량 & 서비스 선택 */}
         <MotiView
@@ -1290,6 +1298,7 @@ const ReservationScreen: React.FC = () => {
           </TouchableOpacity>
         )}
       </View>
+      </KeyboardAvoidingView>
 
       {/* 예약 확인 모달 */}
       <Modal
@@ -1299,7 +1308,7 @@ const ReservationScreen: React.FC = () => {
         onRequestClose={() => setShowConfirmationModal(false)}
       >
         <View style={styles.modalOverlay}>
-          <View style={styles.modalContainer}>
+          <SafeAreaView style={[styles.modalContainer, { paddingBottom: Math.max(insets.bottom, 24) }]}>
             <View style={styles.modalHeader}>
               <Text style={styles.modalTitle}>예약 확정</Text>
               <TouchableOpacity
@@ -1328,7 +1337,7 @@ const ReservationScreen: React.FC = () => {
                 <Text style={styles.modalConfirmButtonText}>확정</Text>
               </TouchableOpacity>
             </View>
-          </View>
+          </SafeAreaView>
         </View>
       </Modal>
 

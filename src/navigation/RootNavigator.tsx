@@ -170,7 +170,7 @@ function MainTabs() {
 // 모든 화면이 직접 Login으로 리다이렉트하는 방식으로 통일됨
 
 export default function RootNavigator() {
-  const [showSplash, setShowSplash] = useState(true);
+  const [showSplash, setShowSplash] = useState(false); // App.tsx에서 이미 로딩 처리하므로 비활성화
 
   const handleSplashFinish = () => {
     setShowSplash(false);

@@ -176,6 +176,66 @@ class AppleLoginService {
     }
   }
 
+  // Apple 세션 silent refresh 시도
+  async silentRefresh(): Promise<AppleAuthResult> {
+    try {
+      devLog.log('🔄 Apple 세션 silent refresh 시도...');
+      
+      // Apple Sign-In 지원 여부 확인
+      const isAvailable = await AppleAuthentication.isAvailableAsync();
+      if (!isAvailable) {
+        return {
+          success: false,
+          error: 'Apple Sign-In is not available on this device'
+        };
+      }
+
+      // 자동 로그인 시도 (사용자 입력 없이)
+      const credential = await AppleAuthentication.signInAsync({
+        requestedScopes: [], // silent refresh에서는 scope 요청하지 않음
+      });
+
+      if (!credential.identityToken) {
+        throw new Error('Silent refresh failed: No identity token received');
+      }
+
+      // Firebase Apple provider 생성
+      const provider = new OAuthProvider('apple.com');
+      const firebaseCredential = provider.credential({
+        idToken: credential.identityToken,
+        rawNonce: undefined,
+      });
+
+      // Firebase에 재로그인
+      const userCredential = await signInWithCredential(getAuthInstance(), firebaseCredential);
+      const firebaseUser = userCredential.user;
+
+      devLog.log('✅ Apple silent refresh 성공:', firebaseUser.uid);
+
+      return {
+        success: true,
+        user: firebaseUser,
+        needsRegistration: false,
+      };
+
+    } catch (error: any) {
+      devLog.log('❌ Apple silent refresh 실패:', error.message);
+      
+      // 사용자가 취소한 경우 (silent refresh에서는 정상적인 상황)
+      if (error.code === 'ERR_REQUEST_CANCELED') {
+        return {
+          success: false,
+          error: 'Silent refresh 취소됨 (재로그인 필요)'
+        };
+      }
+
+      return {
+        success: false,
+        error: `Silent refresh 실패: ${error.message}`
+      };
+    }
+  }
+
   // Apple 계정 연결 해제 (선택사항)
   async revokeAccess(): Promise<boolean> {
     try {

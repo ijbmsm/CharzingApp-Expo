@@ -417,7 +417,7 @@ export const RESERVATION_TYPES: ReservationType[] = [
   {
     id: 'standard',
     name: '스탠다드',
-    price: 70000,
+    price: 100000,
     description: '여러 차량 비교가 필요할 때 경제적인 선택',
     features: [
       'OBD2 단자를 통한 진단',
@@ -431,7 +431,7 @@ export const RESERVATION_TYPES: ReservationType[] = [
   {
     id: 'premium',
     name: '프리미엄',
-    price: 150000,
+    price: 200000,
     description: '정확한 배터리 성능 분석이 필요할 때',
     features: [
       'OBD2 단자를 통한 진단',

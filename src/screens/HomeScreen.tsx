@@ -148,21 +148,43 @@ export default function HomeScreen() {
       return;
     }
 
-    // Firebase Auth currentUser 체크 (토큰 만료 감지)
-    const auth = getAuth();
-    if (!auth.currentUser) {
-      devLog.log('⚠️ Firebase Auth currentUser 없음, 차량 목록 로드 건너뜀');
-      if (isMountedRef.current) {
-        setUserVehicles([]);
-      }
-      return;
-    }
-
     if (!isMountedRef.current) return;
 
     try {
       if (isMountedRef.current) {
         setVehiclesLoading(true);
+      }
+      
+      // Firebase Auth 초기화 상태 확인 (잠시 대기 후 재시도)
+      const auth = getAuth();
+      if (!auth.currentUser) {
+        devLog.log('⚠️ 차량 목록 로드: Firebase Auth currentUser 초기화 중, 잠시 대기...');
+        await new Promise(resolve => setTimeout(resolve, 500));
+        
+        // 재시도 후에도 없으면 로그인 실패로 간주 (Apple 사용자만)
+        if (!auth.currentUser && user.provider === 'apple') {
+          devLog.log('❌ Apple 사용자: Firebase Auth currentUser 최종 확인 실패, 차량 목록 로드 건너뜀');
+          if (isMountedRef.current) {
+            setUserVehicles([]);
+            setVehiclesLoading(false);
+            
+            // Apple 토큰 만료 안내 (한 번만 표시)
+            setTimeout(() => {
+              Alert.alert(
+                '로그인 세션 만료',
+                'Apple 로그인 세션이 만료되었습니다.\n데이터를 불러오려면 다시 로그인해주세요.',
+                [
+                  { text: '취소', style: 'cancel' },
+                  { 
+                    text: '다시 로그인', 
+                    onPress: () => navigation.navigate('Login', { showBackButton: true })
+                  }
+                ]
+              );
+            }, 1000);
+          }
+          return;
+        }
       }
       
       logger.userAction('load_user_vehicles', user.uid);
@@ -204,15 +226,20 @@ export default function HomeScreen() {
         return;
       }
 
-      // Firebase Auth currentUser 체크 (토큰 만료 감지)
+      // Firebase Auth가 완전히 초기화될 때까지 잠시 대기
       const auth = getAuth();
       if (!auth.currentUser) {
-        devLog.log('⚠️ Firebase Auth currentUser 없음, 예약 정보 로드 건너뜀');
-        if (isMountedRef.current) {
+        devLog.log('⚠️ Firebase Auth currentUser 아직 초기화 중, 잠시 대기...');
+        // 1초 정도 대기 후 다시 시도
+        await new Promise(resolve => setTimeout(resolve, 1000));
+        
+        // 재시도 후에도 currentUser가 없으면 로그인 실패로 간주
+        if (!auth.currentUser && isMountedRef.current) {
+          devLog.log('❌ Firebase Auth currentUser 최종 확인 실패, 예약 정보 로드 건너뜀');
           setLatestReservation(null);
           setVehicleReport(null);
+          return;
         }
-        return;
       }
 
       if (isMountedRef.current) {
@@ -268,14 +295,19 @@ export default function HomeScreen() {
       
       // 예약 정보 새로고침
       if (isAuthenticated && user) {
-        // Firebase Auth currentUser 체크
+        // Firebase Auth가 완전히 초기화될 때까지 잠시 대기
         const auth = getAuth();
         if (!auth.currentUser) {
-          devLog.log('⚠️ Firebase Auth currentUser 없음, 새로고침 건너뜀');
-          if (isMountedRef.current) {
+          devLog.log('⚠️ Firebase Auth currentUser 아직 초기화 중, 새로고침 잠시 대기...');
+          // 1초 정도 대기 후 다시 시도
+          await new Promise(resolve => setTimeout(resolve, 1000));
+          
+          // 재시도 후에도 currentUser가 없으면 건너뜀
+          if (!auth.currentUser && isMountedRef.current) {
+            devLog.log('❌ Firebase Auth currentUser 최종 확인 실패, 새로고침 건너뜀');
             setRefreshing(false);
+            return;
           }
-          return;
         }
 
         const reservationPromise = (async () => {
@@ -405,28 +437,38 @@ export default function HomeScreen() {
   };
 
   // 인증이 필요한 기능 실행 헬퍼 (토큰 만료 감지 포함)
-  const executeWithAuth = (action: () => void, feature: string) => {
+  const executeWithAuth = async (action: () => void, feature: string) => {
     if (!isAuthenticated) {
       navigation.navigate('Login', { showBackButton: true });
       return;
     }
     
-    // Firebase Auth 상태도 함께 확인
+    // Firebase Auth 상태 확인 (초기화 대기 포함)
     const auth = getAuth();
-    if (!auth.currentUser && user?.provider === 'apple') {
-      // Apple 토큰 만료로 추정되는 상황
-      Alert.alert(
-        '로그인 필요', 
-        'Apple 로그인 세션이 만료되었습니다.\n다시 로그인해주세요.',
-        [
-          { text: '취소', style: 'cancel' },
-          { 
-            text: '로그인', 
-            onPress: () => navigation.navigate('Login', { showBackButton: true })
-          }
-        ]
-      );
-      return;
+    if (!auth.currentUser) {
+      devLog.log(`⚠️ ${feature}: Firebase Auth currentUser 초기화 중, 잠시 대기...`);
+      
+      // 잠시 대기 후 재확인
+      await new Promise(resolve => setTimeout(resolve, 500));
+      
+      if (!auth.currentUser && user?.provider === 'apple') {
+        // Apple 토큰 만료로 추정되는 상황
+        Alert.alert(
+          '로그인 필요', 
+          'Apple 로그인 세션이 만료되었습니다.\n다시 로그인해주세요.',
+          [
+            { text: '취소', style: 'cancel' },
+            { 
+              text: '로그인', 
+              onPress: () => navigation.navigate('Login', { showBackButton: true })
+            }
+          ]
+        );
+        return;
+      } else if (!auth.currentUser && user?.provider !== 'apple') {
+        devLog.log(`⚠️ ${feature}: Firebase Auth currentUser 아직 없음, 하지만 진행`);
+        // Apple이 아닌 경우는 Redux 인증 상태를 믿고 진행
+      }
     }
     
     action();

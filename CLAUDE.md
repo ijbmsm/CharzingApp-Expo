@@ -1,441 +1,223 @@
-# CharzingApp-Expo 개발 히스토리
+# CLAUDE.md
 
-## 🚗 프로젝트 개요
-전기차 배터리 진단 및 관리 앱 (React Native + Expo)
+이 파일은 Claude Code (claude.ai/code)가 이 저장소에서 작업할 때 필요한 가이드를 제공합니다.
 
----
+## 프로젝트 개요
 
-## 🔧 최근 구현 사항 (2024-09-22)
+CharzingApp-Expo는 한국의 전기차 배터리 진단 및 관리 서비스를 위한 React Native 애플리케이션입니다. Expo managed workflow로 구축되었으며, 전문가가 직접 방문하여 배터리 상태를 진단하고 상세한 리포트를 제공하는 한국 전용 서비스입니다.
 
-### 1. 카카오 지도 통합 및 개선
-#### 문제점
-- 카카오 지도 SDK 로딩 실패
-- WebView에서 지도가 표시되지 않음
-- 위치 권한 설정 누락
+## 기술 스택 및 아키텍처
 
-#### 해결책
-```typescript
-// src/components/KakaoMapView.tsx - 완전 리팩토링
-function KakaoMapView({
-  width = 300,
-  height = 300,
-  latitude = 37.5665,
-  longitude = 126.9780,
-  zoom = 3,
-  onMapClick,
-}: KakaoMapViewProps) {
-  const KAKAO_MAP_JS_KEY = Constants.expoConfig?.extra?.KAKAO_JAVASCRIPT_KEY;
-  
-  const htmlContent = `
-    <script src="https://dapi.kakao.com/v2/maps/sdk.js?appkey=${KAKAO_MAP_JS_KEY}&libraries=services"></script>
-    <script>
-      window.onload = function() {
-        const map = new kakao.maps.Map(document.getElementById('map'), {
-          center: new kakao.maps.LatLng(${latitude}, ${longitude}),
-          level: ${zoom}
-        });
-        // 마커 및 클릭 이벤트 처리
-      }
-    </script>
-  `;
-}
-```
+### 핵심 기술
+- **프론트엔드**: React Native (Expo SDK 54) + TypeScript
+- **상태 관리**: Redux Toolkit + Redux Persist (AsyncStorage)
+- **네비게이션**: React Navigation v7 (Stack + Bottom Tabs)
+- **백엔드**: Firebase (Firestore, Auth, Functions, Cloud Messaging)
+- **지도**: 카카오 지도 JavaScript SDK (WebView 통합)
+- **인증**: Firebase Auth + Google Sign-In + Apple Sign-In
+- **알림**: Expo Notifications + Firebase Cloud Messaging
 
-#### app.json 권한 설정 추가
-```json
-{
-  "ios": {
-    "infoPlist": {
-      "NSLocationWhenInUseUsageDescription": "이 앱은 지도를 표시하고 주변 위치 기반 기능을 위해 현재 위치 접근이 필요합니다."
-    }
-  },
-  "android": {
-    "permissions": ["ACCESS_FINE_LOCATION", "ACCESS_COARSE_LOCATION"]
-  }
-}
-```
-
----
-
-### 2. 진단 예약 시스템 완전 구현
-
-#### Firebase 데이터베이스 통합
-```typescript
-// src/services/firebaseService.ts
-export interface DiagnosisReservation {
-  id: string;
-  userId: string;
-  userName?: string;
-  userPhone?: string;
-  address: string;
-  detailAddress?: string;
-  latitude: number;
-  longitude: number;
-  status: 'pending' | 'confirmed' | 'in_progress' | 'completed' | 'cancelled';
-  requestedDate: Date | FieldValue;
-  estimatedDuration: string;
-  serviceType: string;
-  notes?: string;
-  adminNotes?: string;
-  createdAt: Date | FieldValue;
-  updatedAt: Date | FieldValue;
-}
-
-class FirebaseService {
-  // 진단 예약 생성
-  async createDiagnosisReservation(reservationData: Omit<DiagnosisReservation, 'id' | 'createdAt' | 'updatedAt'>): Promise<string>
-  
-  // 사용자 예약 목록 조회
-  async getUserDiagnosisReservations(userId: string): Promise<DiagnosisReservation[]>
-  
-  // 예약 상태 업데이트 (관리자용)
-  async updateDiagnosisReservationStatus(reservationId: string, status: DiagnosisReservation['status'], adminNotes?: string): Promise<void>
-  
-  // 예약 취소
-  async cancelDiagnosisReservation(reservationId: string, reason?: string): Promise<void>
-}
-```
-
-#### 진단 예약 화면 업데이트
-```typescript
-// src/screens/DiagnosisReservationScreen.tsx
-const DiagnosisReservationScreen: React.FC = () => {
-  const { user, isAuthenticated } = useSelector((state: RootState) => state.auth);
-  
-  const submitReservation = async () => {
-    const reservationData = {
-      userId: user.uid,
-      userName: user.displayName || '사용자',
-      address: userAddress,
-      detailAddress: detailAddress || '',
-      latitude: userLocation.latitude,
-      longitude: userLocation.longitude,
-      status: 'pending' as const,
-      requestedDate: new Date(),
-      estimatedDuration: '약 30분',
-      serviceType: '방문 배터리 진단 및 상담',
-    };
-
-    const reservationId = await firebaseService.createDiagnosisReservation(reservationData);
-    // 예약 완료 처리
-  };
-};
-```
-
-#### 홈 화면 실시간 상태 표시
-```typescript
-// src/screens/HomeScreen.tsx
-export default function HomeScreen() {
-  const { user, isAuthenticated } = useSelector((state: RootState) => state.auth);
-  const [latestReservation, setLatestReservation] = useState<DiagnosisReservation | null>(null);
-  
-  // 상태에 따른 단계 매핑
-  const getStepFromStatus = (status: DiagnosisReservation['status']): number => {
-    switch (status) {
-      case 'pending': return 0; // 접수완료
-      case 'confirmed':
-      case 'in_progress': return 1; // 예약됨
-      case 'completed': return 2; // 완료
-      case 'cancelled': return -1; // 취소됨
-    }
-  };
-
-  const currentStep = latestReservation ? getStepFromStatus(latestReservation.status) : -1;
-
-  // 동적 UI 렌더링
-  {!isLoading && !latestReservation && (
-    <TouchableOpacity 
-      style={styles.reserveButton}
-      onPress={() => navigation.navigate('DiagnosisReservation')}
-    >
-      <Text>진단 예약하기</Text>
-    </TouchableOpacity>
-  )}
-  
-  {!isLoading && latestReservation && currentStep >= 0 && (
-    <StepIndicator
-      currentPosition={currentStep}
-      labels={['접수완료', '예약됨', '완료']}
-      stepCount={3}
-    />
-  )}
-}
-```
-
----
-
-### 3. 구현된 기능 요약
-
-#### ✅ 완료된 기능들
-1. **카카오 지도 WebView 완전 작동**
-   - SDK 로딩 최적화
-   - 지도 클릭 이벤트 처리
-   - 역지오코딩 (좌표→주소 변환)
-   - 한국 지역 유효성 검증
-
-2. **진단 예약 전체 플로우**
-   - 위치 선택 → 주소 자동 입력
-   - Firebase에 예약 데이터 저장
-   - 사용자 인증 연동
-   - 예약 상태 추적
-
-3. **홈 화면 실시간 상태 표시**
-   - 예약 없음: "예약하기" 버튼
-   - 예약 있음: 진행 단계 표시
-   - 상태별 메시지 표시
-   - 자동 새로고침
-
-#### 🎯 사용자 플로우
-```
-홈 화면 → 예약 상태 확인
-    ↓ (예약 없음)
-진단 예약하기 버튼 클릭
-    ↓
-위치 선택 (카카오 지도)
-    ↓
-주소 자동 변환 및 확인
-    ↓
-예약하기 → Firebase 저장
-    ↓
-홈으로 돌아가기
-    ↓
-실시간 상태 표시 (접수완료 → 예약됨 → 완료)
-```
-
-#### 🔧 관리자 기능
-- Firebase Console에서 예약 상태 변경
-- `pending` → `confirmed` → `in_progress` → `completed`
-- 앱에서 실시간 반영
-
----
-
-### 4. 기술 스택 & 아키텍처
-
-#### Frontend
-- **React Native** with **Expo** managed workflow
-- **TypeScript** 완전 지원
-- **Redux Toolkit** 상태 관리
-- **React Navigation** v6
-
-#### Backend & Database
-- **Firebase Firestore** 실시간 데이터베이스
-- **Firebase Authentication** (카카오 연동)
-- **Cloud Functions** (서버리스 백엔드)
-
-#### Maps & Location
-- **Kakao Maps JavaScript SDK** (WebView 통합)
-- **Expo Location** 위치 서비스
-- **카카오 REST API** 지오코딩
-
-#### UI/UX Components
-- **react-native-step-indicator** 진행 상태 표시
-- **react-native-webview** 지도 렌더링
-- **@expo/vector-icons** 아이콘
-- Custom 컴포넌트 구조
-
----
-
-### 5. 파일 구조
+### 주요 디렉토리 구조
 ```
 src/
-├── components/
+├── components/          # 재사용 가능한 UI 컴포넌트
 │   ├── KakaoMapView.tsx          # 카카오 지도 WebView 컴포넌트
+│   ├── AuthProvider.tsx          # 인증 상태 관리
 │   ├── Header.tsx                # 공통 헤더
-│   └── AutoSlider.tsx            # 배너 슬라이더
-├── screens/
-│   ├── HomeScreen.tsx            # 홈 화면 (실시간 상태 표시)
+│   └── VehicleSearchModal.tsx    # 차량 검색 모달
+├── screens/            # 화면 컴포넌트
+│   ├── HomeScreen.tsx            # 홈 화면 (예약 상태 표시)
+│   ├── LoginScreen.tsx           # 로그인 화면
+│   ├── ReservationScreen.tsx     # 통합 예약 화면
 │   └── DiagnosisReservationScreen.tsx  # 진단 예약 화면
-├── services/
-│   └── firebaseService.ts        # Firebase 서비스 계층
-├── store/
-│   └── slices/authSlice.ts       # Redux 인증 상태
-└── navigation/
-    └── RootNavigator.tsx         # 네비게이션 구조
+├── services/           # 비즈니스 로직 및 API 서비스
+│   ├── firebaseService.ts        # 메인 Firebase 서비스 계층
+│   ├── authPersistenceService.ts # 인증 지속성 관리
+│   ├── googleLoginService.ts     # Google 로그인 통합
+│   ├── appleLoginService.ts      # Apple 로그인 통합
+│   └── notificationService.ts    # 푸시/인앱 알림 관리
+├── store/             # Redux 스토어 및 슬라이스
+│   ├── index.ts                  # 스토어 설정
+│   └── slices/authSlice.ts       # 인증 상태 슬라이스
+├── navigation/         # 네비게이션 설정
+│   └── RootNavigator.tsx         # 루트 네비게이터
+├── firebase/          # Firebase 설정
+│   └── config.ts                 # Firebase 서비스 프록시
+└── utils/             # 유틸리티 함수
+    └── devLog.ts                 # 개발용 로깅
 ```
 
----
+## 개발 명령어
 
-### 6. 날짜/시간 선택 시스템 완전 구현 (2024-09-22 추가)
-
-#### 새로운 예약 플로우
-```
-홈 화면 → 진단 예약하기
-    ↓
-위치 선택 (카카오 지도) → 다음
-    ↓
-날짜/시간 선택 (캘린더) → 다음
-    ↓
-예약 확인 → 예약 확정하기
-    ↓
-홈 화면 (실시간 상태 표시)
-```
-
-#### react-native-calendars 통합
-```typescript
-// src/screens/DateTimeSelectionScreen.tsx
-import { Calendar } from 'react-native-calendars';
-
-const DateTimeSelectionScreen: React.FC = () => {
-  const [selectedDate, setSelectedDate] = useState<string>('');
-  const [selectedTimeSlot, setSelectedTimeSlot] = useState<string>('');
-  
-  // 예약 가능한 시간대 생성 (9시-18시)
-  const generateTimeSlots = (date: string): TimeSlot[] => {
-    const timeSlots: TimeSlot[] = [];
-    for (let hour = 9; hour <= 17; hour++) {
-      timeSlots.push({
-        id: `${date}-${hour}`,
-        time: `${hour.toString().padStart(2, '0')}:00`,
-        available: !isPast && !isBooked, // 과거 시간 및 예약된 시간 제외
-      });
-    }
-    return timeSlots;
-  };
-};
-```
-
-#### 예약 확인 화면
-```typescript
-// src/screens/DiagnosisReservationConfirmScreen.tsx
-const DiagnosisReservationConfirmScreen: React.FC = () => {
-  const handleConfirmReservation = async () => {
-    // 선택된 날짜와 시간을 조합하여 requestedDate 생성
-    const [year, month, day] = selectedDate.split('-').map(Number);
-    const [hour] = selectedTime.split(':').map(Number);
-    const requestedDateTime = new Date(year, month - 1, day, hour, 0, 0);
-    
-    const reservationData = {
-      // ... 기존 데이터
-      requestedDate: requestedDateTime, // 정확한 예약 시간
-    };
-    
-    await firebaseService.createDiagnosisReservation(reservationData);
-  };
-};
-```
-
-#### 네비게이션 구조 업데이트
-```typescript
-// RootStackParamList 타입 확장
-export type RootStackParamList = {
-  DateTimeSelection: {
-    userLocation: { latitude: number; longitude: number };
-    userAddress: string;
-    detailAddress?: string;
-  };
-  DiagnosisReservationConfirm: {
-    userLocation: { latitude: number; longitude: number };
-    userAddress: string;
-    detailAddress?: string;
-    selectedDate: string;
-    selectedTime: string;
-  };
-};
-```
-
-#### 구현된 새로운 기능들
-1. **Calendar 컴포넌트 통합**
-   - 30일 앞까지 예약 가능
-   - 과거 날짜 선택 불가
-   - 한국식 날짜 표시 (2024년 9월 22일 (일))
-
-2. **시간대 선택 시스템**
-   - 9시-18시 (1시간 단위)
-   - 과거 시간 자동 비활성화
-   - 랜덤 예약 불가 시간 시뮬레이션
-
-3. **3단계 예약 플로우**
-   - 1단계: 위치 선택
-   - 2단계: 날짜/시간 선택
-   - 3단계: 예약 확인 및 완료
-
-### 7. 다음 개발 예정 사항
-
-#### 🚧 개선 가능한 부분
-1. **시간대 실시간 관리**
-   - Firebase에서 예약된 시간 실시간 조회
-   - 관리자가 운영시간 설정 가능
-
-2. **PDF 리포트 시스템**
-   - 이메일로 받은 PDF를 앱으로 import
-   - `expo-document-picker` 활용
-
-3. **관리자 대시보드**
-   - 예약 관리 화면
-   - 상태 변경 인터페이스
-
-4. **푸시 알림**
-   - 예약 상태 변경 시 알림
-   - Firebase Cloud Messaging
-
-5. **예약 상세 관리**
-   - 예약 취소 기능
-   - 예약 일정 변경
-
----
-
-### 8. 명령어 모음
-
-#### 개발 서버 실행
+### 필수 명령어
 ```bash
+# 의존성 설치 (프로젝트는 yarn 사용)
+yarn install
+
+# 개발 서버 시작
+yarn start
+# 또는 캐시 클리어와 함께
 npx expo start --clear
-npx expo run:ios
-```
 
-#### 타입 체크
-```bash
+# 플랫폼별 실행
+yarn ios
+yarn android  
+yarn web
+
+# 타입 체크 (커밋 전 필수)
+yarn typecheck
+# 또는
 npx tsc --noEmit
+
+# 린팅
+yarn lint
+yarn lint:fix
+
+# 테스트
+yarn test
 ```
 
-#### 빌드
+### 빌드 명령어
 ```bash
-npx expo build:ios
-npx expo build:android
+# 프로덕션 빌드 (모든 플랫폼)
+yarn build:all
+
+# 플랫폼별 빌드
+yarn build:android
+yarn build:ios
+
+# EAS 빌드
+eas build --platform android --profile production
+eas build --platform ios --profile production
 ```
 
----
+## 핵심 패턴 및 컨벤션
 
-### 9. 트러블슈팅 가이드
+### Firebase 통합 패턴
+- **초기화**: `App.tsx`에서 React 컴포넌트 로드 전 Firebase 초기화
+- **서비스 접근**: `src/firebase/config.ts`의 프록시 패턴 사용
+- **인증 지속성**: React Native 환경에서 AsyncStorage를 통한 수동 관리
+- **에러 처리**: Firebase 초기화 타이밍 문제 대응
 
-#### 카카오 지도 안 보일 때
-1. `app.json`에서 `KAKAO_JAVASCRIPT_KEY` 확인
-2. iOS 시뮬레이터 위치를 서울로 설정
-3. WebView 콘솔 로그 확인
+### 컴포넌트 구조 규칙
+- 모든 컴포넌트에서 TypeScript 사용 필수
+- React Navigation v7 타이핑 패턴 준수 (`RootStackParamList`, `MainTabParamList`)
+- Redux Toolkit으로 상태 관리
+- 적절한 에러 바운더리와 로딩 상태 구현
 
-#### Firebase 연결 안 될 때
-1. `src/firebase/config.ts` 설정 확인
-2. Firebase Console에서 프로젝트 상태 확인
-3. 인증 상태 Redux store에서 확인
+### 인증 플로우 아키텍처
+앱은 다중 공급자 인증 시스템을 사용합니다:
+1. **Firebase Auth**: 기본 인증 시스템
+2. **Google Sign-In**: Android 및 웹용
+3. **Apple Sign-In**: iOS용  
+4. **커스텀 지속성 계층**: 토큰 관리 및 세션 복원
 
-#### 위치 권한 문제
-1. iOS: `Info.plist`에서 `NSLocationWhenInUseUsageDescription` 확인
-2. Android: `permissions` 배열 확인
-3. 에뮬레이터/시뮬레이터 위치 설정 확인
+### 카카오 지도 통합
+- **WebView 기반**: `KakaoMapView.tsx`에서 JavaScript SDK를 WebView로 통합
+- **양방향 통신**: JavaScript-React Native 메시지 패싱
+- **에러 처리**: 지도 로딩 실패, 재시도 로직, 네트워크 오류 대응
+- **한국 특화**: 카카오 REST API와 JavaScript API 모두 활용
 
----
+## 환경 설정
 
-### 10. 성과 및 배운 점
+### 필수 환경 변수
+`app.config.js`의 `extra` 섹션에서 설정:
+- `KAKAO_REST_API_KEY`: 카카오 지도 REST API용
+- `KAKAO_JAVASCRIPT_KEY`: 카카오 지도 WebView용
+- `CLOUD_FUNCTION_URL`: Firebase Functions 엔드포인트
+- `GOOGLE_WEB_CLIENT_ID`: Google Sign-In용
 
-#### 🎉 성공적인 구현
-- **복잡한 WebView 통합**: 카카오 지도 JavaScript SDK를 React Native에서 완전히 활용
-- **실시간 데이터 동기화**: Firebase와 Redux를 통한 상태 관리
-- **사용자 경험 최적화**: 로딩 상태, 에러 처리, 직관적인 UI
-- **완전한 예약 플로우**: 3단계 예약 시스템 (위치 → 날짜/시간 → 확인)
+### 플랫폼별 설정
+- **iOS**: Info.plist 권한 (위치, 카메라, 알림, 사진 라이브러리)
+- **Android**: 매니페스트 권한 및 인텐트 필터
+- **딥 링킹**: `charzing.kr` 도메인용 설정
 
-#### 💡 기술적 학습
-- WebView와 React Native 간 메시지 통신
-- Firebase Firestore 실시간 업데이트
-- TypeScript 고급 타입 활용
-- 지도 API 통합 및 지오코딩
-- react-native-calendars 라이브러리 활용
-- 복잡한 네비게이션 파라미터 타입 관리
+## 주요 개발 작업들
 
-#### 🛠 아키텍처 개선
-- 서비스 계층 분리로 코드 재사용성 향상
-- 컴포넌트 재사용성을 고려한 props 설계
-- 상태 관리의 체계적 구조화
+### 새 화면 추가 방법
+1. `src/screens/`에 화면 컴포넌트 생성
+2. `RootNavigator.tsx`의 `RootStackParamList`에 라우트 타입 추가
+3. 네비게이션 스택에 화면 등록
+4. 적절한 TypeScript props 타이핑 구현
 
----
+### Firebase 작업 규칙
+1. 모든 Firestore 작업은 `firebaseService.ts` 사용
+2. Redux에서 인증 상태 처리
+3. 네트워크 작업에 적절한 에러 처리 구현
+4. 데이터 보호를 위한 Firebase Security Rules 활용
 
-*마지막 업데이트: 2024-09-22*
-*작성자: Claude (Anthropic AI)*
+### 카카오 지도 작업
+- `KakaoMapView.tsx`에서 WebView를 통한 지도 통합
+- 지도 이벤트를 위한 JavaScript-React Native 통신 처리
+- 지도 로딩 실패에 대한 적절한 에러 처리 구현
+
+### 알림 시스템 관리
+- `App.tsx`에서 적절한 라이프사이클 관리로 초기화
+- 푸시 알림과 인앱 알림 모두 처리
+- 사용자 권한 요청 및 에러 처리 구현
+
+## 코드 품질 및 테스트
+
+### 타입 체크
+변경사항 커밋 전 반드시 `npx tsc --noEmit` 실행하여 TypeScript 호환성 확인
+
+### 플랫폼 테스트
+- iOS와 Android 모두에서 인증 플로우 테스트
+- 적절한 API 키로 지도 기능 검증
+- 실제 기기에서 푸시 알림 테스트
+- 딥 링킹 기능 검증
+
+### 빌드 프로세스
+- 프로덕션 빌드용 EAS Build 설정
+- 프로덕션 환경에서 환경 변수 적절히 설정
+- 릴리스 전 양쪽 플랫폼에서 빌드 테스트
+
+## 중요 참고사항
+
+### Firebase 설정 주의사항
+- Firebase는 React 컴포넌트보다 먼저 `App.tsx`에서 초기화
+- 안전한 서비스 접근을 위해 `firebase/config.ts`의 프록시 패턴 사용
+- React Native 제한으로 인한 수동 인증 지속성 처리
+
+### 성능 고려사항
+- 구형 기기에서 WebView 지도 통합으로 인한 성능 영향 가능
+- 필수 데이터만을 위한 Redux persist 설정 최적화
+- 애플리케이션 전반에 적절한 로딩 상태 구현
+
+### 보안 고려사항
+- API 키는 환경별로 분리
+- 사용자별 데이터 접근 제한을 위한 Firebase Security Rules
+- AsyncStorage를 통한 인증 토큰 안전 저장
+
+### 한국 특화 기능
+- **카카오 지도**: 한국 지역에 최적화된 지도 서비스
+- **주소 시스템**: 한국 주소 체계 (도로명주소, 지번주소) 지원
+- **지오코딩**: 카카오 REST API를 통한 좌표-주소 변환
+- **차량 데이터**: 한국 전기차 모델 (현대, 기아, 테슬라 등) 지원
+
+### 예약 시스템 아키텍처
+- **3단계 플로우**: 위치 선택 → 날짜/시간 선택 → 예약 확인
+- **실시간 상태 추적**: `pending` → `confirmed` → `in_progress` → `completed`
+- **Firebase Functions**: 백엔드 로직 및 알림 처리
+- **관리자 시스템**: Firebase Console을 통한 예약 관리
+
+### 차량 관리 시스템
+- **사용자 차량 등록**: 제조사, 모델, 연식, 배터리 용량 등
+- **차량 검색**: 한국 전기차 데이터베이스 통합
+- **활성 차량**: 사용자별 메인 차량 설정
+- **진단 연동**: 차량 정보와 진단 예약 연결
+
+## 디버깅 및 로깅
+
+### 개발용 로깅
+- `devLog.ts`: 개발 환경에서만 활성화되는 로깅 시스템
+- Firebase, 인증, 지도 관련 상세 로그
+- 프로덕션에서는 자동으로 비활성화
+
+### 일반적인 문제 해결
+1. **카카오 지도 로딩 실패**: API 키 확인, 네트워크 연결 확인
+2. **Firebase 인증 오류**: Token 만료, AsyncStorage 초기화 필요
+3. **Apple 로그인 세션 만료**: 토큰 갱신 또는 재로그인 필요
+4. **권한 문제**: iOS/Android 권한 설정 확인
+
+이 가이드를 통해 CharzingApp-Expo 프로젝트의 구조와 패턴을 이해하고, 효율적으로 개발할 수 있습니다.

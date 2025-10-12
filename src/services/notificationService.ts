@@ -4,7 +4,7 @@ import Constants from 'expo-constants';
 import { Platform } from 'react-native';
 import firebaseService from './firebaseService';
 import { getDb } from '../firebase/config';
-import { collection, query, orderBy, limit, getDocs, doc, updateDoc, writeBatch, deleteDoc } from 'firebase/firestore';
+import { collection, query, orderBy, limit, getDocs, doc, updateDoc, writeBatch, deleteDoc, onSnapshot, Unsubscribe } from 'firebase/firestore';
 import { store } from '../store';
 import { addNotification, markAsRead, markAllAsRead, setNotifications, removeNotification, InAppNotification } from '../store/slices/notificationSlice';
 import { devLog } from '../utils/devLog';
@@ -33,6 +33,8 @@ export const DEFAULT_NOTIFICATION_SETTINGS: NotificationSettings = {
 
 class NotificationService {
   private expoPushToken: string | null = null;
+  private notificationListener: Unsubscribe | null = null;
+  private currentUserId: string | null = null;
 
   constructor() {
     this.setupNotificationHandlers();
@@ -56,11 +58,12 @@ class NotificationService {
       },
     });
 
-    // 푸시 알림 수신 시 인앱 알림으로 변환
-    devLog.log('📥 NotificationService: 알림 수신 리스너 등록 중...');
+    // 푸시 알림 수신 시 처리 (인앱알림 변환 제거)
+    devLog.log('📥 NotificationService: 푸시 알림 수신 리스너 등록 중...');
     this.addNotificationReceivedListener((notification) => {
-      devLog.log('📨 NotificationService: 알림 수신됨:', notification.request.content.title);
-      this.handleIncomingNotification(notification);
+      devLog.log('📨 NotificationService: 푸시 알림 수신됨:', notification.request.content.title);
+      // 더 이상 인앱알림으로 변환하지 않음 - Firebase에서 직접 로드
+      devLog.log('ℹ️  NotificationService: 인앱알림은 Firebase에서 직접 로드됩니다.');
     });
 
     // 알림 탭 처리
@@ -78,6 +81,14 @@ class NotificationService {
     try {
       let token = null;
 
+      devLog.log('🔔 푸시 알림 등록 시작', {
+        userId,
+        isDevice: Device.isDevice,
+        deviceType: Device.deviceType,
+        osName: Device.osName,
+        osVersion: Device.osVersion
+      });
+
       // 실제 디바이스에서만 푸시 토큰 생성
       if (Device.isDevice) {
         // 알림 권한 요청
@@ -90,9 +101,20 @@ class NotificationService {
         }
 
         if (finalStatus !== 'granted') {
-          devLog.log('푸시 알림 권한이 거부되었습니다.');
+          devLog.log('❌ 푸시 알림 권한이 거부되었습니다.', {
+            userId,
+            existingStatus,
+            finalStatus,
+            device: Device.deviceName
+          });
           return null;
         }
+
+        devLog.log('✅ 푸시 알림 권한 획득 성공', {
+          userId,
+          status: finalStatus,
+          device: Device.deviceName
+        });
 
         // projectId가 있는지 확인
         const projectId = Constants.expoConfig?.extra?.eas?.projectId;
@@ -123,6 +145,9 @@ class NotificationService {
           devLog.log('✅ 기존 사용자: 알림 설정 유지됨');
         }
 
+        // 실시간 인앱 알림 리스너 시작 (푸시 토큰과 독립적으로)
+        this.startRealtimeNotificationListener(userId);
+
       } else {
         devLog.log('⚠️  푸시 알림은 실제 디바이스에서만 작동합니다.');
         devLog.log('📱 실제 디바이스에서 앱을 실행하면 푸시 토큰이 자동으로 생성됩니다.');
@@ -135,6 +160,9 @@ class NotificationService {
         } else {
           devLog.log('✅ 기존 사용자 (에뮬레이터): 알림 설정 유지됨');
         }
+
+        // 실시간 인앱 알림 리스너 시작 (푸시 토큰 없어도 동작)
+        this.startRealtimeNotificationListener(userId);
       }
 
       return token;
@@ -438,6 +466,80 @@ class NotificationService {
       data: data || {},
     }));
     devLog.log('✅ NotificationService: 인앱 알림 추가 완료');
+  }
+
+  // 실시간 인앱 알림 리스너 시작
+  startRealtimeNotificationListener(userId: string): void {
+    this.currentUserId = userId;
+    
+    // 기존 리스너 정리
+    if (this.notificationListener) {
+      this.notificationListener();
+    }
+
+    devLog.log('🔄 NotificationService: 실시간 인앱 알림 리스너 시작');
+    
+    try {
+      const notificationsRef = query(
+        collection(getDb(), 'users', userId, 'inAppNotifications'),
+        orderBy('createdAt', 'desc'),
+        limit(50) // 최근 50개만
+      );
+
+      this.notificationListener = onSnapshot(
+        notificationsRef,
+        (snapshot) => {
+          devLog.log(`🔔 NotificationService: 실시간 알림 업데이트 감지 (${snapshot.size}개)`);
+          
+          const notifications: InAppNotification[] = [];
+          
+          snapshot.forEach((doc) => {
+            const data = doc.data();
+            notifications.push({
+              id: doc.id,
+              title: data.title,
+              body: data.body,
+              category: data.category || 'announcement',
+              data: data.data || {},
+              isRead: data.isRead || false,
+              createdAt: data.createdAt?.toDate() || new Date(),
+            });
+          });
+
+          devLog.log(`✅ NotificationService: ${notifications.length}개의 실시간 알림 업데이트 완료`);
+          
+          // Redux store에 알림들 설정
+          store.dispatch(setNotifications(notifications));
+        },
+        (error) => {
+          devLog.error('❌ NotificationService: 실시간 알림 리스너 오류:', error);
+        }
+      );
+      
+      devLog.log('✅ NotificationService: 실시간 알림 리스너 등록 완료');
+    } catch (error) {
+      devLog.error('❌ NotificationService: 실시간 알림 리스너 시작 실패:', error);
+    }
+  }
+
+  // 실시간 리스너 중지
+  stopRealtimeNotificationListener(): void {
+    if (this.notificationListener) {
+      this.notificationListener();
+      this.notificationListener = null;
+      this.currentUserId = null;
+      devLog.log('🛑 NotificationService: 실시간 인앱 알림 리스너 중지');
+    }
+  }
+
+  // 수동 새로고침 (백업용 - 이제 거의 필요없음)
+  async refreshInAppNotifications(): Promise<void> {
+    if (this.currentUserId) {
+      devLog.log('🔄 NotificationService: 수동 새로고침 실행 (백업)');
+      await this.loadInAppNotifications(this.currentUserId);
+    } else {
+      devLog.log('⚠️  NotificationService: 사용자 ID가 없어서 새로고침 불가');
+    }
   }
 
   // 알림 시스템 테스트용 푸시 알림 시뮬레이션

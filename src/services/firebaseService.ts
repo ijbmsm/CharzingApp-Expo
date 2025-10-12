@@ -195,6 +195,39 @@ class FirebaseService {
     this.CLOUD_FUNCTION_URL = Constants.expoConfig?.extra?.CLOUD_FUNCTION_URL || 
       'https://us-central1-charzing-d1600.cloudfunctions.net';
   }
+
+  /**
+   * Firebase 초기화 완료까지 대기
+   * 서비스 호출 전에 Firebase가 완전히 준비될 때까지 기다림
+   */
+  private async waitForFirebaseReady(): Promise<void> {
+    try {
+      // 동적 import로 순환 참조 방지
+      const { firebaseFacade } = await import('../firebase/config');
+      
+      if (!firebaseFacade) {
+        throw new Error('Firebase Facade를 찾을 수 없습니다.');
+      }
+      
+      // 최대 10초까지 기다림
+      const maxWaitTime = 10000;
+      const checkInterval = 100;
+      let waited = 0;
+
+      while (!firebaseFacade.isReady() && waited < maxWaitTime) {
+        await new Promise(resolve => setTimeout(resolve, checkInterval));
+        waited += checkInterval;
+      }
+
+      if (!firebaseFacade.isReady()) {
+        throw new Error('Firebase가 초기화 중입니다. 잠시 후 다시 시도해주세요.');
+      }
+    } catch (error) {
+      console.error('❌ Firebase 준비 상태 확인 실패:', error);
+      // Firebase가 준비되지 않았을 수도 있지만, 서비스가 작동할 수 있도록 경고만 로그
+      console.warn('⚠️ Firebase 준비 상태를 확인할 수 없어 계속 진행합니다.');
+    }
+  }
   
   // 스케줄 설정 캐시
   private scheduleSettingsCache: ScheduleSettings | null = null;
@@ -241,6 +274,32 @@ class FirebaseService {
       );
       
       devLog.log(`✅ Cloud Function 호출 성공: ${functionName}`);
+      return response.data;
+    } catch (error: any) {
+      devLog.error(`❌ Cloud Function 호출 실패 (${functionName}):`, error);
+      throw error;
+    }
+  }
+
+  /**
+   * 인증 없이 Cloud Function 호출 (로그인 전용)
+   */
+  async callCloudFunctionWithoutAuth(functionName: string, data: any = {}): Promise<any> {
+    try {
+      devLog.log(`🌩️ Cloud Function 직접 호출 (인증 없음): ${functionName}`);
+      
+      const response = await axios.post(
+        `${this.CLOUD_FUNCTION_URL}/${functionName}`,
+        data,
+        {
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          timeout: 15000,
+        }
+      );
+      
+      devLog.log(`✅ Cloud Function 호출 성공 (인증 없음): ${functionName}`);
       return response.data;
     } catch (error: any) {
       devLog.error(`❌ Cloud Function 호출 실패 (${functionName}):`, error);
@@ -378,6 +437,9 @@ class FirebaseService {
    */
   async checkUserDocumentExists(uid: string): Promise<boolean> {
     try {
+      // Firebase 초기화 완료 대기
+      await this.waitForFirebaseReady();
+      
       const userDocRef = doc(this.db, 'users', uid);
       const userDoc = await getDoc(userDocRef);
       return userDoc.exists();
@@ -400,6 +462,9 @@ class FirebaseService {
     kakaoId?: string;
   }): Promise<void> {
     try {
+      // Firebase 초기화 완료 대기
+      await this.waitForFirebaseReady();
+      
       const userDocRef = doc(this.db, 'users', uid);
       
       const userData = {
@@ -437,6 +502,9 @@ class FirebaseService {
     kakaoId?: string;
   }): Promise<void> {
     try {
+      // Firebase 초기화 완료 대기
+      await this.waitForFirebaseReady();
+      
       const exists = await this.checkUserDocumentExists(uid);
       
       if (!exists) {
@@ -488,6 +556,9 @@ class FirebaseService {
    */
   async getUserProfile(uid: string): Promise<UserProfile | null> {
     try {
+      // Firebase 초기화 완료 대기
+      await this.waitForFirebaseReady();
+      
       const userDocRef = doc(this.db, 'users', uid);
       const userDoc = await getDoc(userDocRef);
       
@@ -1412,6 +1483,9 @@ class FirebaseService {
    */
   async saveUserPushToken(userId: string, pushToken: string): Promise<void> {
     try {
+      // Firebase 초기화 완료 대기
+      await this.waitForFirebaseReady();
+      
       // 현재 사용자 확인 및 토큰 갱신
       const auth = getAuth();
       const currentUser = auth.currentUser;
@@ -1521,6 +1595,9 @@ class FirebaseService {
    */
   async saveUserNotificationSettings(userId: string, settings: any): Promise<void> {
     try {
+      // Firebase 초기화 완료 대기
+      await this.waitForFirebaseReady();
+      
       const userDoc = doc(this.usersCollectionRef, userId);
       // setDoc with merge를 사용해서 문서가 없어도 생성되도록
       await setDoc(userDoc, {
@@ -1539,6 +1616,9 @@ class FirebaseService {
    */
   async getUserNotificationSettings(userId: string): Promise<any | null> {
     try {
+      // Firebase 초기화 완료 대기
+      await this.waitForFirebaseReady();
+      
       const userDoc = doc(this.usersCollectionRef, userId);
       const docSnap = await getDoc(userDoc);
       
@@ -1619,6 +1699,9 @@ class FirebaseService {
    */
   async getUserVehicles(userId: string): Promise<UserVehicle[]> {
     try {
+      // Firebase 초기화 완료 대기
+      await this.waitForFirebaseReady();
+      
       devLog.log('📱 클라이언트에서 사용자 차량 목록 조회 시작:', userId);
       
       // 현재 로그인한 사용자만 자신의 차량을 조회할 수 있도록 체크

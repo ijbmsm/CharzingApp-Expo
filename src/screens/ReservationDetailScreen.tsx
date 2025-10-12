@@ -212,135 +212,135 @@ const ReservationDetailScreen: React.FC = () => {
       />
       
       <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
-        {/* 상태 헤더 */}
-        <View style={styles.statusSection}>
-          <View style={[styles.statusBadge, { backgroundColor: getStatusColor(currentReservation.status) }]}>
-            <Text style={styles.statusText}>{getStatusText(currentReservation.status)}</Text>
-          </View>
-          <Text style={styles.statusDescription}>
-            {getStatusDescription(currentReservation.status)}
-          </Text>
-          
-          {/* 진단 리포트 버튼 - 완료된 예약에만 표시 */}
-          {currentReservation.status === 'completed' && (
-            <View style={styles.reportButtonContainer}>
-              {reportLoading ? (
-                <View style={styles.reportLoadingContainer}>
-                  <ActivityIndicator size="small" color="#4495E8" />
-                  <Text style={styles.reportLoadingText}>리포트 확인 중...</Text>
-                </View>
-              ) : vehicleReport ? (
-                <TouchableOpacity
-                  style={styles.reportButton}
-                  onPress={handleViewReport}
-                  activeOpacity={0.8}
-                >
-                  <View style={styles.reportButtonContent}>
-                    <Ionicons name="document-text" size={20} color="#4495E8" />
-                    <Text style={styles.reportButtonText}>진단 리포트 보기</Text>
-                    <Ionicons name="chevron-forward" size={16} color="#4495E8" />
+        {/* 통합된 예약 정보 카드 */}
+        <View style={styles.receiptCard}>
+          {/* 상태 헤더 */}
+          <View style={styles.statusHeader}>
+            <View style={[styles.statusBadge, { backgroundColor: getStatusColor(currentReservation.status) }]}>
+              <Text style={styles.statusText}>{getStatusText(currentReservation.status)}</Text>
+            </View>
+            <Text style={styles.statusDescription}>
+              {getStatusDescription(currentReservation.status)}
+            </Text>
+            
+            {/* 진단 리포트 버튼 - 완료된 예약에만 표시 */}
+            {currentReservation.status === 'completed' && (
+              <View style={styles.reportButtonContainer}>
+                {reportLoading ? (
+                  <View style={styles.reportLoadingContainer}>
+                    <ActivityIndicator size="small" color="#4495E8" />
+                    <Text style={styles.reportLoadingText}>리포트 확인 중...</Text>
                   </View>
-                </TouchableOpacity>
-              ) : (
-                <View style={styles.noReportContainer}>
-                  <Ionicons name="document-outline" size={16} color="#9CA3AF" />
-                  <Text style={styles.noReportText}>진단 리포트 준비 중</Text>
-                </View>
-              )}
-            </View>
-          )}
-        </View>
+                ) : vehicleReport ? (
+                  <TouchableOpacity
+                    style={styles.reportButton}
+                    onPress={handleViewReport}
+                    activeOpacity={0.8}
+                  >
+                    <View style={styles.reportButtonContent}>
+                      <Ionicons name="document-text" size={20} color="#4495E8" />
+                      <Text style={styles.reportButtonText}>진단 리포트 보기</Text>
+                      <Ionicons name="chevron-forward" size={16} color="#4495E8" />
+                    </View>
+                  </TouchableOpacity>
+                ) : (
+                  <View style={styles.noReportContainer}>
+                    <Ionicons name="document-outline" size={16} color="#9CA3AF" />
+                    <Text style={styles.noReportText}>진단 리포트 준비 중</Text>
+                  </View>
+                )}
+              </View>
+            )}
+          </View>
 
+          {/* 구분선 */}
+          <View style={styles.divider} />
 
-        {/* 예약 상세 정보 */}
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>예약 상세</Text>
-          
-          <View style={styles.kakaoRow}>
-            <Text style={styles.kakaoLabel}>서비스 종류</Text>
-            <Text style={styles.kakaoValue}>
-              {(() => {
-                const serviceType = currentReservation.serviceType || '스탠다드';
-                const servicePrice = currentReservation.servicePrice;
-                
-                if (servicePrice === 70000) {
+          {/* 영수증 스타일 정보 */}
+            <View style={styles.receiptRow}>
+              <Text style={styles.receiptLabel}>서비스</Text>
+              <Text style={styles.receiptValue}>
+                {(() => {
+                  const serviceType = currentReservation.serviceType || '스탠다드';
+                  const servicePrice = currentReservation.servicePrice;
+                  
+                  if (servicePrice === 100000) {
+                    return '스탠다드';
+                  } else if (servicePrice === 200000) {
+                    return '프리미엄';
+                  } else if (serviceType.includes('프리미엄')) {
+                    return '프리미엄';
+                  }
                   return '스탠다드';
-                } else if (servicePrice === 150000) {
-                  return '프리미엄';
-                } else if (serviceType.includes('프리미엄')) {
-                  return '프리미엄';
-                }
-                return '스탠다드';
-              })()}
-            </Text>
-          </View>
-          
-          <View style={styles.kakaoRow}>
-            <Text style={styles.kakaoLabel}>방문 일시</Text>
-            <Text style={styles.kakaoValue}>{formatDate(currentReservation.requestedDate)}</Text>
-          </View>
-          
-          <View style={styles.kakaoRow}>
-            <Text style={styles.kakaoLabel}>방문 주소</Text>
-            <Text style={[styles.kakaoValue, styles.addressText]} numberOfLines={1}>
-              {currentReservation.address}{currentReservation.detailAddress && ` ${currentReservation.detailAddress}`}
-            </Text>
-          </View>
-
-          {(currentReservation.vehicleBrand || currentReservation.vehicleModel) && (
-            <View style={styles.kakaoRow}>
-              <Text style={styles.kakaoLabel}>차량</Text>
-              <Text style={styles.kakaoValue}>
-                {currentReservation.vehicleBrand} {currentReservation.vehicleModel}
-                {currentReservation.vehicleYear && ` (${currentReservation.vehicleYear}년)`}
+                })()}
               </Text>
             </View>
-          )}
-
-          {currentReservation.userName && (
-            <View style={styles.kakaoRow}>
-              <Text style={styles.kakaoLabel}>예약자</Text>
-              <Text style={styles.kakaoValue}>{currentReservation.userName}</Text>
+            
+            <View style={styles.receiptRow}>
+              <Text style={styles.receiptLabel}>방문일시</Text>
+              <Text style={styles.receiptValue}>{formatDate(currentReservation.requestedDate)}</Text>
             </View>
-          )}
-          
-          <View style={styles.kakaoRow}>
-            <Text style={styles.kakaoLabel}>전화번호</Text>
-            <Text style={styles.kakaoValue}>{currentReservation.userPhone || '-'}</Text>
-          </View>
-          
-          {currentReservation.notes && (
-            <View style={styles.kakaoRow}>
-              <Text style={styles.kakaoLabel}>요청사항</Text>
-              <Text style={[styles.kakaoValue, styles.notesText]} numberOfLines={1}>
-                {currentReservation.notes}
+
+            {currentReservation.userName && (
+              <View style={styles.receiptRow}>
+                <Text style={styles.receiptLabel}>예약자</Text>
+                <Text style={styles.receiptValue}>{currentReservation.userName}</Text>
+              </View>
+            )}
+            
+            <View style={styles.receiptRow}>
+              <Text style={styles.receiptLabel}>연락처</Text>
+              <Text style={styles.receiptValue}>{currentReservation.userPhone || '-'}</Text>
+            </View>
+
+            {(currentReservation.vehicleBrand || currentReservation.vehicleModel) && (
+              <View style={styles.receiptRow}>
+                <Text style={styles.receiptLabel}>차량</Text>
+                <Text style={styles.receiptValue}>
+                  {currentReservation.vehicleBrand} {currentReservation.vehicleModel}
+                  {currentReservation.vehicleYear && ` (${currentReservation.vehicleYear}년)`}
+                </Text>
+              </View>
+            )}
+            
+            <View style={styles.receiptRow}>
+              <Text style={styles.receiptLabel}>주소</Text>
+              <Text style={[styles.receiptValue, styles.addressValue]} numberOfLines={2}>
+                {currentReservation.address}{currentReservation.detailAddress && ` ${currentReservation.detailAddress}`}
               </Text>
             </View>
-          )}
 
-          <View style={styles.kakaoRow}>
-            <Text style={styles.kakaoLabel}>신청일</Text>
-            <Text style={styles.kakaoValue}>{formatDate(currentReservation.createdAt)}</Text>
-          </View>
-          
+            {currentReservation.notes && (
+              <View style={styles.receiptRow}>
+                <Text style={styles.receiptLabel}>요청사항</Text>
+                <Text style={[styles.receiptValue, styles.addressValue]} numberOfLines={2}>
+                  {currentReservation.notes}
+                </Text>
+              </View>
+            )}
 
-          <View style={[styles.kakaoRow, styles.totalRow]}>
-            <Text style={[styles.kakaoLabel, styles.totalLabel]}>결제 금액</Text>
-            <Text style={styles.totalAmount}>
-              {(() => {
-                const servicePrice = currentReservation.servicePrice;
-                if (servicePrice) {
-                  return servicePrice.toLocaleString() + '원';
-                }
-                
-                const serviceType = currentReservation.serviceType || '스탠다드';
-                if (serviceType.includes('프리미엄')) {
-                  return '150,000원';
-                }
-                return '70,000원';
-              })()}
-            </Text>
-          </View>
+            <View style={styles.receiptRow}>
+              <Text style={styles.receiptLabel}>신청일</Text>
+              <Text style={styles.receiptValue}>{formatDate(currentReservation.createdAt)}</Text>
+            </View>
+            
+            <View style={[styles.receiptRow, styles.priceRow]}>
+              <Text style={[styles.receiptLabel, styles.priceLabel]}>결제금액</Text>
+              <Text style={styles.priceValue}>
+                {(() => {
+                  const servicePrice = currentReservation.servicePrice;
+                  if (servicePrice) {
+                    return servicePrice.toLocaleString() + '원';
+                  }
+                  
+                  const serviceType = currentReservation.serviceType || '스탠다드';
+                  if (serviceType.includes('프리미엄')) {
+                    return '200,000원';
+                  }
+                  return '100,000원';
+                })()}
+              </Text>
+            </View>
         </View>
 
         {/* 관리자 메모 */}
@@ -404,18 +404,6 @@ const styles = StyleSheet.create({
   content: {
     flex: 1,
     paddingHorizontal: 16,
-  },
-  statusSection: {
-    backgroundColor: '#FFFFFF',
-    borderRadius: 12,
-    padding: 20,
-    marginVertical: 8,
-    alignItems: 'center',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 3.84,
-    elevation: 5,
   },
   statusBadge: {
     paddingHorizontal: 16,
@@ -595,9 +583,69 @@ const styles = StyleSheet.create({
   cancelButtonText: {
     color: '#EF4444',
   },
-  priceValue: {
+  // 통합된 카드 스타일
+  receiptCard: {
+    backgroundColor: '#FFFFFF',
+    borderRadius: 12,
+    padding: 20,
+    marginVertical: 8,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 3.84,
+    elevation: 5,
+    borderWidth: 1,
+    borderColor: '#E5E7EB',
+  },
+  statusHeader: {
+    alignItems: 'center',
+    marginBottom: 16,
+  },
+  divider: {
+    height: 1,
+    backgroundColor: '#E5E7EB',
+    marginVertical: 16,
+  },
+  receiptRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'flex-start',
+    paddingVertical: 6,
+    minHeight: 24,
+  },
+  receiptLabel: {
+    fontSize: 13,
+    color: '#6B7280',
+    fontWeight: '500',
+    width: 65,
+    flexShrink: 0,
+  },
+  receiptValue: {
+    fontSize: 13,
+    color: '#1F2937',
+    flex: 1,
+    textAlign: 'right',
+    fontWeight: '500',
+  },
+  priceRow: {
+    borderTopWidth: 1,
+    borderTopColor: '#E5E7EB',
+    paddingTop: 12,
+    marginTop: 8,
+  },
+  priceLabel: {
+    fontSize: 14,
     fontWeight: '600',
+    color: '#1F2937',
+  },
+  priceValue: {
+    fontSize: 15,
+    fontWeight: '700',
     color: '#4495E8',
+  },
+  addressValue: {
+    fontSize: 12,
+    lineHeight: 16,
   },
   kakaoCard: {
     backgroundColor: '#FFFFFF',
@@ -647,7 +695,7 @@ const styles = StyleSheet.create({
     color: '#2563EB',
   },
   addressText: {
-    fontSize: 15,
+    fontSize: 13,
     lineHeight: 22,
   },
   restrictionContainer: {

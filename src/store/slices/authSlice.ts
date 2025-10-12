@@ -23,7 +23,7 @@ const initialState: AuthState = {
   user: null,
   isLoading: false,
   isAuthenticated: false,
-  autoLoginEnabled: true, // 기본값은 자동 로그인 활성화
+  autoLoginEnabled: false, // 기본값은 자동 로그인 비활성화 (임시)
 };
 
 const authSlice = createSlice({

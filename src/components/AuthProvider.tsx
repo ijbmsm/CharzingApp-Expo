@@ -316,17 +316,23 @@ const AuthProvider: React.FC = () => {
             devLog.log('🔄 Redux에 사용자 정보가 있음, 커스텀 세션 복원 확인 중...');
             devLog.log('📝 Redux 사용자:', { uid: user.uid, provider: user.provider, displayName: user.displayName });
             
-            // 먼저 커스텀 persistence 서비스로 세션 복원 시도
-            devLog.log('💾 커스텀 persistence 서비스로 세션 복원 시도...');
-            const restoredUser = await authPersistenceService.restoreAuthState();
+            // 커스텀 persistence 토큰 유효성만 확인
+            devLog.log('💾 커스텀 persistence 토큰 유효성 확인...');
+            const isTokenValid = await authPersistenceService.isTokenValid();
             
-            if (restoredUser && restoredUser.uid === user.uid) {
-              devLog.log('✅ 커스텀 persistence에서 세션 복원 성공:', restoredUser.uid);
-              // Redux 상태는 이미 있으므로 추가 처리 불필요
-              dispatch(setLoading(false));
-              return;
+            if (!isTokenValid) {
+              devLog.log('⏰ 저장된 토큰이 만료됨, 재로그인 필요');
+              
+              // Apple 사용자의 경우 재로그인 안내
+              if (user.provider === 'apple') {
+                devLog.log('🍎 Apple 토큰 만료로 Redux 상태 정리');
+                await authPersistenceService.clearAuthState();
+                dispatch(setUser(null));
+                dispatch(setLoading(false));
+                return;
+              }
             } else {
-              devLog.log('❌ 커스텀 persistence에서 세션 복원 실패, Firebase Auth 재시도 로직 진행');
+              devLog.log('✅ 커스텀 persistence 토큰이 유효함, 하지만 Firebase Auth 재시도 필요');
             }
             
             // Apple 로그인 사용자의 경우 더 긴 대기 시간 적용
@@ -372,9 +378,26 @@ const AuthProvider: React.FC = () => {
                         await currentAuth.authStateReady();
                         devLog.log('🔄 authStateReady 완료, currentUser:', currentAuth.currentUser?.uid || 'still none');
                         
-                        // 만약 여전히 currentUser가 없으면 Apple 토큰 재인증 필요 알림
+                        // 만약 여전히 currentUser가 없으면 Apple silent refresh 시도
                         if (!currentAuth.currentUser && parsedAuthData.providerData?.[0]?.providerId === 'apple.com') {
-                          devLog.log('🍎 Apple 토큰 만료 확인됨, 재로그인이 필요합니다');
+                          devLog.log('🍎 Apple 토큰 만료 확인됨, silent refresh 시도...');
+                          
+                          try {
+                            const appleLoginService = (await import('../services/appleLoginService')).default;
+                            const refreshResult = await appleLoginService.silentRefresh();
+                            
+                            if (refreshResult.success && refreshResult.user && isComponentMounted) {
+                              devLog.log('✅ Apple silent refresh 성공, 인증 상태 업데이트');
+                              // AuthProvider에서 onAuthStateChanged가 자동으로 호출될 것임
+                              if (retryInterval) clearInterval(retryInterval);
+                              retryInterval = null;
+                              return;
+                            } else {
+                              devLog.log('❌ Apple silent refresh 실패:', refreshResult.error);
+                            }
+                          } catch (error) {
+                            devLog.log('❌ Apple silent refresh 중 오류:', error);
+                          }
                         }
                         
                       } catch (parseError) {

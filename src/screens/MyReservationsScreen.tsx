@@ -110,6 +110,7 @@ const MyReservationsScreen: React.FC = () => {
       case 'pending':
         return 0; // 접수완료
       case 'confirmed':
+        return 1; // 예약됨
       case 'completed':
         return 2; // 완료
       case 'cancelled':

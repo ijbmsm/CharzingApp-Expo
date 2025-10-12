@@ -24,7 +24,9 @@ interface UpdateProfileData {
 }
 
 class UserService {
-  private auth = getAuth();
+  private getAuthInstance() {
+    return getAuth();
+  }
   private functions = getFunctions(undefined, 'us-central1');
 
   /**
@@ -32,7 +34,7 @@ class UserService {
    */
   async getCurrentUserProfile(): Promise<UserProfile | null> {
     try {
-      const currentUser = this.auth.currentUser;
+      const currentUser = this.getAuthInstance().currentUser;
       if (!currentUser) {
         return null;
       }
@@ -59,7 +61,7 @@ class UserService {
    */
   async updateUserProfile(data: UpdateProfileData): Promise<boolean> {
     try {
-      const currentUser = this.auth.currentUser;
+      const currentUser = this.getAuthInstance().currentUser;
       if (!currentUser) {
         throw new Error('로그인된 사용자가 없습니다.');
       }
@@ -109,35 +111,35 @@ class UserService {
    * 로그인 상태 확인
    */
   isLoggedIn(): boolean {
-    return this.auth.currentUser !== null;
+    return this.getAuthInstance().currentUser !== null;
   }
 
   /**
    * 현재 사용자 UID 가져오기
    */
   getCurrentUserId(): string | null {
-    return this.auth.currentUser?.uid || null;
+    return this.getAuthInstance().currentUser?.uid || null;
   }
 
   /**
    * 현재 사용자 이메일 가져오기
    */
   getCurrentUserEmail(): string | null {
-    return this.auth.currentUser?.email || null;
+    return this.getAuthInstance().currentUser?.email || null;
   }
 
   /**
    * Firebase 사용자 객체 가져오기
    */
   getCurrentUser() {
-    return this.auth.currentUser;
+    return this.getAuthInstance().currentUser;
   }
 
   /**
    * 인증 상태 변화 리스너 등록
    */
   onAuthStateChanged(callback: (user: any) => void) {
-    return this.auth.onAuthStateChanged(callback);
+    return this.getAuthInstance().onAuthStateChanged(callback);
   }
 }
 
