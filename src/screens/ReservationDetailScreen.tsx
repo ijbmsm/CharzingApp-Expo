@@ -152,9 +152,9 @@ const ReservationDetailScreen: React.FC = () => {
 
   const getStatusColor = (status: DiagnosisReservation['status']) => {
     switch (status) {
-      case 'pending': return '#F59E0B';
-      case 'confirmed': return '#3B82F6';
-      case 'completed': return '#10B981';
+      case 'pending': return '#8B5CF6';
+      case 'confirmed': return '#4F46E5';
+      case 'completed': return '#22C55E';
       case 'cancelled': return '#EF4444';
       default: return '#6B7280';
     }
@@ -228,7 +228,7 @@ const ReservationDetailScreen: React.FC = () => {
               <View style={styles.reportButtonContainer}>
                 {reportLoading ? (
                   <View style={styles.reportLoadingContainer}>
-                    <ActivityIndicator size="small" color="#4495E8" />
+                    <ActivityIndicator size="small" color="#202632" />
                     <Text style={styles.reportLoadingText}>리포트 확인 중...</Text>
                   </View>
                 ) : vehicleReport ? (
@@ -238,14 +238,14 @@ const ReservationDetailScreen: React.FC = () => {
                     activeOpacity={0.8}
                   >
                     <View style={styles.reportButtonContent}>
-                      <Ionicons name="document-text" size={20} color="#4495E8" />
+                      <Ionicons name="document-text" size={20} color="#4F46E5" />
                       <Text style={styles.reportButtonText}>진단 리포트 보기</Text>
-                      <Ionicons name="chevron-forward" size={16} color="#4495E8" />
+                      <Ionicons name="chevron-forward" size={16} color="#4F46E5" />
                     </View>
                   </TouchableOpacity>
                 ) : (
                   <View style={styles.noReportContainer}>
-                    <Ionicons name="document-outline" size={16} color="#9CA3AF" />
+                    <Ionicons name="document-outline" size={16} color="#4F46E5" />
                     <Text style={styles.noReportText}>진단 리포트 준비 중</Text>
                   </View>
                 )}
@@ -259,21 +259,7 @@ const ReservationDetailScreen: React.FC = () => {
           {/* 영수증 스타일 정보 */}
             <View style={styles.receiptRow}>
               <Text style={styles.receiptLabel}>서비스</Text>
-              <Text style={styles.receiptValue}>
-                {(() => {
-                  const serviceType = currentReservation.serviceType || '스탠다드';
-                  const servicePrice = currentReservation.servicePrice;
-                  
-                  if (servicePrice === 100000) {
-                    return '스탠다드';
-                  } else if (servicePrice === 200000) {
-                    return '프리미엄';
-                  } else if (serviceType.includes('프리미엄')) {
-                    return '프리미엄';
-                  }
-                  return '스탠다드';
-                })()}
-              </Text>
+              <Text style={styles.receiptValue}>방문진단</Text>
             </View>
             
             <View style={styles.receiptRow}>
@@ -332,11 +318,6 @@ const ReservationDetailScreen: React.FC = () => {
                   if (servicePrice) {
                     return servicePrice.toLocaleString() + '원';
                   }
-                  
-                  const serviceType = currentReservation.serviceType || '스탠다드';
-                  if (serviceType.includes('프리미엄')) {
-                    return '200,000원';
-                  }
                   return '100,000원';
                 })()}
               </Text>
@@ -368,7 +349,7 @@ const ReservationDetailScreen: React.FC = () => {
                   onPress={handleModifyReservation}
                   activeOpacity={0.8}
                 >
-                  <Ionicons name="create-outline" size={24} color="#4495E8" />
+                  <Ionicons name="create-outline" size={24} color="#4F46E5" />
                   <Text style={[styles.bottomButtonText, styles.bottomModifyText]}>
                     예약 수정
                   </Text>
@@ -429,7 +410,7 @@ const styles = StyleSheet.create({
   reportButton: {
     backgroundColor: '#F0F8FF',
     borderWidth: 1,
-    borderColor: '#4495E8',
+    borderColor: '#202632',
     borderRadius: 12,
     padding: 16,
   },
@@ -441,7 +422,7 @@ const styles = StyleSheet.create({
   reportButtonText: {
     fontSize: 16,
     fontWeight: '600',
-    color: '#4495E8',
+    color: '#202632',
     marginLeft: 8,
     marginRight: 8,
   },
@@ -566,7 +547,7 @@ const styles = StyleSheet.create({
   modifyButton: {
     backgroundColor: '#F0F8FF',
     borderWidth: 1,
-    borderColor: '#4495E8',
+    borderColor: '#202632',
   },
   cancelButton: {
     backgroundColor: '#FEF2F2',
@@ -578,7 +559,7 @@ const styles = StyleSheet.create({
     fontWeight: '600',
   },
   modifyButtonText: {
-    color: '#4495E8',
+    color: '#202632',
   },
   cancelButtonText: {
     color: '#EF4444',
@@ -641,7 +622,7 @@ const styles = StyleSheet.create({
   priceValue: {
     fontSize: 15,
     fontWeight: '700',
-    color: '#4495E8',
+    color: '#202632',
   },
   addressValue: {
     fontSize: 12,
@@ -747,7 +728,7 @@ const styles = StyleSheet.create({
     fontWeight: '500',
   },
   bottomModifyText: {
-    color: '#4495E8',
+    color: '#202632',
   },
   bottomCancelText: {
     color: '#EF4444',

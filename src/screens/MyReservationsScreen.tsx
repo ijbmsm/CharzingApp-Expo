@@ -127,15 +127,15 @@ const MyReservationsScreen: React.FC = () => {
     currentStepIndicatorSize: 30,
     separatorStrokeWidth: 2,
     currentStepStrokeWidth: 2,
-    stepStrokeCurrentColor: '#4495E8',
+    stepStrokeCurrentColor: '#202632',
     stepStrokeWidth: 2,
-    stepStrokeFinishedColor: '#4495E8',
+    stepStrokeFinishedColor: '#202632',
     stepStrokeUnFinishedColor: '#E5E7EB',
-    separatorFinishedColor: '#4495E8',
+    separatorFinishedColor: '#202632',
     separatorUnFinishedColor: '#E5E7EB',
-    stepIndicatorFinishedColor: '#4495E8',
+    stepIndicatorFinishedColor: '#202632',
     stepIndicatorUnFinishedColor: '#FFFFFF',
-    stepIndicatorCurrentColor: '#4495E8',
+    stepIndicatorCurrentColor: '#202632',
     stepIndicatorLabelFontSize: 0, // 숫자 숨기기
     currentStepIndicatorLabelFontSize: 0,
     stepIndicatorLabelCurrentColor: 'transparent',
@@ -144,7 +144,7 @@ const MyReservationsScreen: React.FC = () => {
     labelColor: '#9CA3AF',
     labelSize: 10,
     labelFontFamily: 'System',
-    currentStepLabelColor: '#4495E8',
+    currentStepLabelColor: '#202632',
   };
 
   const renderStepIndicator = (params: any) => {
@@ -172,9 +172,9 @@ const MyReservationsScreen: React.FC = () => {
 
   const getStatusColor = (status: DiagnosisReservation['status']) => {
     switch (status) {
-      case 'pending': return '#F59E0B';
-      case 'confirmed': return '#3B82F6';
-      case 'completed': return '#10B981';
+      case 'pending': return '#8B5CF6';
+      case 'confirmed': return '#4F46E5';
+      case 'completed': return '#22C55E';
       case 'cancelled': return '#EF4444';
       default: return '#6B7280';
     }
@@ -265,7 +265,7 @@ const MyReservationsScreen: React.FC = () => {
           <Text style={styles.createdText}>
             신청일: {formatDate(item.createdAt)}
           </Text>
-          <Ionicons name="chevron-forward" size={16} color="#9CA3AF" />
+          <Ionicons name="chevron-forward" size={16} color="#4F46E5" />
         </View>
       </TouchableOpacity>
     );
@@ -273,7 +273,7 @@ const MyReservationsScreen: React.FC = () => {
 
   const renderEmptyState = () => (
     <View style={styles.emptyContainer}>
-      <Ionicons name="calendar-outline" size={64} color="#D1D5DB" />
+      <Ionicons name="calendar-outline" size={64} color="#4F46E5" />
       <Text style={styles.emptyTitle}>예약 내역이 없습니다</Text>
       <Text style={styles.emptySubtitle}>
         배터리 진단 예약을 신청해보세요
@@ -297,7 +297,7 @@ const MyReservationsScreen: React.FC = () => {
           onBackPress={() => navigation.goBack()}
         />
         <View style={styles.notAuthContainer}>
-          <Ionicons name="person-outline" size={64} color="#D1D5DB" />
+          <Ionicons name="person-outline" size={64} color="#4F46E5" />
           <Text style={styles.notAuthTitle}>로그인이 필요합니다</Text>
           <Text style={styles.notAuthSubtitle}>
             예약 내역을 확인하려면 로그인해주세요
@@ -318,7 +318,7 @@ const MyReservationsScreen: React.FC = () => {
       
       {isLoading ? (
         <View style={styles.loadingContainer}>
-          <ActivityIndicator size="large" color="#4495E8" />
+          <ActivityIndicator size="large" color="#4F46E5" />
           <Text style={styles.loadingText}>예약 내역을 불러오는 중...</Text>
         </View>
       ) : (
@@ -331,8 +331,8 @@ const MyReservationsScreen: React.FC = () => {
             <RefreshControl
               refreshing={isRefreshing}
               onRefresh={handleRefresh}
-              colors={['#4495E8']}
-              tintColor="#4495E8"
+              colors={['#4F46E5']}
+              tintColor="#4F46E5"
             />
           }
           ListEmptyComponent={renderEmptyState}
@@ -444,7 +444,7 @@ const styles = StyleSheet.create({
   priceValue: {
     fontSize: 13,
     fontWeight: '700',
-    color: '#4495E8',
+    color: '#202632',
   },
   addressValue: {
     fontSize: 11,
@@ -496,7 +496,7 @@ const styles = StyleSheet.create({
     marginBottom: 32,
   },
   reserveButton: {
-    backgroundColor: '#4495E8',
+    backgroundColor: '#202632',
     paddingHorizontal: 24,
     paddingVertical: 12,
     borderRadius: 8,
