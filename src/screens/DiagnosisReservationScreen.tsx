@@ -77,7 +77,7 @@ const DiagnosisReservationScreen: React.FC = () => {
   if (!params || !params.vehicleData || !params.serviceData) {
     return (
       <View style={[styles.container, styles.loadingContainer]}>
-        <ActivityIndicator size="large" color="#2196f3" />
+        <ActivityIndicator size="large" color="#06B6D4" />
         <Text style={styles.loadingText}>새로운 예약 화면으로 이동 중...</Text>
       </View>
     );
@@ -647,7 +647,7 @@ const DiagnosisReservationScreen: React.FC = () => {
 
                 {/* 방문 주소 */}
                 <View style={styles.infoRow}>
-                  <Ionicons name="location-outline" size={20} color="#4495E8" />
+                  <Ionicons name="location-outline" size={20} color="#06B6D4" />
                   <View style={styles.infoContent}>
                     <Text style={styles.infoLabel}>방문 주소</Text>
                     <Text style={styles.infoText}>{userAddress}</Text>
@@ -659,7 +659,7 @@ const DiagnosisReservationScreen: React.FC = () => {
 
                 {/* 예약 날짜 및 시간 */}
                 <View style={styles.infoRow}>
-                  <Ionicons name="calendar-outline" size={20} color="#4495E8" />
+                  <Ionicons name="calendar-outline" size={20} color="#06B6D4" />
                   <View style={styles.infoContent}>
                     <Text style={styles.infoLabel}>예약 일시</Text>
                     <Text style={styles.infoText}>
@@ -670,7 +670,7 @@ const DiagnosisReservationScreen: React.FC = () => {
 
                 {/* 서비스 정보 */}
                 <View style={styles.infoRow}>
-                  <Ionicons name="construct-outline" size={20} color="#4495E8" />
+                  <Ionicons name="construct-outline" size={20} color="#06B6D4" />
                   <View style={styles.infoContent}>
                     <Text style={styles.infoLabel}>서비스 내용</Text>
                     <Text style={styles.infoText}>전기차 배터리 진단 및 상담</Text>
@@ -724,7 +724,7 @@ const styles = StyleSheet.create({
     borderTopColor: '#E5E7EB',
   },
   button: {
-    backgroundColor: '#4495E8',
+    backgroundColor: '#06B6D4',
     borderRadius: 12,
     padding: 16,
     alignItems: 'center',
@@ -825,7 +825,7 @@ const styles = StyleSheet.create({
     padding: 16,
     borderRadius: 8,
     borderLeftWidth: 3,
-    borderLeftColor: '#4495E8',
+    borderLeftColor: '#06B6D4',
   },
   noticeTitle: {
     fontSize: 14,
@@ -858,7 +858,7 @@ const styles = StyleSheet.create({
   },
   confirmButton: {
     flex: 1,
-    backgroundColor: '#4495E8',
+    backgroundColor: '#06B6D4',
     borderRadius: 8,
     padding: 16,
     alignItems: 'center',

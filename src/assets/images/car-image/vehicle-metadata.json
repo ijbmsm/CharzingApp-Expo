@@ -1,0 +1,280 @@
+{
+  "version": "1.0.0",
+  "lastUpdated": "2025-10-21T08:26:57.911Z",
+  "namingConvention": "{BRAND}-{MODEL}-{YEAR}-{VARIANT}.png",
+  "vehicles": {
+    "KIA": {
+      "EV3": {
+        "models": [
+          "STANDARD",
+          "LONGRANGE"
+        ],
+        "years": [
+          2024,
+          2025
+        ],
+        "defaultYear": 2024
+      },
+      "EV4": {
+        "models": [
+          "STANDARD"
+        ],
+        "years": [
+          2025
+        ],
+        "defaultYear": 2025
+      },
+      "EV6": {
+        "models": [
+          "STANDARD",
+          "LONGRANGE-2WD",
+          "LONGRANGE-AWD"
+        ],
+        "years": [
+          2022,
+          2023,
+          2024,
+          2025
+        ],
+        "defaultYear": 2024
+      },
+      "EV6-GT": {
+        "models": [
+          "GT"
+        ],
+        "years": [
+          2023,
+          2024,
+          2025,
+          2026
+        ],
+        "defaultYear": 2025
+      },
+      "EV9": {
+        "models": [
+          "STANDARD",
+          "LONGRANGE",
+          "LONGRANGE-AWD"
+        ],
+        "years": [
+          2023,
+          2024,
+          2025
+        ],
+        "defaultYear": 2024
+      },
+      "EV9-GT": {
+        "models": [
+          "GT"
+        ],
+        "years": [
+          2025
+        ],
+        "defaultYear": 2025
+      },
+      "NIRO-EV": {
+        "models": [
+          "STANDARD"
+        ],
+        "years": [
+          2018,
+          2019,
+          2020,
+          2021,
+          2022,
+          2023,
+          2024
+        ],
+        "defaultYear": 2022
+      },
+      "RAY": {
+        "models": [
+          "STANDARD"
+        ],
+        "years": [
+          2012,
+          2024
+        ],
+        "defaultYear": 2024
+      }
+    },
+    "HYUNDAI": {
+      "IONIQ-5": {
+        "models": [
+          "STANDARD",
+          "LONGRANGE",
+          "LONGRANGE-AWD"
+        ],
+        "years": [
+          2021,
+          2022,
+          2023,
+          2024,
+          2025
+        ],
+        "defaultYear": 2024
+      },
+      "IONIQ-5-N": {
+        "models": [
+          "N"
+        ],
+        "years": [
+          2023,
+          2024
+        ],
+        "defaultYear": 2024
+      },
+      "IONIQ-6": {
+        "models": [
+          "STANDARD",
+          "LONGRANGE",
+          "LONGRANGE-AWD",
+          "LONGRANGE-NLINE",
+          "LONGRANGE-NLINE-AWD"
+        ],
+        "years": [
+          2022,
+          2023,
+          2024,
+          2025
+        ],
+        "defaultYear": 2024
+      },
+      "IONIQ-6-N": {
+        "models": [
+          "N"
+        ],
+        "years": [
+          2025,
+          2026
+        ],
+        "defaultYear": 2025
+      },
+      "IONIQ-9": {
+        "models": [
+          "STANDARD",
+          "LONGRANGE",
+          "LONGRANGE-AWD"
+        ],
+        "years": [
+          2025
+        ],
+        "defaultYear": 2025
+      },
+      "KONA-ELECTRIC": {
+        "models": [
+          "STANDARD",
+          "LONGRANGE"
+        ],
+        "years": [
+          2018,
+          2019,
+          2020,
+          2021,
+          2022,
+          2023,
+          2024,
+          2025
+        ],
+        "defaultYear": 2023
+      },
+      "CASPER-ELECTRIC": {
+        "models": [
+          "STANDARD",
+          "PREMIUM",
+          "INSPIRATION",
+          "CROSS"
+        ],
+        "years": [
+          2024,
+          2025,
+          2026
+        ],
+        "defaultYear": 2024
+      }
+    },
+    "TESLA": {
+      "MODEL-3": {
+        "models": [
+          "STANDARD",
+          "LONGRANGE", 
+          "PERFORMANCE",
+          "RWD",
+          "HIGHLAND"
+        ],
+        "years": [
+          2019,
+          2020,
+          2021,
+          2022,
+          2023,
+          2024,
+          2025
+        ],
+        "defaultYear": 2024
+      },
+      "MODEL-S": {
+        "models": [
+          "STANDARD",
+          "LONGRANGE",
+          "PLAID"
+        ],
+        "years": [
+          2019,
+          2020,
+          2021,
+          2022,
+          2023,
+          2024,
+          2025
+        ],
+        "defaultYear": 2024
+      },
+      "MODEL-X": {
+        "models": [
+          "STANDARD",
+          "LONGRANGE",
+          "PLAID"
+        ],
+        "years": [
+          2019,
+          2020,
+          2021,
+          2022,
+          2023,
+          2024,
+          2025
+        ],
+        "defaultYear": 2024
+      },
+      "MODEL-Y": {
+        "models": [
+          "STANDARD",
+          "LONGRANGE",
+          "PERFORMANCE"
+        ],
+        "years": [
+          2020,
+          2021,
+          2022,
+          2023,
+          2024,
+          2025
+        ],
+        "defaultYear": 2024
+      },
+      "CYBERTRUCK": {
+        "models": [
+          "STANDARD",
+          "AWD",
+          "CYBERBEAST"
+        ],
+        "years": [
+          2024,
+          2025
+        ],
+        "defaultYear": 2024
+      }
+    }
+  }
+}

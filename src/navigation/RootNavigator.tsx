@@ -9,7 +9,6 @@ import { Ionicons } from '@expo/vector-icons';
 
 // Screens
 import HomeScreen from '../screens/HomeScreen';
-import DiagnosticScreen from '../screens/DiagnosticScreen';
 import DiagnosisReservationScreen from '../screens/DiagnosisReservationScreen';
 import DiagnosisReportScreen from '../screens/DiagnosisReportScreen';
 import VehicleDiagnosisReportScreen from '../screens/VehicleDiagnosisReportScreen';
@@ -21,9 +20,11 @@ import SettingsScreen from '../screens/SettingsScreen';
 import LoginScreen from '../screens/LoginScreen';
 import SplashScreen from '../screens/SplashScreen';
 import SignupCompleteScreen from '../screens/SignupCompleteScreen';
+import BatteryInfoScreen from '../screens/BatteryInfoScreen';
 
 // 새로운 예약 플로우 화면들
 import ReservationScreen from '../screens/ReservationScreen';
+import DiagnosticTabScreen from '../screens/DiagnosticTabScreen';
 
 // Types
 export type RootStackParamList = {
@@ -71,7 +72,7 @@ export type RootStackParamList = {
       provider: 'google';
     };
   };
-  // 새로운 예약 플로우 화면들
+  // 상세 예약 플로우 화면들
   Reservation: {
     editMode?: boolean;
     existingReservation?: Omit<import('../services/firebaseService').DiagnosisReservation, 'requestedDate' | 'createdAt' | 'updatedAt'> & {
@@ -90,21 +91,21 @@ export type RootStackParamList = {
 };
 
 export type MainTabParamList = {
-  Home: undefined;
-  Diagnostic: undefined;
-  MyPage: undefined;
+  Home: undefined;        // 통합된 홈 (진단예약 + 홈 기능)
+  BatteryInfo: undefined; // 배터리 정보
+  MyPage: undefined;      // 마이페이지
 };
 
 const Stack = createStackNavigator<RootStackParamList>();
 const Tab = createBottomTabNavigator<MainTabParamList>();
 
-// Tab bar icon components
+// Tab bar icon components - 3개 탭용
 const HomeIcon = ({ color, size }: { color: string; size: number }) => (
   <Ionicons name="home-outline" size={size} color={color} />
 );
 
-const DiagnosticIcon = ({ color, size }: { color: string; size: number }) => (
-  <Ionicons name="construct-outline" size={size} color={color} />
+const BatteryInfoIcon = ({ color, size }: { color: string; size: number }) => (
+  <Ionicons name="search-outline" size={size} color={color} />
 );
 
 const MyPageIcon = ({ color, size }: { color: string; size: number }) => (
@@ -120,7 +121,7 @@ function MainTabs() {
     <Tab.Navigator
       screenOptions={{
         headerShown: false,
-        tabBarActiveTintColor: '#4495E8',
+        tabBarActiveTintColor: '#202632',
         tabBarInactiveTintColor: '#6B7280',
         tabBarStyle: {
           backgroundColor: '#FFFFFF',
@@ -133,6 +134,8 @@ function MainTabs() {
           shadowColor: '#000',
           shadowOffset: { width: 0, height: -2 },
           shadowRadius: 4,
+          borderTopLeftRadius: 30,
+          borderTopRightRadius: 30,
         },
         tabBarLabelStyle: {
           fontSize: 12,
@@ -148,11 +151,11 @@ function MainTabs() {
         }}
       />
       <Tab.Screen 
-        name="Diagnostic" 
-        component={DiagnosticScreen}
+        name="BatteryInfo" 
+        component={BatteryInfoScreen}
         options={{
-          tabBarLabel: '진단예약',
-          tabBarIcon: DiagnosticIcon,
+          tabBarLabel: '배터리 정보',
+          tabBarIcon: BatteryInfoIcon,
         }}
       />
       <Tab.Screen 
@@ -335,7 +338,7 @@ export default function RootNavigator() {
           }}
         />
         
-        {/* 새로운 예약 플로우 화면들 */}
+        {/* 상세 예약 플로우 화면들 */}
         <Stack.Screen 
           name="Reservation" 
           component={ReservationScreen}

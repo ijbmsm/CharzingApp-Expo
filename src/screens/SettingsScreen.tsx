@@ -10,15 +10,19 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useNavigation } from '@react-navigation/native';
-import { useSelector } from 'react-redux';
+import { useSelector, useDispatch } from 'react-redux';
 import { RootState } from '../store';
+import { logout } from '../store/slices/authSlice';
 import Header from '../components/Header';
 import { Ionicons } from '@expo/vector-icons';
 import notificationService, { NotificationSettings } from '../services/notificationService';
+import firebaseService from '../services/firebaseService';
+import authPersistenceService from '../services/authPersistenceService';
 import devLog from '../utils/devLog';
 
 const SettingsScreen: React.FC = () => {
   const navigation = useNavigation();
+  const dispatch = useDispatch();
   const { user, isAuthenticated } = useSelector((state: RootState) => state.auth);
   const [notificationSettings, setNotificationSettings] = useState<NotificationSettings>({
     enabled: true,
@@ -93,6 +97,55 @@ const SettingsScreen: React.FC = () => {
     }
   };
 
+  const handleDeleteAccount = async () => {
+    if (!isAuthenticated || !user) {
+      Alert.alert('오류', '로그인이 필요합니다.');
+      return;
+    }
+
+    Alert.alert(
+      '회원탈퇴',
+      '정말로 탈퇴하시겠습니까?\n\n⚠️ 주의사항:\n• 모든 데이터가 영구적으로 삭제됩니다\n• 예약 내역, 진단 리포트 등이 모두 삭제됩니다\n• 이 작업은 되돌릴 수 없습니다',
+      [
+        {
+          text: '취소',
+          style: 'cancel',
+        },
+        {
+          text: '탈퇴하기',
+          style: 'destructive',
+          onPress: async () => {
+            try {
+              devLog.log('회원탈퇴 시작...');
+
+              // Firestore에서 사용자 데이터 삭제
+              await firebaseService.deleteUser(user.uid);
+
+              // Firebase Auth 로그아웃
+              await firebaseService.signOut();
+
+              // 커스텀 persistence 데이터 삭제
+              await authPersistenceService.clearAuthState();
+
+              // Redux 상태 초기화
+              dispatch(logout());
+
+              devLog.log('✅ 회원탈퇴 완료');
+
+              Alert.alert('탈퇴 완료', '회원탈퇴가 완료되었습니다.');
+
+              // 홈으로 이동
+              navigation.navigate('Home' as never);
+            } catch (error) {
+              devLog.error('회원탈퇴 오류:', error);
+              Alert.alert('오류', '회원탈퇴 중 오류가 발생했습니다. 다시 시도해주세요.');
+            }
+          },
+        },
+      ]
+    );
+  };
+
   if (isLoading) {
     return (
       <SafeAreaView style={styles.container}>
@@ -122,7 +175,7 @@ const SettingsScreen: React.FC = () => {
         {/* 알림 설정 섹션 */}
         <View style={styles.section}>
           <View style={styles.sectionHeader}>
-            <Ionicons name="notifications-outline" size={20} color="#4495E8" />
+            <Ionicons name="notifications-outline" size={20} color="#06B6D4" />
             <Text style={styles.sectionTitle}>알림 설정</Text>
           </View>
           
@@ -137,8 +190,8 @@ const SettingsScreen: React.FC = () => {
             <Switch
               value={notificationSettings.enabled}
               onValueChange={(value) => handleToggleSetting('enabled', value)}
-              trackColor={{ false: '#E5E7EB', true: '#93C5FD' }}
-              thumbColor={notificationSettings.enabled ? '#4495E8' : '#9CA3AF'}
+              trackColor={{ false: '#E5E7EB', true: '#06B6D4' }}
+              thumbColor={notificationSettings.enabled ? '#06B6D4' : '#9CA3AF'}
               ios_backgroundColor="#E5E7EB"
             />
           </View>
@@ -155,8 +208,8 @@ const SettingsScreen: React.FC = () => {
               value={notificationSettings.reservation}
               onValueChange={(value) => handleToggleSetting('reservation', value)}
               disabled={!notificationSettings.enabled}
-              trackColor={{ false: '#E5E7EB', true: '#93C5FD' }}
-              thumbColor={notificationSettings.reservation && notificationSettings.enabled ? '#4495E8' : '#9CA3AF'}
+              trackColor={{ false: '#E5E7EB', true: '#06B6D4' }}
+              thumbColor={notificationSettings.reservation && notificationSettings.enabled ? '#06B6D4' : '#9CA3AF'}
               ios_backgroundColor="#E5E7EB"
             />
           </View>
@@ -173,8 +226,8 @@ const SettingsScreen: React.FC = () => {
               value={notificationSettings.report}
               onValueChange={(value) => handleToggleSetting('report', value)}
               disabled={!notificationSettings.enabled}
-              trackColor={{ false: '#E5E7EB', true: '#93C5FD' }}
-              thumbColor={notificationSettings.report && notificationSettings.enabled ? '#4495E8' : '#9CA3AF'}
+              trackColor={{ false: '#E5E7EB', true: '#06B6D4' }}
+              thumbColor={notificationSettings.report && notificationSettings.enabled ? '#06B6D4' : '#9CA3AF'}
               ios_backgroundColor="#E5E7EB"
             />
           </View>
@@ -191,8 +244,8 @@ const SettingsScreen: React.FC = () => {
               value={notificationSettings.announcement}
               onValueChange={(value) => handleToggleSetting('announcement', value)}
               disabled={!notificationSettings.enabled}
-              trackColor={{ false: '#E5E7EB', true: '#93C5FD' }}
-              thumbColor={notificationSettings.announcement && notificationSettings.enabled ? '#4495E8' : '#9CA3AF'}
+              trackColor={{ false: '#E5E7EB', true: '#06B6D4' }}
+              thumbColor={notificationSettings.announcement && notificationSettings.enabled ? '#06B6D4' : '#9CA3AF'}
               ios_backgroundColor="#E5E7EB"
             />
           </View>
@@ -209,8 +262,8 @@ const SettingsScreen: React.FC = () => {
               value={notificationSettings.marketing}
               onValueChange={(value) => handleToggleSetting('marketing', value)}
               disabled={!notificationSettings.enabled}
-              trackColor={{ false: '#E5E7EB', true: '#93C5FD' }}
-              thumbColor={notificationSettings.marketing && notificationSettings.enabled ? '#4495E8' : '#9CA3AF'}
+              trackColor={{ false: '#E5E7EB', true: '#06B6D4' }}
+              thumbColor={notificationSettings.marketing && notificationSettings.enabled ? '#06B6D4' : '#9CA3AF'}
               ios_backgroundColor="#E5E7EB"
             />
           </View>
@@ -219,7 +272,7 @@ const SettingsScreen: React.FC = () => {
         {/* 개인정보 및 지원 섹션 */}
         <View style={styles.section}>
           <View style={styles.sectionHeader}>
-            <Ionicons name="information-circle-outline" size={20} color="#4495E8" />
+            <Ionicons name="information-circle-outline" size={20} color="#06B6D4" />
             <Text style={styles.sectionTitle}>개인정보 및 지원</Text>
           </View>
           
@@ -236,8 +289,8 @@ const SettingsScreen: React.FC = () => {
           </TouchableOpacity>
 
           {/* 고객지원 */}
-          <TouchableOpacity 
-            style={[styles.linkItem, { borderBottomWidth: 0 }]}
+          <TouchableOpacity
+            style={styles.linkItem}
             onPress={() => openLink('https://charzing.kr/support', '고객지원')}
           >
             <View style={styles.linkInfo}>
@@ -246,6 +299,20 @@ const SettingsScreen: React.FC = () => {
             </View>
             <Ionicons name="chevron-forward" size={20} color="#9CA3AF" />
           </TouchableOpacity>
+
+          {/* 회원탈퇴 */}
+          {isAuthenticated && (
+            <TouchableOpacity
+              style={[styles.linkItem, { borderBottomWidth: 0 }]}
+              onPress={handleDeleteAccount}
+            >
+              <View style={styles.linkInfo}>
+                <Text style={[styles.linkTitle, styles.deleteText]}>회원탈퇴</Text>
+                <Text style={styles.linkDescription}>계정 및 모든 데이터 삭제</Text>
+              </View>
+              <Ionicons name="chevron-forward" size={20} color="#EF4444" />
+            </TouchableOpacity>
+          )}
         </View>
 
         
@@ -361,6 +428,9 @@ const styles = StyleSheet.create({
   linkDescription: {
     fontSize: 14,
     color: '#6B7280',
+  },
+  deleteText: {
+    color: '#EF4444',
   },
 });
 

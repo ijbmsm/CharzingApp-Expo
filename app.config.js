@@ -26,11 +26,17 @@ export default {
     description: "한국 1위 전기차 배터리 진단 전문 서비스. 중고 전기차 구매 전 전문가가 직접 방문하여 배터리 상태를 정확히 진단하고 24시간 내 상세한 리포트를 제공합니다.",
     githubUrl: "https://github.com/ijbmsm/CharzingApp-Expo",
     splash: {
-      backgroundColor: "#000000",
+      image: "./assets/images/splash.png",
+      backgroundColor: "#202632",
+      resizeMode: "contain",
       hideExponentText: true
     },
     assetBundlePatterns: [
       "**/*"
+    ],
+    fonts: [
+      "./assets/fonts/LINESeedSansKR-Regular.ttf",
+      "./assets/fonts/LINESeedSansKR-Bold.ttf"
     ],
     ios: {
       supportsTablet: true,
@@ -123,14 +129,6 @@ export default {
         {
           iosUrlScheme: "com.googleusercontent.apps.91035459357-lc3tir17pmmomf793bnce1qmstns4rh7",
           androidClientId: "91035459357-lc3tir17pmmomf793bnce1qmstns4rh7.apps.googleusercontent.com"
-        }
-      ],
-      [
-        "@react-native-seoul/kakao-login",
-        {
-          kakaoAppKey: process.env.EXPO_PUBLIC_KAKAO_NATIVE_APP_KEY,
-          overrideKakaoSDKVersion: "2.11.2",
-          kotlinVersion: "1.9.0"
         }
       ],
       [

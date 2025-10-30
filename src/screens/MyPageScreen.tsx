@@ -9,15 +9,16 @@ import {
   Image,
   TextInput,
   Modal,
+  Dimensions,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useSelector, useDispatch } from 'react-redux';
 import { useNavigation } from '@react-navigation/native';
 import { StackNavigationProp } from '@react-navigation/stack';
+import { MotiView } from 'moti';
 import { RootState } from '../store';
 import { logout, updateUserProfile } from '../store/slices/authSlice';
 import Header from '../components/Header';
-// 카카오 로그인 서비스 제거됨
 import firebaseService from '../services/firebaseService';
 import authPersistenceService from '../services/authPersistenceService';
 import { RootStackParamList } from '../navigation/RootNavigator';
@@ -28,16 +29,15 @@ type NavigationProp = StackNavigationProp<RootStackParamList>;
 
 
 // 마이페이지 컴포넌트
-const AuthenticatedMyPage: React.FC<{ 
-  user: any; 
-  onLogout: () => void; 
-  onDeleteAccount: (user: { uid: string; kakaoId?: string }) => void;
+const AuthenticatedMyPage: React.FC<{
+  user: any;
+  onLogout: () => void;
   dispatch: any;
-}> = ({ user, onLogout, onDeleteAccount, dispatch }) => {
+}> = ({ user, onLogout, dispatch }) => {
   const navigation = useNavigation<NavigationProp>();
   const [firebaseUser, setFirebaseUser] = useState<any>(null);
   const [_profileLoading, setProfileLoading] = useState(true);
-  
+
   // 편집 관련 상태
   const [showEditModal, setShowEditModal] = useState(false);
   const [editingField, setEditingField] = useState<'realName' | null>(null);
@@ -46,7 +46,7 @@ const AuthenticatedMyPage: React.FC<{
 
   const loadUserProfile = useCallback(async () => {
     if (!user?.uid) return;
-    
+
     try {
       const profile = await firebaseService.getUserProfile(user.uid);
       setFirebaseUser(profile);
@@ -64,7 +64,7 @@ const AuthenticatedMyPage: React.FC<{
   // 편집 시작 함수
   const startEdit = (field: 'realName') => {
     const currentValue = displayUser?.realName || '';
-    
+
     setEditingField(field);
     setEditValue(currentValue);
     setShowEditModal(true);
@@ -73,36 +73,36 @@ const AuthenticatedMyPage: React.FC<{
   // 편집 저장 함수
   const saveEdit = async () => {
     if (!editingField || !user?.uid) return;
-    
+
     try {
       setUpdating(true);
-      
+
       // Firestore 업데이트 데이터 준비
       const updateData: any = {
         uid: user.uid,
         updatedAt: new Date(),
       };
-      
+
       // 필드에 따라 업데이트
       if (editingField === 'realName') {
         updateData.realName = editValue.trim();
       }
-      
+
       // Firestore에 직접 업데이트
       await firebaseService.createOrUpdateUser(updateData);
-      
+
       // Redux 상태 업데이트
       dispatch(updateUserProfile({ [editingField]: editValue.trim() }));
-      
+
       // 프로필 새로고침
       await loadUserProfile();
-      
+
       setShowEditModal(false);
       setEditingField(null);
       setEditValue('');
-      
+
       Alert.alert('성공', '프로필이 업데이트되었습니다.');
-      
+
     } catch (error) {
       devLog.error('프로필 업데이트 실패:', error);
       Alert.alert('오류', '프로필 업데이트에 실패했습니다.');
@@ -123,85 +123,90 @@ const AuthenticatedMyPage: React.FC<{
   return (
     <SafeAreaView style={styles.container} edges={['top']}>
       <Header title="마이페이지" showLogo={false} />
-      <ScrollView 
+      <ScrollView
         style={styles.content}
         contentContainerStyle={{ flexGrow: 1 }}
+        showsVerticalScrollIndicator={false}
       >
-        <View style={styles.profileSection}>
-          <View style={styles.avatar}>
-            {displayUser?.photoURL ? (
-              <Image 
-                source={{ uri: displayUser.photoURL }} 
-                style={styles.avatarImage}
-              />
-            ) : (
-              <Text style={styles.avatarText}>👤</Text>
-            )}
+        {/* 메인 프로필 섹션 */}
+        <MotiView
+          style={styles.profileCard}
+          from={{ opacity: 0, translateY: 20 }}
+          animate={{ opacity: 1, translateY: 0 }}
+          transition={{ type: 'timing', duration: 500 }}
+        >
+          <View style={styles.profileHeader}>
+            <Text style={styles.profileTitle}>내 정보</Text>
+            <TouchableOpacity style={styles.editIconButton} onPress={() => startEdit('realName')}>
+              <Ionicons name="pencil" size={18} color="#6B7280" />
+            </TouchableOpacity>
           </View>
-          {/* 실명 (우선 표시) */}
-          {displayUser?.realName && (
-            <View style={styles.nameRow}>
-              <Text style={styles.realName}>
-                {displayUser.realName}
-              </Text>
-              <TouchableOpacity 
-                style={styles.editButton}
-                onPress={() => startEdit('realName')}
-              >
-                <Ionicons name="pencil" size={16} color="#666" />
-              </TouchableOpacity>
+
+          <View style={styles.profileContent}>
+            <View style={styles.avatarContainer}>
+              {displayUser?.photoURL ? (
+                <Image
+                  source={{ uri: displayUser.photoURL }}
+                  style={styles.avatarImage}
+                />
+              ) : (
+                <View style={styles.defaultAvatar}>
+                  <Ionicons name="person" size={32} color="#6B7280" />
+                </View>
+              )}
             </View>
-          )}
-          
-          
-          
-          {displayUser?.email && (
-            <Text style={styles.userEmail}>
-              {displayUser.email}
-            </Text>
-          )}
-          {!displayUser?.email && (
-            <Text style={[styles.userEmail, styles.noEmailText]}>
-              이메일 정보 없음
-            </Text>
-          )}
-          {displayUser?.provider && (
-            <Text style={styles.providerText}>
-              {displayUser.provider === 'kakao' ? '카카오 로그인' : '이메일 로그인'}
-            </Text>
-          )}
-        </View>
-        
-        <View style={styles.menuSection}>
-          <TouchableOpacity 
-            style={styles.menuItem}
-            onPress={() => navigation.navigate('MyReservations')}
-          >
-            <Text style={styles.menuText}>내 예약</Text>
-            <Text style={styles.menuArrow}>›</Text>
-          </TouchableOpacity>
-          
-          <TouchableOpacity 
-            style={styles.menuItem}
+
+            <View style={styles.userInfo}>
+              <Text style={styles.userName}>
+                {displayUser?.realName || displayUser?.displayName || '이름 없음'}
+              </Text>
+              <Text style={styles.userEmail}>
+                {displayUser?.email || '이메일 정보 없음'}
+              </Text>
+              <View style={styles.providerBadge}>
+                <Text style={styles.providerText}>
+                  {displayUser?.provider === 'kakao' ? '카카오' :
+                   displayUser?.provider === 'google' ? '구글' :
+                   displayUser?.provider === 'apple' ? '애플' : '이메일'} 로그인
+                </Text>
+              </View>
+            </View>
+          </View>
+        </MotiView>
+
+        {/* 액션 그리드 - 홈 스타일 */}
+        <MotiView
+          from={{ opacity: 0, translateY: 20 }}
+          animate={{ opacity: 1, translateY: 0 }}
+          transition={{ type: 'timing', duration: 500, delay: 200 }}
+          style={styles.actionGridContainer}
+        >
+          <TouchableOpacity
+            style={styles.actionItem}
             onPress={() => navigation.navigate('Settings')}
+            activeOpacity={0.7}
           >
-            <Text style={styles.menuText}>설정</Text>
-            <Text style={styles.menuArrow}>›</Text>
+            <View style={styles.actionIconContainer}>
+              <Ionicons name="settings" size={32} color="#6B7280" />
+            </View>
+            <Text style={styles.actionTitle}>설정</Text>
+            <Text style={styles.actionSubtitle}>앱 관리</Text>
           </TouchableOpacity>
-          
-          
-          <TouchableOpacity style={styles.menuItem} onPress={onLogout}>
-            <Text style={[styles.menuText, styles.logoutText]}>로그아웃</Text>
-            <Text style={styles.menuArrow}>›</Text>
+
+          <TouchableOpacity
+            style={styles.actionItem}
+            onPress={onLogout}
+            activeOpacity={0.7}
+          >
+            <View style={styles.actionIconContainer}>
+              <Ionicons name="log-out" size={32} color="#6B7280" />
+            </View>
+            <Text style={styles.actionTitle}>로그아웃</Text>
+            <Text style={styles.actionSubtitle}>계정 종료</Text>
           </TouchableOpacity>
-          
-          <TouchableOpacity style={styles.menuItem} onPress={() => onDeleteAccount(user)}>
-            <Text style={[styles.menuText, styles.deleteText]}>회원탈퇴</Text>
-            <Text style={styles.menuArrow}>›</Text>
-          </TouchableOpacity>
-        </View>
+        </MotiView>
       </ScrollView>
-      
+
       {/* 편집 모달 */}
       <Modal
         visible={showEditModal}
@@ -214,7 +219,7 @@ const AuthenticatedMyPage: React.FC<{
             <Text style={styles.modalTitle}>
               실명 수정
             </Text>
-            
+
             <TextInput
               style={styles.modalInput}
               value={editValue}
@@ -223,16 +228,16 @@ const AuthenticatedMyPage: React.FC<{
               autoFocus={true}
               maxLength={20}
             />
-            
+
             <View style={styles.modalButtons}>
-              <TouchableOpacity 
+              <TouchableOpacity
                 style={[styles.modalButton, styles.cancelButton]}
                 onPress={cancelEdit}
               >
                 <Text style={styles.cancelButtonText}>취소</Text>
               </TouchableOpacity>
-              
-              <TouchableOpacity 
+
+              <TouchableOpacity
                 style={[styles.modalButton, styles.saveButton, updating && styles.disabledButton]}
                 onPress={saveEdit}
                 disabled={updating || !editValue.trim()}
@@ -245,7 +250,7 @@ const AuthenticatedMyPage: React.FC<{
           </View>
         </View>
       </Modal>
-      
+
     </SafeAreaView>
   );
 };
@@ -255,49 +260,6 @@ const MyPageScreen: React.FC = () => {
   const navigation = useNavigation<NavigationProp>();
   const { user, isAuthenticated } = useSelector((state: RootState) => state.auth);
 
-  const handleDeleteAccount = async (userToDelete: { uid: string; kakaoId?: string }) => {
-    Alert.alert(
-      '회원탈퇴',
-      '정말로 탈퇴하시겠습니까?\n\n⚠️ 주의사항:\n• 모든 데이터가 영구적으로 삭제됩니다\n• 이 작업은 되돌릴 수 없습니다',
-      [
-        {
-          text: '취소',
-          style: 'cancel',
-        },
-        {
-          text: '탈퇴하기',
-          style: 'destructive',
-          onPress: async () => {
-            try {
-              devLog.log('회원탈퇴 시작...');
-              
-              // Firebase Auth 로그아웃 먼저 처리
-              await firebaseService.signOut();
-              // 커스텀 persistence 데이터 삭제
-              await authPersistenceService.clearAuthState();
-              devLog.log('계정 삭제 처리 완료');
-              
-              // Redux 상태 초기화
-              dispatch(logout());
-              
-              Alert.alert(
-                '탈퇴 완료',
-                '회원탈퇴가 완료되었습니다.',
-                [{ text: '확인' }]
-              );
-            } catch (error) {
-              devLog.error('회원탈퇴 오류:', error);
-              Alert.alert(
-                '탈퇴 실패',
-                '회원탈퇴 중 오류가 발생했습니다. 다시 시도해주세요.',
-                [{ text: '확인' }]
-              );
-            }
-          },
-        },
-      ]
-    );
-  };
 
   const handleLogout = async () => {
     Alert.alert(
@@ -336,44 +298,71 @@ const MyPageScreen: React.FC = () => {
     return (
       <SafeAreaView style={styles.container} edges={['top']}>
         <Header title="마이페이지" showLogo={false} />
-        <ScrollView 
+        <ScrollView
           style={styles.content}
           contentContainerStyle={{ flexGrow: 1 }}
+          showsVerticalScrollIndicator={false}
         >
-          <View style={styles.profileSection}>
+          {/* 로그인 필요 섹션 */}
+          <MotiView
+            style={styles.loginCard}
+            from={{ opacity: 0, translateY: 20 }}
+            animate={{ opacity: 1, translateY: 0 }}
+            transition={{ type: 'timing', duration: 500 }}
+          >
+            <View style={styles.loginIconContainer}>
+              <Ionicons name="person-circle-outline" size={64} color="#9CA3AF" />
+            </View>
+
             <Text style={styles.loginTitle}>로그인이 필요합니다</Text>
             <Text style={styles.loginSubtitle}>
-              소셜 계정으로 간편하게 로그인하세요
+              차징 앱의 모든 기능을 이용하려면{'\n'}로그인해주세요
             </Text>
-            
-            <TouchableOpacity 
+
+            <TouchableOpacity
               style={styles.loginButton}
               onPress={() => navigation.navigate('Login', { showBackButton: true })}
             >
-              <Ionicons name="log-in-outline" size={22} color="#FFFFFF" />
               <Text style={styles.loginButtonText}>로그인하기</Text>
             </TouchableOpacity>
-          </View>
-          
-          <View style={styles.menuSection}>
-            <View style={[styles.menuItem, styles.disabledMenuItem]}>
-              <Text style={[styles.menuText, styles.disabledText]}>내 예약</Text>
-              <Text style={[styles.menuArrow, styles.disabledText]}>›</Text>
-            </View>
-            
-            <View style={[styles.menuItem, styles.disabledMenuItem]}>
-              <Text style={[styles.menuText, styles.disabledText]}>설정</Text>
-              <Text style={[styles.menuArrow, styles.disabledText]}>›</Text>
-            </View>
-            
-          </View>
+          </MotiView>
+
+          {/* 비활성화된 그리드 */}
+          <MotiView
+            style={styles.disabledSection}
+            from={{ opacity: 0, translateY: 20 }}
+            animate={{ opacity: 1, translateY: 0 }}
+            transition={{ type: 'timing', duration: 500, delay: 200 }}
+          >
+            <TouchableOpacity
+              style={[styles.actionItem, styles.disabledActionItem]}
+              disabled={true}
+            >
+              <View style={styles.actionIconContainer}>
+                <Ionicons name="settings" size={32} color="#D1D5DB" />
+              </View>
+              <Text style={[styles.actionTitle, styles.disabledText]}>설정</Text>
+              <Text style={[styles.actionSubtitle, styles.disabledText]}>로그인 필요</Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              style={[styles.actionItem, styles.disabledActionItem]}
+              disabled={true}
+            >
+              <View style={styles.actionIconContainer}>
+                <Ionicons name="log-out" size={32} color="#D1D5DB" />
+              </View>
+              <Text style={[styles.actionTitle, styles.disabledText]}>로그아웃</Text>
+              <Text style={[styles.actionSubtitle, styles.disabledText]}>로그인 필요</Text>
+            </TouchableOpacity>
+          </MotiView>
         </ScrollView>
       </SafeAreaView>
     );
   }
 
   return (
-    <AuthenticatedMyPage user={user} onLogout={handleLogout} onDeleteAccount={handleDeleteAccount} dispatch={dispatch} />
+    <AuthenticatedMyPage user={user} onLogout={handleLogout} dispatch={dispatch} />
   );
 };
 
@@ -384,111 +373,171 @@ const styles = StyleSheet.create({
   },
   content: {
     flex: 1,
+    padding: 16,
   },
-  profileSection: {
+
+  // 로그인된 사용자 - 프로필 카드
+  profileCard: {
     backgroundColor: '#FFFFFF',
-    paddingVertical: 48,
-    paddingHorizontal: 32,
-    alignItems: 'center',
-    borderBottomWidth: 1,
-    borderBottomColor: '#E5E7EB',
+    borderRadius: 16,
+    padding: 20,
+    marginBottom: 16,
+    shadowColor: '#000',
+    shadowOffset: {
+      width: 0,
+      height: 2,
+    },
+    shadowOpacity: 0.1,
+    shadowRadius: 3.84,
+    elevation: 5,
   },
-  avatar: {
-    width: 96,
-    height: 96,
-    borderRadius: 48,
-    backgroundColor: '#F8FAFC',
+  profileHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
     alignItems: 'center',
-    justifyContent: 'center',
-    marginBottom: 24,
-    borderWidth: 3,
-    borderColor: '#E2E8F0',
+    marginBottom: 16,
   },
-  avatarText: {
-    fontSize: 40,
-    opacity: 0.7,
+  profileTitle: {
+    fontSize: 18,
+    fontWeight: '700',
+    color: '#1F2937',
+  },
+  editIconButton: {
+    padding: 8,
+    borderRadius: 8,
+    backgroundColor: '#F9FAFB',
+  },
+  profileContent: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  avatarContainer: {
+    marginRight: 16,
   },
   avatarImage: {
-    width: 96,
-    height: 96,
-    borderRadius: 48,
+    width: 60,
+    height: 60,
+    borderRadius: 30,
+  },
+  defaultAvatar: {
+    width: 60,
+    height: 60,
+    borderRadius: 30,
+    backgroundColor: '#F3F4F6',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  userInfo: {
+    flex: 1,
   },
   userName: {
-    fontSize: 20,
-    fontWeight: 'bold',
+    fontSize: 18,
+    fontWeight: '600',
     color: '#1F2937',
     marginBottom: 4,
   },
+  userEmail: {
+    fontSize: 14,
+    color: '#6B7280',
+    marginBottom: 8,
+  },
+  providerBadge: {
+    alignSelf: 'flex-start',
+  },
+  providerText: {
+    fontSize: 12,
+    color: '#6366F1',
+    backgroundColor: '#EEF2FF',
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 12,
+    overflow: 'hidden',
+  },
+
+  // 액션 그리드 - 홈 스타일
+  actionGridContainer: {
+    flexDirection: 'row',
+    justifyContent: 'flex-start',
+    marginBottom: 16,
+    paddingHorizontal: 0,
+  },
+  actionItem: {
+    alignItems: 'center',
+    backgroundColor: '#FFFFFF',
+    borderRadius: 12,
+    paddingVertical: 20,
+    paddingHorizontal: 16,
+    marginRight: 12,
+    shadowColor: '#000',
+    shadowOffset: {
+      width: 0,
+      height: 2,
+    },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 3,
+    width: (Dimensions.get('window').width - 48) / 3, // 화면 너비의 1/3 (패딩 16*2 + 마진 16 고려)
+  },
+  actionIconContainer: {
+    marginBottom: 8,
+  },
+  actionTitle: {
+    fontSize: 14,
+    fontWeight: '700',
+    color: '#1F2937',
+    marginBottom: 4,
+    textAlign: 'center',
+  },
+  actionSubtitle: {
+    fontSize: 11,
+    color: '#6B7280',
+    textAlign: 'center',
+    lineHeight: 14,
+  },
+  disabledActionItem: {
+    opacity: 0.5,
+  },
+
+
+  // 로그인 안된 사용자
+  loginCard: {
+    backgroundColor: '#FFFFFF',
+    borderRadius: 16,
+    padding: 32,
+    marginBottom: 16,
+    alignItems: 'center',
+    shadowColor: '#000',
+    shadowOffset: {
+      width: 0,
+      height: 2,
+    },
+    shadowOpacity: 0.1,
+    shadowRadius: 3.84,
+    elevation: 5,
+  },
+  loginIconContainer: {
+    marginBottom: 16,
+  },
   loginTitle: {
-    fontSize: 24,
+    fontSize: 20,
     fontWeight: '700',
     color: '#1F2937',
     marginBottom: 8,
     textAlign: 'center',
   },
   loginSubtitle: {
-    fontSize: 16,
-    color: '#6B7280',
-    marginBottom: 32,
-    textAlign: 'center',
-    lineHeight: 22,
-  },
-  userEmail: {
     fontSize: 14,
     color: '#6B7280',
-    marginBottom: 4,
-  },
-  noEmailText: {
-    fontStyle: 'italic',
-    opacity: 0.8,
-  },
-  providerText: {
-    fontSize: 12,
-    color: '#4495E8',
-    backgroundColor: '#F0F8FF',
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    borderRadius: 12,
-    overflow: 'hidden',
-  },
-  menuSection: {
-    backgroundColor: '#FFFFFF',
-    marginTop: 16,
-  },
-  menuItem: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    padding: 16,
-    borderBottomWidth: 1,
-    borderBottomColor: '#F3F4F6',
-  },
-  menuText: {
-    fontSize: 16,
-    color: '#1F2937',
-  },
-  logoutText: {
-    color: '#EF4444',
-  },
-  deleteText: {
-    color: '#DC2626',
-    fontWeight: 'bold',
-  },
-  menuArrow: {
-    fontSize: 20,
-    color: '#9CA3AF',
+    marginBottom: 24,
+    textAlign: 'center',
+    lineHeight: 20,
   },
   loginButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: '#3B82F6',
-    paddingHorizontal: 32,
-    paddingVertical: 16,
+    backgroundColor: '#1F2937',
+    paddingHorizontal: 24,
+    paddingVertical: 12,
     borderRadius: 12,
-    gap: 10,
-    marginTop: 0,
-    shadowColor: '#3B82F6',
+    shadowColor: '#000',
     shadowOffset: {
       width: 0,
       height: 4,
@@ -498,34 +547,21 @@ const styles = StyleSheet.create({
     elevation: 8,
   },
   loginButtonText: {
-    fontSize: 18,
-    fontWeight: '700',
+    fontSize: 16,
+    fontWeight: '600',
     color: '#FFFFFF',
-    letterSpacing: 0.5,
   },
-  disabledMenuItem: {
-    opacity: 0.5,
+
+  // 비활성화된 섹션
+  disabledSection: {
+    flexDirection: 'row',
+    justifyContent: 'flex-start',
+    paddingHorizontal: 0,
   },
   disabledText: {
     color: '#9CA3AF',
   },
-  // 새로 추가된 스타일들
-  nameRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginBottom: 4,
-  },
-  realName: {
-    fontSize: 20,
-    fontWeight: 'bold',
-    color: '#1F2937',
-    marginRight: 8,
-  },
-  editButton: {
-    padding: 4,
-    marginLeft: 8,
-  },
+
   // 모달 스타일들
   modalOverlay: {
     flex: 1,
@@ -571,7 +607,7 @@ const styles = StyleSheet.create({
     backgroundColor: '#F3F4F6',
   },
   saveButton: {
-    backgroundColor: '#4495E8',
+    backgroundColor: '#202632',
   },
   disabledButton: {
     backgroundColor: '#D1D5DB',

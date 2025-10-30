@@ -172,10 +172,10 @@ const MyReservationsScreen: React.FC = () => {
 
   const getStatusColor = (status: DiagnosisReservation['status']) => {
     switch (status) {
-      case 'pending': return '#8B5CF6';
-      case 'confirmed': return '#4F46E5';
-      case 'completed': return '#22C55E';
-      case 'cancelled': return '#EF4444';
+      case 'pending': return '#06B6D4';
+      case 'confirmed': return '#06B6D4';
+      case 'completed': return '#06B6D4';
+      case 'cancelled': return '#6B7280';
       default: return '#6B7280';
     }
   };
@@ -265,7 +265,7 @@ const MyReservationsScreen: React.FC = () => {
           <Text style={styles.createdText}>
             신청일: {formatDate(item.createdAt)}
           </Text>
-          <Ionicons name="chevron-forward" size={16} color="#4F46E5" />
+          <Ionicons name="chevron-forward" size={16} color="#06B6D4" />
         </View>
       </TouchableOpacity>
     );
@@ -273,7 +273,7 @@ const MyReservationsScreen: React.FC = () => {
 
   const renderEmptyState = () => (
     <View style={styles.emptyContainer}>
-      <Ionicons name="calendar-outline" size={64} color="#4F46E5" />
+      <Ionicons name="calendar-outline" size={64} color="#06B6D4" />
       <Text style={styles.emptyTitle}>예약 내역이 없습니다</Text>
       <Text style={styles.emptySubtitle}>
         배터리 진단 예약을 신청해보세요
@@ -297,7 +297,7 @@ const MyReservationsScreen: React.FC = () => {
           onBackPress={() => navigation.goBack()}
         />
         <View style={styles.notAuthContainer}>
-          <Ionicons name="person-outline" size={64} color="#4F46E5" />
+          <Ionicons name="person-outline" size={64} color="#06B6D4" />
           <Text style={styles.notAuthTitle}>로그인이 필요합니다</Text>
           <Text style={styles.notAuthSubtitle}>
             예약 내역을 확인하려면 로그인해주세요
@@ -318,7 +318,7 @@ const MyReservationsScreen: React.FC = () => {
       
       {isLoading ? (
         <View style={styles.loadingContainer}>
-          <ActivityIndicator size="large" color="#4F46E5" />
+          <ActivityIndicator size="large" color="#06B6D4" />
           <Text style={styles.loadingText}>예약 내역을 불러오는 중...</Text>
         </View>
       ) : (
@@ -331,8 +331,8 @@ const MyReservationsScreen: React.FC = () => {
             <RefreshControl
               refreshing={isRefreshing}
               onRefresh={handleRefresh}
-              colors={['#4F46E5']}
-              tintColor="#4F46E5"
+              colors={['#06B6D4']}
+              tintColor="#06B6D4"
             />
           }
           ListEmptyComponent={renderEmptyState}

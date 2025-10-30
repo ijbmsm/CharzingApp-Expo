@@ -1,0 +1,99 @@
+# This file specifies files that are *not* uploaded to Google Cloud
+# using gcloud. It follows the same syntax as .gitignore, with the addition of
+# "#!include" directives (which insert the entries of the given .gitignore-style
+# file at that point).
+
+#!include:.gitignore
+
+# Node.js dependencies (Firebase rebuilds them in cloud):
+node_modules/
+
+# TypeScript compilation output:
+*.js.map
+
+# Test files
+*.test.js
+*.test.ts
+test/
+tests/
+__tests__/
+
+# Documentation
+docs/
+*.md
+
+# IDE files
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Log files
+*.log
+logs/
+
+# Local development files
+.env
+.env.local
+.env.development
+.env.test
+.env.production
+
+# Cache directories
+.cache/
+.tmp/
+.temp/
+
+# Source maps
+*.map
+
+# Backup files
+*.bak
+*.backup
+
+# OS generated files
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+
+# Coverage reports
+coverage/
+.nyc_output/
+
+# Firebase debug logs
+firebase-debug.log
+firebase-debug.*.log
+
+# Firebase cache
+.firebase/
+
+# Local Firebase Emulator data
+.runtimeconfig.json
+
+# Scripts directory (contains test files)
+scripts/
+
+# JSON key files
+*.json
+!package.json
+!package-lock.json
+!tsconfig.json
+
+# iOS and Android directories (not needed in Cloud Functions)
+ios/
+android/
+
+# React Native specific files
+metro.config.js
+babel.config.js
+.expo/
+.vscode/
+
+# Test files
+test-*.js
+*test.js
+*.test.*

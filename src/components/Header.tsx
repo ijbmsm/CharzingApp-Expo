@@ -32,7 +32,7 @@ const Header: React.FC<HeaderProps> = ({
   title,
   showLogo = true,
   showBackButton = false,
-  showNotification = true,
+  showNotification = false,
   onLogoPress,
   onBackPress,
 }) => {

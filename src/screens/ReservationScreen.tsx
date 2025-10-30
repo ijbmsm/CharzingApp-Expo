@@ -16,12 +16,14 @@ import {
 import { MotiView } from 'moti';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
+import { LinearGradient } from 'expo-linear-gradient';
 import { Calendar, LocaleConfig } from 'react-native-calendars';
 import * as Location from 'expo-location';
 import Constants from 'expo-constants';
 import Header from '../components/Header';
 import LocationAddressSection from '../components/LocationAddressSection';
 import KakaoMapView from '../components/KakaoMapView';
+import VehicleAccordionSelector from '../components/VehicleAccordionSelector';
 import { useNavigation, useRoute, CommonActions } from '@react-navigation/native';
 import { useSelector } from 'react-redux';
 import { RootState } from '../store';
@@ -29,8 +31,9 @@ import { useLoading } from '../contexts/LoadingContext';
 import firebaseService from '../services/firebaseService';
 import analyticsService from '../services/analyticsService';
 import { devLog } from '../utils/devLog';
-import { VEHICLE_BRANDS, VEHICLE_MODELS, RESERVATION_TYPES, VehicleBrand, VehicleModel, ReservationType } from '../constants/vehicles';
+import { getAvailableBrands, getAvailableModels, getAvailableYearsForModel, RESERVATION_TYPES, ReservationType, VehicleBrand, VehicleModel } from '../constants/ev-battery-database';
 
+import { handleError, handleFirebaseError, handleNetworkError, handleAuthError, showUserError } from '../services/errorHandler';
 // 캘린더 한국어 설정
 LocaleConfig.locales['ko'] = {
   monthNames: [
@@ -47,6 +50,32 @@ LocaleConfig.locales['ko'] = {
 };
 LocaleConfig.defaultLocale = 'ko';
 
+// 타입 안전 접근을 위한 헬퍼 함수들
+const safeGetString = (
+  obj: Record<string, unknown> | any,
+  key: string,
+  defaultValue = "정보 없음"
+): string => {
+  const value = obj?.[key];
+  if (typeof value === "string") return value;
+  if (typeof value === "number") return value.toString();
+  return defaultValue;
+};
+
+const safeGetNumber = (
+  obj: Record<string, unknown> | any,
+  key: string,
+  defaultValue = 0
+): number => {
+  const value = obj?.[key];
+  if (typeof value === "number") return value;
+  if (typeof value === "string") {
+    const parsed = parseInt(value, 10);
+    return isNaN(parsed) ? defaultValue : parsed;
+  }
+  return defaultValue;
+};
+
 interface TimeSlot {
   id: string;
   time: string;
@@ -57,6 +86,7 @@ interface VehicleData {
   vehicleBrand: string;
   vehicleModel: string;
   vehicleYear: string;
+  vehicleTrim?: string;
 }
 
 interface ServiceData {
@@ -93,10 +123,16 @@ const ReservationScreen: React.FC = () => {
   // 수정 모드 및 기존 예약 데이터
   const editMode = route.params?.editMode || false;
   const existingReservation = route.params?.reservation || null;
+  
+  // Tab Navigator에서 접근할 때는 params가 없을 수 있음
+  console.log('🔍 Route params:', route.params);
 
   // 예약 단계 관리
   const [currentStep, setCurrentStep] = useState<number>(1);
   const [isSubmitting, setIsSubmitting] = useState<boolean>(false);
+  
+  // 사용자 차량 목록
+  const [userVehicles, setUserVehicles] = useState<any[]>([]);
 
   // 단계별 데이터
   const [vehicleData, setVehicleData] = useState<VehicleData | null>(null);
@@ -113,12 +149,17 @@ const ReservationScreen: React.FC = () => {
   const [isManualInput, setIsManualInput] = useState<boolean>(false);
   const [manualBrand, setManualBrand] = useState<string>('');
   const [manualModel, setManualModel] = useState<string>('');
-  const [selectedService, setSelectedService] = useState<ReservationType | null>(null);
+  const [selectedService, setSelectedService] = useState<ReservationType | null>(RESERVATION_TYPES[0] || null);
   
   // 차량 선택 모달
-  const [showVehicleModal, setShowVehicleModal] = useState<boolean>(false);
-  const [showYearModal, setShowYearModal] = useState<boolean>(false);
-  const [expandedModel, setExpandedModel] = useState<string | null>(null);
+  const [showReservationVehicleModal, setShowReservationVehicleModal] = useState<boolean>(false);
+  const [isVehicleSelected, setIsVehicleSelected] = useState<boolean>(false);
+  
+  // 모달 상태 변경 감지
+  useEffect(() => {
+    console.log('📱 ReservationScreen 모달 상태 변경:', showReservationVehicleModal);
+  }, [showReservationVehicleModal]);
+  
 
   // 2단계: 주소 선택
   const [userLocation, setUserLocation] = useState<{latitude: number; longitude: number} | null>(null);
@@ -140,24 +181,56 @@ const ReservationScreen: React.FC = () => {
   const [nameError, setNameError] = useState<string>('');
   const [phoneError, setPhoneError] = useState<string>('');
 
-  // 5단계: 예약 확인
+  // 5단계: 서비스 타입 선택
+  const [serviceType, setServiceType] = useState<'standard' | 'premium' | null>(null);
+  const [servicePrice, setServicePrice] = useState<number>(0);
+
+  // 6단계: 예약 확인
   const [showConfirmationModal, setShowConfirmationModal] = useState<boolean>(false);
 
   // moti 애니메이션을 위한 step 상태로 제어
 
+  // 초기 설정 (한 번만 실행)
   useEffect(() => {
     // 초기 위치 설정
     setUserLocation({ latitude: 37.5665, longitude: 126.9780 });
     
-    // 사용자 정보 자동 입력 - 실명 우선 사용
+    // Analytics - 무한 리렌더링 문제 해결 전까지 비활성화
+    console.log('📊 ReservationScreen mounted');
+    // analyticsService.logScreenView('ReservationScreen', 'ReservationScreen').catch(console.error);
+  }, []);
+
+  // 사용자 정보 자동 입력
+  useEffect(() => {
     if (user) {
       setUserName(user.realName || user.displayName || user.email?.split('@')[0] || '');
       setUserPhone((user as any).phoneNumber || '');
+      
+      // 사용자 차량 목록 로드
+      loadUserVehicles();
     }
-
-    // Analytics
-    analyticsService.logScreenView('ReservationScreen', 'ReservationScreen').catch(console.error);
   }, [user]);
+
+  // 사용자 차량 목록 로드
+  const loadUserVehicles = async () => {
+    if (!user?.uid) {
+      devLog.log('⚠️ 사용자 UID가 없음');
+      return;
+    }
+    
+    try {
+      devLog.log('🔍 사용자 차량 목록 조회 시작, userId:', user.uid);
+      const vehicles = await firebaseService.getUserVehicles(user.uid);
+      devLog.log('✅ 사용자 차량 목록 로드됨:', {
+        count: vehicles.length,
+        vehicles: vehicles
+      });
+      setUserVehicles([...vehicles]); // 새로운 배열로 강제 리렌더링
+    } catch (error) {
+      devLog.error('❌ 사용자 차량 목록 로드 실패:', error);
+      setUserVehicles([]);
+    }
+  };
 
   // 수정 모드일 때 기존 데이터로 초기화
   useEffect(() => {
@@ -254,10 +327,19 @@ const ReservationScreen: React.FC = () => {
     }
   }, [editMode, existingReservation]);
 
-  // 로그인 체크
+  // 로그인 체크 및 안전한 네비게이션
   useEffect(() => {
     if (!isAuthenticated) {
-      navigation.navigate('Login', { showBackButton: true });
+      // 탭 네비게이터에서 접근한 경우 홈 탭으로 안전하게 이동 후 로그인 화면 표시
+      navigation.dispatch(
+        CommonActions.reset({
+          index: 1,
+          routes: [
+            { name: 'Main' }, // 메인 탭으로 먼저 이동
+            { name: 'Login', params: { showBackButton: true } } // 그 다음 로그인 화면
+          ],
+        })
+      );
     }
   }, [isAuthenticated, navigation]);
 
@@ -344,6 +426,9 @@ const ReservationScreen: React.FC = () => {
       });
 
       setCurrentStep(5);
+    } else if (currentStep === 5 && validateStep5()) {
+      // 서비스 타입 선택 완료 후 최종 단계로
+      setCurrentStep(6);
     }
   };
 
@@ -387,6 +472,14 @@ const ReservationScreen: React.FC = () => {
   const validateStep4 = (): boolean => {
     if (!validateName(userName) || !validatePhone(userPhone)) {
       Alert.alert('알림', '입력한 정보를 다시 확인해주세요.');
+      return false;
+    }
+    return true;
+  };
+
+  const validateStep5 = (): boolean => {
+    if (!serviceType) {
+      Alert.alert('알림', '서비스 타입을 선택해주세요.');
       return false;
     }
     return true;
@@ -444,20 +537,31 @@ const ReservationScreen: React.FC = () => {
     return years;
   };
 
-  // 차량 선택 핸들러
-  const handleVehicleSelect = (brand: VehicleBrand, model: VehicleModel) => {
-    setSelectedBrand(brand);
-    setSelectedModel(model.name);
-    setSelectedModelData(model);
-    setShowVehicleModal(false);
-    setShowYearModal(true);
+  // 내 차량 선택 핸들러 (한 대만 지원)
+  const handleMyVehicleSelect = (vehicle: any) => {
+    devLog.log('🚗 내 차량 선택됨:', vehicle);
+    
+    // UserVehicle을 VehicleData 형태로 변환
+    const vehicleData: VehicleData = {
+      vehicleBrand: safeGetString(vehicle, 'make', ''),
+      vehicleModel: safeGetString(vehicle, 'model', ''),
+      vehicleYear: safeGetNumber(vehicle, 'year', 0).toString(),
+      vehicleTrim: safeGetString(vehicle, 'trim', ''),
+    };
+    
+    setVehicleData(vehicleData);
+    
+    // 기본 서비스 데이터도 설정 (내 차량 선택 시)
+    const defaultServiceData: ServiceData = {
+      serviceType: "배터리 진단",
+      servicePrice: 100000,
+    };
+    setServiceData(defaultServiceData);
+    
+    setCurrentStep(2); // 다음 단계로 이동
   };
 
-  // 연식 선택 핸들러
-  const handleYearSelect = (year: string) => {
-    setSelectedYear(year);
-    setShowYearModal(false);
-  };
+  // 차량 선택 핸들러는 VehicleAccordionSelector에서 직접 처리됨
 
   // 직접 입력 모드 토글
   const toggleManualInput = () => {
@@ -757,193 +861,228 @@ const ReservationScreen: React.FC = () => {
 
   return (
     <SafeAreaView style={styles.container}>
-      <Header 
-        title={editMode ? "예약 수정" : "진단 예약"} 
-        showBackButton 
-        onBackPress={handlePrevious}
-      />
+      {/* 프로그레스 인디케이터 */}
+      <View style={styles.progressContainer}>
+        <View style={styles.progressHeader}>
+          <TouchableOpacity 
+            style={styles.backButton}
+            onPress={currentStep === 1 ? () => navigation.goBack() : handlePrevious}
+          >
+            <Ionicons name="arrow-back" size={24} color="#1F2937" />
+          </TouchableOpacity>
+          <Text style={styles.progressTitle}>
+            {currentStep === 1 && "차량 선택"}
+            {currentStep === 2 && "주소 입력"}
+            {currentStep === 3 && "날짜/시간 선택"}
+            {currentStep === 4 && "연락처 입력"}
+            {currentStep === 5 && "서비스 선택"}
+            {currentStep === 6 && "예약 확인"}
+          </Text>
+          <View style={styles.stepIndicator}>
+            <Text style={styles.stepText}>{currentStep}/6</Text>
+          </View>
+        </View>
+        
+        {/* 프로그레스 바 */}
+        <View style={styles.progressBarContainer}>
+          <MotiView
+            style={styles.progressBar}
+            animate={{
+              width: `${(currentStep / 6) * 100}%`,
+            }}
+            transition={{
+              type: 'timing',
+              duration: 600,
+            }}
+          />
+        </View>
+      </View>
 
       <KeyboardAvoidingView 
         style={{ flex: 1 }}
         behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
         keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 20}
+        pointerEvents="box-none"
       >
-        <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
+        {/* 1단계: 차량 선택 */}
+        {currentStep === 1 && (
+          <MotiView
+            from={{ opacity: 0, translateY: 20 }}
+            animate={{ opacity: 1, translateY: 0 }}
+            transition={{ type: 'timing', duration: 800, delay: 200 }}
+            style={[styles.vehicleSelectionContainer, { pointerEvents: 'box-none' }]}
+          >
+            <VehicleAccordionSelector
+              key="reservation-vehicle-selector"
+              visible={showReservationVehicleModal}
+              editMode={false}
+              onComplete={async (vehicle) => {
+                console.log('🎉 ReservationScreen VehicleAccordionSelector onComplete 호출됨!');
+                console.log('🚗 ReservationScreen에서 선택된 차량:', vehicle);
+                
+                try {
+                  // 선택된 차량을 사용자 차량 목록에 추가
+                  if (user?.uid) {
+                    console.log('💾 사용자 차량 목록에 추가 중...');
+                    const userVehicleData = {
+                      userId: user.uid,
+                      make: vehicle.make,
+                      model: vehicle.model,
+                      trim: vehicle.trim,
+                      year: vehicle.year,
+                      batteryCapacity: vehicle.batteryCapacity ? String(vehicle.batteryCapacity) : undefined,
+                      imageUrl: vehicle.imageUrl,
+                      brandId: vehicle.brandId,
+                      modelId: vehicle.modelId,
+                      trimId: vehicle.trimId,
+                      isActive: true,
+                    };
+                    
+                    const vehicleId = await firebaseService.addUserVehicle(userVehicleData);
+                    console.log('✅ 사용자 차량 추가 완료 - vehicleId:', vehicleId);
+                    
+                    // 로컬 차량 목록도 업데이트
+                    await loadUserVehicles();
+                    console.log('🔄 ReservationScreen 로컬 차량 목록 업데이트 완료');
+                  }
+                } catch (error) {
+                  console.log('❌ 사용자 차량 추가 실패:', error);
+                  // 에러가 발생해도 예약은 계속 진행
+                }
+                
+                // vehicleData 설정
+                setVehicleData({
+                  vehicleBrand: vehicle.make,
+                  vehicleModel: vehicle.model,
+                  vehicleYear: vehicle.year.toString(),
+                });
 
-        {/* 1단계: 차량 & 서비스 선택 */}
-        <MotiView
-          style={styles.stepContainer}
-          animate={{
-            opacity: currentStep >= 1 ? 1 : 0,
-            translateY: currentStep === 1 ? 0 : currentStep > 1 ? 0 : 50,
-            height: currentStep === 1 ? 'auto' : currentStep > 1 ? 100 : 0,
-          }}
-          transition={{
-            type: 'timing',
-            duration: 350,
-          }}
+                // 서비스 데이터 설정 (기본값)
+                setServiceData({
+                  serviceType: selectedService?.name || '방문 배터리 진단',
+                  servicePrice: selectedService?.price || 0,
+                });
+
+                // 모달 닫기
+                setShowReservationVehicleModal(false);
+                setIsVehicleSelected(true);
+                  
+                  // 다음 단계로 자동 진행
+                  setTimeout(() => {
+                    setCurrentStep(2);
+                  }, 500);
+                }}
+                onClose={() => {
+                  console.log('🔒 ReservationScreen VehicleAccordionSelector 닫기');
+                  setShowReservationVehicleModal(false);
+                }}
+              />
+            
+            {/* 차량 선택 버튼 */}
+            <View style={[styles.welcomeContainer, { pointerEvents: 'box-none' }]}>
+              <Text style={styles.welcomeTitle}>내 차량을 선택해 주세요</Text>
+              <Text style={styles.welcomeSubtitle}>정확한 진단을 위해 차량 정보가 필요합니다</Text>
+              
+              {/* 등록된 내 차량 (한 대만 지원) */}
+              {userVehicles.length > 0 && (
+              <View style={styles.myVehiclesContainer}>
+                <Text style={styles.myVehiclesTitle}>내 차량</Text>
+                <TouchableOpacity
+                  style={styles.myVehicleCard}
+                  onPress={() => userVehicles[0] && handleMyVehicleSelect(userVehicles[0])}
+                  activeOpacity={0.7}
+                >
+                  <View style={styles.myVehicleInfo}>
+                    <Text 
+                      style={styles.myVehicleName}
+                      numberOfLines={1}
+                      ellipsizeMode="tail"
+                    >
+                      {userVehicles[0]?.year} {userVehicles[0]?.make} {userVehicles[0]?.model}
+                    </Text>
+                    {userVehicles[0]?.trim && (
+                      <Text style={styles.myVehicleTrim}>{userVehicles[0]?.trim}</Text>
+                    )}
+                  </View>
+                  <Ionicons name="chevron-forward" size={18} color="#9CA3AF" />
+                </TouchableOpacity>
+                
+                <View style={styles.dividerContainer}>
+                  <View style={styles.dividerLine} />
+                  <Text style={styles.dividerText}>또는</Text>
+                  <View style={styles.dividerLine} />
+                </View>
+              </View>
+              )}
+              
+              <View style={styles.addVehicleButton}>
+                <TouchableOpacity
+                  style={{
+                    position: 'absolute',
+                    top: 0,
+                    left: 0,
+                    right: 0,
+                    bottom: 0,
+                    zIndex: 10000,
+                    backgroundColor: 'transparent',
+                  }}
+                  onPress={() => {
+                    console.log('🚗 ReservationScreen 차량 버튼 클릭 - 모달 열기');
+                    setShowReservationVehicleModal(true);
+                  }}
+                  activeOpacity={1}
+                />
+                <Ionicons name="car-outline" size={24} color="#06B6D4" />
+                <Text style={styles.addVehicleButtonText}>
+                  {userVehicles.length > 0 ? '차량 변경하기' : '차량 선택하기'}
+                </Text>
+                <Ionicons name="chevron-forward" size={18} color="#9CA3AF" />
+              </View>
+            </View>
+          </MotiView>
+        )}
+
+        <ScrollView 
+          style={styles.content} 
+          showsVerticalScrollIndicator={false}
+          pointerEvents="box-none"
         >
-          {currentStep >= 1 && (
+
+        {/* 1단계: 차량 & 서비스 선택 (Step 2 이상에서만 표시) */}
+        {currentStep > 1 && (
+          <MotiView
+            style={styles.stepContainer}
+            animate={{
+              opacity: 1,
+              translateY: 0,
+              height: currentStep > 1 ? 100 : 0,
+            }}
+            transition={{
+              type: 'timing',
+              duration: 350,
+            }}
+          >
             <TouchableOpacity 
               style={styles.stepCard}
               onPress={() => handleCardClick(1)}
-              disabled={currentStep === 1}
-              activeOpacity={currentStep > 1 ? 0.7 : 1}
+              activeOpacity={0.7}
             >
               <Text style={styles.stepTitle}>차량 정보 & 서비스 선택</Text>
               
-              {currentStep === 1 && (
-                <View>
-                  {/* 차량 선택 방식 */}
-                  <View style={styles.inputModeContainer}>
-                    <TouchableOpacity
-                      style={[styles.modeButton, !isManualInput && styles.modeButtonActive]}
-                      onPress={() => setIsManualInput(false)}
-                    >
-                      <Text style={[styles.modeButtonText, !isManualInput && styles.modeButtonTextActive]}>
-                        목록에서 선택
-                      </Text>
-                    </TouchableOpacity>
-                    <TouchableOpacity
-                      style={[styles.modeButton, isManualInput && styles.modeButtonActive]}
-                      onPress={toggleManualInput}
-                    >
-                      <Text style={[styles.modeButtonText, isManualInput && styles.modeButtonTextActive]}>
-                        직접 입력
-                      </Text>
-                    </TouchableOpacity>
-                  </View>
+              {/* 복잡한 차량 선택 UI는 제거됨 - 나중에 추가될 예정 */}
 
-                  {!isManualInput ? (
-                    <View>
-                      {/* 차량 선택 버튼 */}
-                      <View style={styles.inputContainer}>
-                        <TouchableOpacity
-                          style={styles.vehicleSelectButton}
-                          onPress={() => setShowVehicleModal(true)}
-                        >
-                          <Text style={styles.vehicleSelectButtonText}>
-                            {selectedBrand && selectedModel && selectedYear 
-                              ? `${selectedBrand.name} ${selectedModel} (${selectedYear}년)`
-                              : '차량을 선택해주세요'
-                            }
-                          </Text>
-                          <Ionicons name="chevron-down" size={20} color="#666" />
-                        </TouchableOpacity>
-                      </View>
-                    </View>
-                  ) : (
-                    <View>
-                      {/* 직접 입력 */}
-                      <View style={styles.inputContainer}>
-                        <Text style={styles.inputLabel}>차량 브랜드</Text>
-                        <TextInput
-                          style={styles.textInput}
-                          placeholder="예: 현대, 기아, BMW 등"
-                          value={manualBrand}
-                          onChangeText={setManualBrand}
-                        />
-                      </View>
-                      <View style={styles.inputContainer}>
-                        <Text style={styles.inputLabel}>차량 모델</Text>
-                        <TextInput
-                          style={styles.textInput}
-                          placeholder="예: 소나타, K5, 320i 등"
-                          value={manualModel}
-                          onChangeText={setManualModel}
-                        />
-                      </View>
-                      <View style={styles.inputContainer}>
-                        <Text style={styles.inputLabel}>연식</Text>
-                        <TextInput
-                          style={styles.textInput}
-                          placeholder="예: 2023"
-                          value={selectedYear}
-                          onChangeText={setSelectedYear}
-                          keyboardType="numeric"
-                          maxLength={4}
-                        />
-                      </View>
-                    </View>
-                  )}
-
-                  {/* 서비스 타입 선택 */}
-                  <View style={styles.inputContainer}>
-                    <Text style={styles.inputLabel}>서비스 타입</Text>
-                    {RESERVATION_TYPES.map((service) => (
-                      <TouchableOpacity
-                        key={service.id}
-                        style={[
-                          styles.serviceCard,
-                          selectedService?.id === service.id && styles.serviceCardSelected,
-                        ]}
-                        onPress={() => setSelectedService(service)}
-                      >
-                        <View style={styles.serviceCardHeader}>
-                          <Text
-                            style={[
-                              styles.serviceCardTitle,
-                              selectedService?.id === service.id && styles.serviceCardTitleSelected,
-                            ]}
-                          >
-                            {service.name}
-                          </Text>
-                          <Text
-                            style={[
-                              styles.serviceCardPrice,
-                              selectedService?.id === service.id && styles.serviceCardPriceSelected,
-                            ]}
-                          >
-                            {service.price.toLocaleString()}원
-                          </Text>
-                        </View>
-                        <Text
-                          style={[
-                            styles.serviceCardDescription,
-                            selectedService?.id === service.id && styles.serviceCardDescriptionSelected,
-                          ]}
-                        >
-                          {service.description}
-                        </Text>
-                        <View style={styles.serviceCardFeatures}>
-                          {service.features.slice(0, 3).map((feature, index) => (
-                            <Text
-                              key={index}
-                              style={[
-                                styles.serviceCardFeature,
-                                selectedService?.id === service.id && styles.serviceCardFeatureSelected,
-                              ]}
-                            >
-                              • {feature}
-                            </Text>
-                          ))}
-                          {service.features.length > 3 && (
-                            <Text
-                              style={[
-                                styles.serviceCardFeature,
-                                selectedService?.id === service.id && styles.serviceCardFeatureSelected,
-                              ]}
-                            >
-                              외 {service.features.length - 3}가지
-                            </Text>
-                          )}
-                        </View>
-                      </TouchableOpacity>
-                    ))}
-                  </View>
-                </View>
-              )}
-
-              {currentStep > 1 && vehicleData && serviceData && (
+              {currentStep > 1 && vehicleData && (
                 <View style={styles.summaryContainer}>
                   <Text style={styles.summaryText}>
-                    {vehicleData.vehicleBrand} {vehicleData.vehicleModel} ({vehicleData.vehicleYear}) - {serviceData.serviceType}
+                    {vehicleData.vehicleBrand} {vehicleData.vehicleModel} ({vehicleData.vehicleYear})
+                    {vehicleData.vehicleTrim ? ` ${vehicleData.vehicleTrim}` : ''}
+                    {serviceData ? ` - ${serviceData.serviceType}` : ''}
                   </Text>
                 </View>
               )}
             </TouchableOpacity>
-          )}
-        </MotiView>
+          </MotiView>
+        )}
 
         {/* 2단계: 주소 선택 */}
         <MotiView
@@ -1026,19 +1165,19 @@ const ReservationScreen: React.FC = () => {
                     markedDates={{
                       [selectedDate]: {
                         selected: true,
-                        selectedColor: '#2196f3',
+                        selectedColor: '#06B6D4',
                       },
                     }}
                     theme={{
                       backgroundColor: '#ffffff',
                       calendarBackground: '#ffffff',
                       textSectionTitleColor: '#b6c1cd',
-                      selectedDayBackgroundColor: '#2196f3',
+                      selectedDayBackgroundColor: '#06B6D4',
                       selectedDayTextColor: '#ffffff',
-                      todayTextColor: '#2196f3',
+                      todayTextColor: '#06B6D4',
                       dayTextColor: '#2d4150',
                       textDisabledColor: '#d9e1e8',
-                      arrowColor: '#2196f3',
+                      arrowColor: '#06B6D4',
                     }}
                   />
 
@@ -1047,7 +1186,7 @@ const ReservationScreen: React.FC = () => {
                       <Text style={styles.inputLabel}>시간 선택</Text>
                       {isLoadingTimeSlots ? (
                         <View style={styles.loadingContainer}>
-                          <ActivityIndicator size="large" color="#2196f3" />
+                          <ActivityIndicator size="large" color="#06B6D4" />
                           <Text style={styles.loadingText}>예약정보를 불러오는 중...</Text>
                         </View>
                       ) : (
@@ -1185,30 +1324,143 @@ const ReservationScreen: React.FC = () => {
           )}
         </MotiView>
 
-        {/* 5단계: 예약 확인 */}
+        {/* 5단계: 서비스 타입 선택 */}
         <MotiView
           style={styles.stepContainer}
           animate={{
             opacity: currentStep >= 5 ? 1 : 0,
-            translateY: currentStep === 5 ? 0 : 50,
-            height: currentStep === 5 ? 'auto' : 0,
+            translateY: currentStep === 5 ? 0 : currentStep > 5 ? 0 : 50,
+            height: currentStep === 5 ? 'auto' : currentStep > 5 ? 100 : 0,
           }}
           transition={{
             type: 'timing',
             duration: 350,
           }}
         >
-          {currentStep === 5 && vehicleData && serviceData && addressData && dateTimeData && contactData && (
+          {currentStep >= 5 && (
             <TouchableOpacity 
               style={styles.stepCard}
               onPress={() => handleCardClick(5)}
               disabled={currentStep === 5}
               activeOpacity={currentStep > 5 ? 0.7 : 1}
             >
+              <Text style={styles.stepTitle}>서비스 타입 선택</Text>
+              
+              {currentStep === 5 ? (
+                <View style={styles.serviceTypeSelection}>
+                  <Text style={styles.serviceTypeLabel}>원하시는 서비스 타입을 선택해주세요</Text>
+                  
+                  <View style={styles.serviceTypeOptions}>
+                    <TouchableOpacity
+                      style={[
+                        styles.serviceTypeOption,
+                        serviceType === 'standard' && styles.serviceTypeOptionSelected
+                      ]}
+                      onPress={() => {
+                        setServiceType('standard');
+                        setServicePrice(100000);
+                        setServiceData({
+                          serviceType: 'standard',
+                          servicePrice: 100000,
+                        });
+                      }}
+                    >
+                      <View style={styles.serviceTypeHeader}>
+                        <Text style={[
+                          styles.serviceTypeName,
+                          serviceType === 'standard' && styles.serviceTypeNameSelected
+                        ]}>
+                          스탠다드
+                        </Text>
+                        <Text style={[
+                          styles.serviceTypePrice,
+                          serviceType === 'standard' && styles.serviceTypePriceSelected
+                        ]}>
+                          100,000원
+                        </Text>
+                      </View>
+                      <Text style={[
+                        styles.serviceTypeDescription,
+                        serviceType === 'standard' && styles.serviceTypeDescriptionSelected
+                      ]}>
+                        기본 배터리 진단 서비스
+                      </Text>
+                    </TouchableOpacity>
+                    
+                    <TouchableOpacity
+                      style={[
+                        styles.serviceTypeOption,
+                        serviceType === 'premium' && styles.serviceTypeOptionSelected
+                      ]}
+                      onPress={() => {
+                        setServiceType('premium');
+                        setServicePrice(200000);
+                        setServiceData({
+                          serviceType: 'premium',
+                          servicePrice: 200000,
+                        });
+                      }}
+                    >
+                      <View style={styles.serviceTypeHeader}>
+                        <Text style={[
+                          styles.serviceTypeName,
+                          serviceType === 'premium' && styles.serviceTypeNameSelected
+                        ]}>
+                          프리미엄
+                        </Text>
+                        <Text style={[
+                          styles.serviceTypePrice,
+                          serviceType === 'premium' && styles.serviceTypePriceSelected
+                        ]}>
+                          200,000원
+                        </Text>
+                      </View>
+                      <Text style={[
+                        styles.serviceTypeDescription,
+                        serviceType === 'premium' && styles.serviceTypeDescriptionSelected
+                      ]}>
+                        기술분석 배터리 진단
+                      </Text>
+                    </TouchableOpacity>
+                  </View>
+                </View>
+              ) : (
+                serviceData && (
+                  <View style={styles.summaryContainer}>
+                    <Text style={styles.summaryText}>
+                      {serviceType === 'standard' ? '스탠다드' : '프리미엄'} • {servicePrice.toLocaleString()}원
+                    </Text>
+                  </View>
+                )
+              )}
+            </TouchableOpacity>
+          )}
+        </MotiView>
+
+        {/* 6단계: 예약 확인 */}
+        <MotiView
+          style={styles.stepContainer}
+          animate={{
+            opacity: currentStep >= 6 ? 1 : 0,
+            translateY: currentStep === 6 ? 0 : 50,
+            height: currentStep === 6 ? 'auto' : 0,
+          }}
+          transition={{
+            type: 'timing',
+            duration: 350,
+          }}
+        >
+          {currentStep === 6 && vehicleData && serviceData && addressData && dateTimeData && contactData && serviceType && (
+            <TouchableOpacity 
+              style={styles.stepCard}
+              onPress={() => handleCardClick(6)}
+              disabled={currentStep === 6}
+              activeOpacity={currentStep > 6 ? 0.7 : 1}
+            >
               <Text style={styles.stepTitle}>예약 확인</Text>
               
               <View style={styles.confirmationHeader}>
-                <Ionicons name="checkmark-circle" size={48} color="#4caf50" />
+                <Ionicons name="checkmark-circle" size={48} color="#06B6D4" />
                 <Text style={styles.confirmationTitle}>예약 정보를 확인해주세요</Text>
               </View>
 
@@ -1272,7 +1524,7 @@ const ReservationScreen: React.FC = () => {
 
       {/* 하단 버튼 */}
       <View style={styles.buttonContainer}>
-        {currentStep < 5 ? (
+        {currentStep < 6 ? (
           <TouchableOpacity
             style={[
               styles.nextButton,
@@ -1341,143 +1593,7 @@ const ReservationScreen: React.FC = () => {
         </View>
       </Modal>
 
-      {/* 차량 선택 모달 */}
-      <Modal
-        visible={showVehicleModal}
-        animationType="slide"
-        presentationStyle="pageSheet"
-        onRequestClose={() => setShowVehicleModal(false)}
-      >
-        <SafeAreaView style={styles.vehicleModalContainer}>
-          <View style={styles.modalHeader}>
-            <Text style={styles.modalTitle}>차량 선택</Text>
-            <TouchableOpacity
-              style={styles.closeButton}
-              onPress={() => setShowVehicleModal(false)}
-            >
-              <Ionicons name="close" size={24} color="#1F2937" />
-            </TouchableOpacity>
-          </View>
-          
-          <ScrollView style={styles.vehicleModalContent} showsVerticalScrollIndicator={false}>
-              {VEHICLE_BRANDS.map((brand) => {
-                const models = VEHICLE_MODELS[brand.id] || [];
-                if (models.length === 0) return null;
-                
-                return (
-                  <View key={brand.id} style={styles.brandSection}>
-                    <Text style={styles.brandTitle}>{brand.name}</Text>
-                    {models.map((model) => {
-                      const modelKey = `${brand.id}-${model.id}`;
-                      const isExpanded = expandedModel === modelKey;
-                      const years = model.years || getYearOptions();
-                      
-                      return (
-                        <View key={modelKey} style={styles.vehicleListItem}>
-                          <TouchableOpacity
-                            style={styles.vehicleItemHeader}
-                            onPress={() => setExpandedModel(isExpanded ? null : modelKey)}
-                          >
-                            <Text style={styles.vehicleItemText}>
-                              {model.name}
-                            </Text>
-                            <Ionicons 
-                              name={isExpanded ? "chevron-up" : "chevron-down"} 
-                              size={22} 
-                              color={isExpanded ? "#3B82F6" : "#64748B"} 
-                            />
-                          </TouchableOpacity>
-                          
-                          {isExpanded && (
-                            <View style={styles.yearList}>
-                              <View style={styles.yearGrid}>
-                                {years.reduce((rows: string[][], year: string, index: number) => {
-                                  const rowIndex = Math.floor(index / 3);
-                                  if (!rows[rowIndex]) rows[rowIndex] = [];
-                                  rows[rowIndex].push(year);
-                                  return rows;
-                                }, [] as string[][]).map((row: string[], rowIndex: number) => (
-                                  <View key={rowIndex} style={styles.yearRow}>
-                                    {row.map((year) => (
-                                      <TouchableOpacity
-                                        key={year}
-                                        style={[
-                                          styles.yearListItem,
-                                          { width: `${(100 - 6) / 3}%` }
-                                        ]}
-                                        onPress={() => {
-                                          setSelectedBrand(brand);
-                                          setSelectedModel(model.name);
-                                          setSelectedModelData(model);
-                                          setSelectedYear(year);
-                                          setShowVehicleModal(false);
-                                          setExpandedModel(null);
-                                        }}
-                                      >
-                                        <Text style={styles.yearListItemText}>{year}년</Text>
-                                      </TouchableOpacity>
-                                    ))}
-                                  </View>
-                                ))}
-                              </View>
-                            </View>
-                          )}
-                        </View>
-                      );
-                    })}
-                  </View>
-                );
-              })}
-            </ScrollView>
-        </SafeAreaView>
-      </Modal>
-
-      {/* 연식 선택 모달 */}
-      <Modal
-        visible={showYearModal}
-        animationType="slide"
-        transparent={true}
-        onRequestClose={() => setShowYearModal(false)}
-      >
-        <View style={styles.modalOverlay}>
-          <View style={styles.yearModalContainer}>
-            <View style={styles.modalHeader}>
-              <Text style={styles.modalTitle}>연식 선택</Text>
-              <TouchableOpacity
-                style={styles.closeButton}
-                onPress={() => setShowYearModal(false)}
-              >
-                <Ionicons name="close" size={24} color="#9CA3AF" />
-              </TouchableOpacity>
-            </View>
-            
-            <Text style={styles.selectedVehicleText}>
-              {selectedBrand?.name} {selectedModel}
-            </Text>
-            
-            <View style={styles.yearGrid}>
-              {(selectedModelData?.years || getYearOptions()).reduce((rows, year, index) => {
-                const rowIndex = Math.floor(index / 4);
-                if (!rows[rowIndex]) rows[rowIndex] = [];
-                rows[rowIndex].push(year);
-                return rows;
-              }, [] as string[][]).map((row, rowIndex) => (
-                <View key={rowIndex} style={styles.yearRow}>
-                  {row.map((item) => (
-                    <TouchableOpacity
-                      key={item}
-                      style={[styles.yearItem, { width: `${(100 - 9) / 4}%` }]}
-                      onPress={() => handleYearSelect(item)}
-                    >
-                      <Text style={styles.yearItemText}>{item}년</Text>
-                    </TouchableOpacity>
-                  ))}
-                </View>
-              ))}
-            </View>
-          </View>
-        </View>
-      </Modal>
+      {/* 차량 선택 모달은 1단계에서 직접 처리됨 */}
     </SafeAreaView>
   );
 
@@ -1494,6 +1610,8 @@ const ReservationScreen: React.FC = () => {
         return !!(selectedDate && selectedTimeSlot);
       case 4:
         return !!(userName.trim() && userPhone.trim() && !nameError && !phoneError);
+      case 5:
+        return !!serviceType;
       default:
         return false;
     }
@@ -1503,11 +1621,144 @@ const ReservationScreen: React.FC = () => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#fff',
+    backgroundColor: '#F9FAFB',
+  },
+  // 프로그레스 인디케이터 스타일
+  progressContainer: {
+    backgroundColor: '#FFFFFF',
+    paddingBottom: 16,
+    borderBottomWidth: 1,
+    borderBottomColor: '#E5E7EB',
+  },
+  progressHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: 16,
+    paddingTop: 8,
+    paddingBottom: 12,
+  },
+  progressTitle: {
+    fontSize: 18,
+    fontWeight: '600',
+    color: '#1F2937',
+    flex: 1,
+    textAlign: 'center',
+    marginHorizontal: 16,
+  },
+  stepIndicator: {
+    backgroundColor: '#202632',
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 16,
+  },
+  stepText: {
+    color: '#FFFFFF',
+    fontSize: 14,
+    fontWeight: '600',
+  },
+  progressBarContainer: {
+    height: 4,
+    backgroundColor: '#E5E7EB',
+    marginHorizontal: 16,
+    borderRadius: 2,
+    overflow: 'hidden',
+  },
+  progressBar: {
+    height: '100%',
+    backgroundColor: '#202632',
+    borderRadius: 2,
+  },
+  // 차량 선택 컨테이너 스타일
+  vehicleSelectionContainer: {
+    flexGrow: 1,
+    paddingHorizontal: 16,
+    paddingTop: 40,
+    minHeight: '100%',
+  },
+  backButtonContainer: {
+    paddingHorizontal: 16,
+    paddingTop: 8,
+    paddingBottom: 8,
+  },
+  backButton: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: '#F9FAFB',
+    alignItems: 'center',
+    justifyContent: 'center',
+    shadowColor: '#000',
+    shadowOffset: {
+      width: 0,
+      height: 1,
+    },
+    shadowOpacity: 0.1,
+    shadowRadius: 2,
+    elevation: 2,
   },
   content: {
     flex: 1,
     paddingTop: 16,
+  },
+  emptyContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingHorizontal: 32,
+  },
+  welcomeContainer: {
+    alignItems: 'center',
+    justifyContent: 'flex-start',
+    paddingHorizontal: 32,
+    paddingVertical: 40,
+    minHeight: 400,
+  },
+  welcomeTitle: {
+    fontSize: 28,
+    fontWeight: 'bold',
+    color: '#1F2937',
+    marginBottom: 12,
+    textAlign: 'center',
+  },
+  welcomeSubtitle: {
+    fontSize: 16,
+    color: '#6B7280',
+    marginBottom: 48,
+    textAlign: 'center',
+    lineHeight: 24,
+  },
+  addVehicleButton: {
+    backgroundColor: '#FFFFFF',
+    paddingVertical: 20,
+    paddingHorizontal: 24,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: '#E5E7EB',
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginTop: 24,
+    shadowColor: '#000',
+    shadowOffset: {
+      width: 0,
+      height: 2,
+    },
+    shadowOpacity: 0.05,
+    shadowRadius: 8,
+    elevation: 2,
+    zIndex: 100,
+    minHeight: 60,
+  },
+  addVehicleButtonText: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#374151',
+    flex: 1,
+    textAlign: 'center',
+    marginHorizontal: 12,
+    includeFontPadding: false,
+    textAlignVertical: 'center',
   },
   stepIndicatorContainer: {
     padding: 20,
@@ -1519,7 +1770,7 @@ const styles = StyleSheet.create({
     color: '#333',
     marginBottom: 10,
   },
-  stepIndicator: {
+  stepDotIndicator: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 8,
@@ -1538,17 +1789,25 @@ const styles = StyleSheet.create({
     marginBottom: 16,
   },
   stepCard: {
-    backgroundColor: '#f8f9fa',
+    backgroundColor: '#FFFFFF',
     borderRadius: 12,
     padding: 16,
     borderWidth: 1,
-    borderColor: '#e0e0e0',
+    borderColor: '#E5E7EB',
     minHeight: 100,
+    shadowColor: '#000',
+    shadowOffset: {
+      width: 0,
+      height: 2,
+    },
+    shadowOpacity: 0.05,
+    shadowRadius: 8,
+    elevation: 2,
   },
   stepTitle: {
     fontSize: 18,
     fontWeight: '700',
-    color: '#333',
+    color: '#202632',
     marginBottom: 8,
   },
   inputModeContainer: {
@@ -1657,6 +1916,37 @@ const styles = StyleSheet.create({
   serviceCardFeatureSelected: {
     color: '#555',
   },
+  serviceInfoCard: {
+    backgroundColor: '#f8f9fa',
+    borderRadius: 12,
+    padding: 16,
+    borderWidth: 1,
+    borderColor: '#e0e0e0',
+  },
+  serviceInfoTitle: {
+    fontSize: 18,
+    fontWeight: '700',
+    color: '#333',
+  },
+  serviceInfoPrice: {
+    fontSize: 18,
+    fontWeight: '700',
+    color: '#2196f3',
+  },
+  serviceInfoDescription: {
+    fontSize: 14,
+    color: '#666',
+    marginBottom: 12,
+    lineHeight: 20,
+  },
+  serviceInfoFeatures: {
+    gap: 6,
+  },
+  serviceInfoFeature: {
+    fontSize: 13,
+    color: '#555',
+    lineHeight: 18,
+  },
   timeSlotsContainer: {
     marginTop: 16,
   },
@@ -1682,8 +1972,8 @@ const styles = StyleSheet.create({
     opacity: 0.5,
   },
   timeSlotSelected: {
-    backgroundColor: '#2196f3',
-    borderColor: '#1976d2',
+    backgroundColor: '#06B6D4',
+    borderColor: '#0891B2',
   },
   timeSlotText: {
     fontSize: 14,
@@ -1707,9 +1997,11 @@ const styles = StyleSheet.create({
     color: '#666',
   },
   summaryContainer: {
-    backgroundColor: '#ffffff',
+    backgroundColor: '#EEF2FF',
     borderRadius: 8,
     padding: 12,
+    borderWidth: 1,
+    borderColor: '#E0E7FF',
   },
   summaryText: {
     fontSize: 16,
@@ -1769,13 +2061,13 @@ const styles = StyleSheet.create({
     borderTopColor: '#e9ecef',
   },
   nextButton: {
-    backgroundColor: '#2196f3',
+    backgroundColor: '#06B6D4',
     paddingVertical: 16,
     borderRadius: 8,
     alignItems: 'center',
   },
   nextButtonDisabled: {
-    backgroundColor: '#ccc',
+    backgroundColor: '#D1D5DB',
   },
   nextButtonText: {
     color: '#fff',
@@ -1786,13 +2078,13 @@ const styles = StyleSheet.create({
     color: '#999',
   },
   confirmButton: {
-    backgroundColor: '#4caf50',
+    backgroundColor: '#06B6D4',
     paddingVertical: 16,
     borderRadius: 8,
     alignItems: 'center',
   },
   confirmButtonDisabled: {
-    backgroundColor: '#ccc',
+    backgroundColor: '#D1D5DB',
   },
   confirmButtonText: {
     color: '#fff',
@@ -1845,21 +2137,21 @@ const styles = StyleSheet.create({
   },
   modalCancelButton: {
     flex: 1,
-    backgroundColor: '#f8f9fa',
+    backgroundColor: '#F9FAFB',
     paddingVertical: 12,
     borderRadius: 8,
     alignItems: 'center',
     borderWidth: 1,
-    borderColor: '#e9ecef',
+    borderColor: '#E5E7EB',
   },
   modalCancelButtonText: {
-    color: '#666',
+    color: '#6B7280',
     fontSize: 16,
     fontWeight: '600',
   },
   modalConfirmButton: {
     flex: 1,
-    backgroundColor: '#4caf50',
+    backgroundColor: '#06B6D4',
     paddingVertical: 12,
     borderRadius: 8,
     alignItems: 'center',
@@ -1869,153 +2161,114 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: '700',
   },
-  vehicleSelectButton: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    borderWidth: 1,
-    borderColor: '#e0e0e0',
-    borderRadius: 8,
-    paddingHorizontal: 16,
-    paddingVertical: 12,
-    backgroundColor: '#fff',
+  
+  // 내 차량 목록 스타일
+  myVehiclesContainer: {
+    marginBottom: 20,
   },
-  vehicleSelectButtonText: {
+  myVehiclesTitle: {
     fontSize: 16,
-    color: '#333',
+    fontWeight: '600',
+    color: '#374151',
+    marginBottom: 12,
   },
-  vehicleModalContainer: {
+  myVehicleCard: {
+    backgroundColor: '#F8FAFC',
+    borderRadius: 12,
+    padding: 16,
+    marginBottom: 8,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+    width: '100%',
+  },
+  myVehicleInfo: {
     flex: 1,
-    backgroundColor: '#FFFFFF',
+    paddingRight: 12,
   },
-  vehicleModalContent: {
-    flex: 1,
-    paddingHorizontal: 20,
-    paddingTop: 20,
-  },
-  brandSection: {
-    marginBottom: 32,
-  },
-  brandTitle: {
+  myVehicleName: {
     fontSize: 16,
     fontWeight: '600',
     color: '#1F2937',
-    marginBottom: 12,
-    paddingHorizontal: 12,
-    paddingVertical: 8,
-    backgroundColor: '#F8FAFC',
-    borderRadius: 8,
-    position: 'relative',
+    marginBottom: 2,
+  },
+  myVehicleTrim: {
+    fontSize: 14,
+    color: '#6B7280',
+  },
+  dividerContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginVertical: 16,
+  },
+  dividerLine: {
+    flex: 1,
+    height: 1,
+    backgroundColor: '#E5E7EB',
+  },
+  dividerText: {
+    marginHorizontal: 12,
+    fontSize: 14,
+    color: '#9CA3AF',
+    fontWeight: '500',
+  },
+
+  // 서비스 타입 선택 스타일
+  serviceTypeSelection: {
+    marginTop: 16,
+  },
+  serviceTypeLabel: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#1F2937',
+    marginBottom: 16,
     textAlign: 'center',
-    shadowColor: '#3B82F6',
-    shadowOffset: {
-      width: 0,
-      height: 1,
-    },
-    shadowOpacity: 0.05,
-    shadowRadius: 1,
-    elevation: 1,
   },
-  vehicleListItem: {
-    marginBottom: 6,
+  serviceTypeOptions: {
+    gap: 12,
+  },
+  serviceTypeOption: {
+    padding: 16,
     borderRadius: 12,
+    borderWidth: 2,
+    borderColor: '#E5E7EB',
     backgroundColor: '#FFFFFF',
-    shadowColor: '#000',
-    shadowOffset: {
-      width: 0,
-      height: 1,
-    },
-    shadowOpacity: 0.05,
-    shadowRadius: 2,
-    elevation: 1,
-    overflow: 'hidden',
   },
-  vehicleItemHeader: {
+  serviceTypeOptionSelected: {
+    borderColor: '#10B981',
+    backgroundColor: '#F0FDF4',
+  },
+  serviceTypeHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    paddingHorizontal: 16,
-    paddingVertical: 14,
-    backgroundColor: '#FFFFFF',
-    borderBottomWidth: 1,
-    borderBottomColor: '#F1F5F9',
-  },
-  vehicleItemText: {
-    fontSize: 15,
-    fontWeight: '500',
-    color: '#1E293B',
-    letterSpacing: -0.1,
-  },
-  yearList: {
-    paddingHorizontal: 16,
-    paddingVertical: 8,
-    backgroundColor: '#FAFBFC',
-  },
-  yearGrid: {
-    paddingBottom: 8,
-  },
-  yearRow: {
-    flexDirection: 'row',
-    justifyContent: 'flex-start',
-    gap: 8,
     marginBottom: 8,
   },
-  yearListItem: {
-    paddingVertical: 10,
-    paddingHorizontal: 8,
-    borderRadius: 8,
-    backgroundColor: '#FFFFFF',
-    borderWidth: 1,
-    borderColor: '#E2E8F0',
-    shadowColor: '#000',
-    shadowOffset: {
-      width: 0,
-      height: 1,
-    },
-    shadowOpacity: 0.02,
-    shadowRadius: 1,
-    elevation: 0.5,
+  serviceTypeName: {
+    fontSize: 18,
+    fontWeight: '700',
+    color: '#1F2937',
   },
-  yearListItemText: {
-    fontSize: 13,
-    color: '#475569',
-    fontWeight: '500',
-    textAlign: 'center',
+  serviceTypeNameSelected: {
+    color: '#10B981',
   },
-  yearModalContainer: {
-    backgroundColor: '#fff',
-    borderTopLeftRadius: 20,
-    borderTopRightRadius: 20,
-    maxHeight: '70%',
-    minHeight: '40%',
-    width: '100%',
-    paddingHorizontal: 20,
-    paddingBottom: 20,
-  },
-  selectedVehicleText: {
+  serviceTypePrice: {
     fontSize: 16,
     fontWeight: '600',
-    color: '#2196f3',
-    textAlign: 'center',
-    marginBottom: 20,
-    paddingVertical: 12,
-    backgroundColor: '#f0f8ff',
-    borderRadius: 8,
+    color: '#6B7280',
   },
-  yearItem: {
-    flex: 1,
-    margin: 4,
-    paddingVertical: 12,
-    backgroundColor: '#f8f9fa',
-    borderRadius: 8,
-    alignItems: 'center',
-    borderWidth: 1,
-    borderColor: '#e0e0e0',
+  serviceTypePriceSelected: {
+    color: '#10B981',
   },
-  yearItemText: {
+  serviceTypeDescription: {
     fontSize: 14,
-    fontWeight: '500',
-    color: '#333',
+    color: '#6B7280',
+    lineHeight: 20,
+  },
+  serviceTypeDescriptionSelected: {
+    color: '#059669',
   },
 });
 

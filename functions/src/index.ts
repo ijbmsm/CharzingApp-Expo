@@ -4,8 +4,13 @@ import axios from 'axios';
 import cors from 'cors';
 import { google } from 'googleapis';
 
-// Firebase Admin 초기화
-admin.initializeApp();
+// 차량 데이터 업로드 함수 import
+export { uploadVehiclesToFirestore } from './uploadVehicles';
+
+// Firebase Admin 초기화 (중복 초기화 방지)
+if (admin.apps.length === 0) {
+  admin.initializeApp();
+}
 
 // CORS 설정 (프로덕션에서는 특정 도메인만 허용)
 const corsHandler = cors({
@@ -79,35 +84,111 @@ export const kakaoLoginHttp = functions
         return;
       }
 
-      // Firebase UID 생성 (Kakao ID 기반)
-      const firebaseUID = `kakao_${userInfo.id}`;
-      const userDocRef = db.collection('users').doc(firebaseUID);
-      const userDoc = await userDocRef.get();
-      const isNewUser = !userDoc.exists;
-      
-      console.log('🔍 사용자 존재 여부:', isNewUser ? '신규 사용자' : '기존 사용자', 'UID:', firebaseUID);
+      // 기존 사용자인지 kakaoId로 확인
+      const existingUserQuery = await db.collection('users')
+        .where('kakaoId', '==', userInfo.id)
+        .limit(1)
+        .get();
 
-      // 사용자 정보 저장/업데이트
-      const userData = {
-        kakaoId: userInfo.id,
-        email: userInfo.email,
-        displayName: userInfo.nickname || userInfo.email?.split('@')[0] || '카카오 사용자',
-        photoURL: userInfo.profileImageUrl,
-        provider: 'kakao',
-        lastLoginAt: admin.firestore.FieldValue.serverTimestamp(),
-        updatedAt: admin.firestore.FieldValue.serverTimestamp(),
-      };
+      let firebaseUID;
+      let isNewUser;
 
-      if (isNewUser) {
-        await userDocRef.set({
-          ...userData,
-          createdAt: admin.firestore.FieldValue.serverTimestamp(),
-          isRegistrationComplete: false,
+      if (!existingUserQuery.empty) {
+        // 기존 사용자
+        firebaseUID = existingUserQuery.docs[0].id;
+        isNewUser = false;
+        console.log('✅ 기존 카카오 사용자 발견:', firebaseUID);
+        
+        // 기존 사용자 정보 업데이트
+        await db.collection('users').doc(firebaseUID).update({
+          email: userInfo.email,
+          displayName: userInfo.nickname || userInfo.email?.split('@')[0] || '카카오 사용자',
+          photoURL: userInfo.profileImageUrl,
+          lastLoginAt: admin.firestore.FieldValue.serverTimestamp(),
+          updatedAt: admin.firestore.FieldValue.serverTimestamp(),
         });
-        console.log('✅ 신규 카카오 사용자 생성:', firebaseUID);
-      } else {
-        await userDocRef.update(userData);
         console.log('✅ 기존 카카오 사용자 정보 업데이트:', firebaseUID);
+      } else {
+        // 신규 사용자 생성 시도
+        try {
+          const userRecord = await admin.auth().createUser({
+            email: userInfo.email,
+            displayName: userInfo.nickname || userInfo.email?.split('@')[0] || '카카오 사용자',
+            photoURL: userInfo.profileImageUrl,
+          });
+          firebaseUID = userRecord.uid;
+          isNewUser = true;
+          
+          console.log('✅ 신규 카카오 사용자 생성 (Firebase 자동 UID):', firebaseUID);
+          
+          // Firestore에 사용자 문서 생성
+          await db.collection('users').doc(firebaseUID).set({
+            kakaoId: userInfo.id,
+            email: userInfo.email,
+            displayName: userInfo.nickname || userInfo.email?.split('@')[0] || '카카오 사용자',
+            photoURL: userInfo.profileImageUrl,
+            provider: 'kakao',
+            createdAt: admin.firestore.FieldValue.serverTimestamp(),
+            lastLoginAt: admin.firestore.FieldValue.serverTimestamp(),
+            updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+            isRegistrationComplete: false,
+          });
+        } catch (createError: any) {
+          if (createError.code === 'auth/email-already-exists') {
+            console.log('🔄 이메일이 이미 존재함. 기존 사용자에 카카오 연동 추가:', userInfo.email);
+            
+            // 기존 이메일로 사용자 찾기
+            const existingUserRecord = await admin.auth().getUserByEmail(userInfo.email);
+            firebaseUID = existingUserRecord.uid;
+            
+            console.log('📧 기존 이메일 사용자 UID:', firebaseUID);
+            
+            // 기존 사용자에 카카오 정보 추가/업데이트
+            const userDoc = await db.collection('users').doc(firebaseUID).get();
+            
+            if (userDoc.exists) {
+              // 기존 Firestore 문서 업데이트 (카카오 정보 추가)
+              await db.collection('users').doc(firebaseUID).update({
+                kakaoId: userInfo.id,
+                photoURL: userInfo.profileImageUrl || existingUserRecord.photoURL,
+                displayName: userInfo.nickname || existingUserRecord.displayName,
+                lastLoginAt: admin.firestore.FieldValue.serverTimestamp(),
+                updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+                'providers.kakao': {
+                  id: userInfo.id,
+                  nickname: userInfo.nickname,
+                  profileImageUrl: userInfo.profileImageUrl,
+                  linkedAt: admin.firestore.FieldValue.serverTimestamp()
+                }
+              });
+              console.log('✅ 기존 사용자에 카카오 정보 추가 완료');
+            } else {
+              // Firestore 문서가 없으면 새로 생성
+              await db.collection('users').doc(firebaseUID).set({
+                kakaoId: userInfo.id,
+                email: userInfo.email,
+                displayName: userInfo.nickname || existingUserRecord.displayName || '사용자',
+                photoURL: userInfo.profileImageUrl || existingUserRecord.photoURL,
+                provider: 'multi', // 다중 provider
+                providers: {
+                  kakao: {
+                    id: userInfo.id,
+                    nickname: userInfo.nickname,
+                    profileImageUrl: userInfo.profileImageUrl,
+                    linkedAt: admin.firestore.FieldValue.serverTimestamp()
+                  }
+                },
+                createdAt: admin.firestore.FieldValue.serverTimestamp(),
+                lastLoginAt: admin.firestore.FieldValue.serverTimestamp(),
+                updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+                isRegistrationComplete: false,
+              });
+              console.log('✅ 기존 Auth 사용자에 Firestore 문서 생성 (카카오 연동)');
+            }
+          } else {
+            throw createError;
+          }
+        }
       }
 
       // Firebase Custom Token 생성
@@ -117,7 +198,7 @@ export const kakaoLoginHttp = functions
         provider: 'kakao',
         kakaoId: userInfo.id,
         email: userInfo.email || null,
-        displayName: userData.displayName,
+        displayName: userInfo.nickname || userInfo.email?.split('@')[0] || '카카오 사용자',
         isVerified: true,
         role: 'user',
         canCreateReservation: true,
@@ -134,7 +215,7 @@ export const kakaoLoginHttp = functions
         userInfo: {
           id: firebaseUID,
           email: userInfo.email,
-          displayName: userData.displayName,
+          displayName: userInfo.nickname || userInfo.email?.split('@')[0] || '카카오 사용자',
           photoURL: userInfo.profileImageUrl,
         },
         isExistingUser: !isNewUser,
@@ -1664,5 +1745,368 @@ export const getUsersWithPushTokensAdmin = functions
         success: false,
         error: error instanceof Error ? error.message : '알 수 없는 오류'
       });
+    }
+  });
+
+// ======= 차량 데이터 조회 Functions (Admin SDK 사용) =======
+
+// 타입 정의
+interface VehicleBattery {
+  manufacturers: string[];
+  capacity: string;
+  warranty?: string;
+  cellType?: string;
+  variant: string;
+}
+
+interface VehicleSpecs {
+  range?: string;
+  powerMax?: string;
+  torqueMax?: string;
+  acceleration?: string;
+  topSpeed?: string;
+  driveType?: string;
+  efficiency?: string;
+  seats?: number;
+}
+
+interface VehicleTrimData {
+  trimId: string;
+  startYear: number;
+  endYear?: number;
+  battery: VehicleBattery;
+  specs: VehicleSpecs;
+  createdAt?: admin.firestore.Timestamp;
+  updatedAt?: admin.firestore.Timestamp;
+}
+
+interface VehicleTrim {
+  id: string;
+  trimName: string;
+  year: number;
+  batteryCapacity: string | null;
+  range: string | null;
+  powerType: 'BEV' | 'PHEV' | 'HEV' | 'FCEV';
+  drivetrain: '2WD' | 'AWD' | '4WD';
+  modelId: string;
+  brandId: string;
+  battery: VehicleBattery;
+  specs: VehicleSpecs;
+  startYear: number;
+  endYear?: number;
+  createdAt: string | null;
+  updatedAt: string | null;
+}
+
+/**
+ * 차량 트림 목록 조회 (새로운 nested 구조 사용)
+ * 구조: /vehicles/{brandId}/models/{modelId}/trims/{trimId}/driveTypes/{driveTypeId}
+ */
+export const getVehicleTrims = functions
+  .region('us-central1')
+  .https.onRequest(async (req, res) => {
+    try {
+      // CORS 헤더 설정
+      res.set('Access-Control-Allow-Origin', '*');
+      res.set('Access-Control-Allow-Methods', 'POST');
+      res.set('Access-Control-Allow-Headers', 'Content-Type');
+
+      if (req.method === 'OPTIONS') {
+        res.status(204).send('');
+        return;
+      }
+
+      console.log('🔍 차량 트림 목록 조회 요청 (단순 구조)');
+      
+      const { brandId, modelId } = req.body.data || req.body;
+      
+      if (!brandId || !modelId) {
+        res.status(400).json({
+          success: false,
+          error: 'brandId와 modelId가 필요합니다.'
+        });
+        return;
+      }
+
+      console.log(`📋 트림 조회: ${brandId}/${modelId}`);
+
+      // 모델 문서 경로: /vehicles/{brandId}/models/{modelId}
+      const modelDocRef = db.collection('vehicles').doc(brandId).collection('models').doc(modelId);
+      const modelDoc = await modelDocRef.get();
+      
+      if (!modelDoc.exists) {
+        console.log(`❌ 모델 문서가 존재하지 않음: ${brandId}/${modelId}`);
+        res.status(404).json({
+          success: false,
+          trims: [],
+          message: '모델을 찾을 수 없습니다.'
+        });
+        return;
+      }
+      
+      const modelData = modelDoc.data() as {
+        modelName?: string;
+        trims?: Array<{
+          trimId: string;
+          trimName: string;
+          driveType: string;
+          years?: string[];
+          batteryCapacity?: string;
+        }>;
+      } | undefined;
+      
+      if (!modelData) {
+        console.log(`❌ 모델 데이터가 비어있음: ${brandId}/${modelId}`);
+        res.status(404).json({
+          success: false,
+          trims: [],
+          message: '모델 데이터를 찾을 수 없습니다.'
+        });
+        return;
+      }
+      
+      console.log(`📄 모델 데이터:`, modelData);
+
+      // 모델 문서 안의 trims 배열 사용
+      const trimsArray = modelData.trims || [];
+      console.log(`🔍 발견된 트림 수: ${trimsArray.length}`);
+      
+      const trims: Array<{
+        trimId: string;
+        trimName: string;
+        driveType: string;
+        years: string[];
+        batteryCapacity: string;
+        brandId: string;
+        modelId: string;
+        modelName: string;
+      }> = [];
+      
+      // 각 트림 데이터 처리
+      for (const trimData of trimsArray) {
+        console.log(`📋 트림 처리 중:`, trimData);
+        
+        trims.push({
+          trimId: trimData.trimId,
+          trimName: trimData.trimName,
+          driveType: trimData.driveType,
+          years: trimData.years || [],
+          batteryCapacity: trimData.batteryCapacity || '',
+          brandId,
+          modelId,
+          modelName: modelData.modelName || modelId
+        });
+      }
+      
+      // 트림명으로 정렬
+      trims.sort((a, b) => a.trimName.localeCompare(b.trimName));
+      
+      console.log(`✅ 트림 조회 완료: ${brandId}/${modelId}, 총 ${trims.length}개 트림`);
+
+      res.status(200).json({
+        success: true,
+        trims,
+        totalCount: trims.length,
+        message: `${trims.length}개 트림을 찾았습니다.`
+      });
+      return;
+
+    } catch (error) {
+      console.error('❌ 차량 트림 조회 실패:', error);
+      
+      const errorMessage = error instanceof Error ? error.message : '알 수 없는 오류';
+      res.status(500).json({
+        success: false,
+        error: '차량 트림 조회 중 오류가 발생했습니다.',
+        details: errorMessage
+      });
+      return;
+    }
+  });
+
+/**
+ * 브랜드 목록 조회 (새로운 nested 구조 사용)
+ * 구조: /vehicles/{brandId}
+ */
+export const getBrands = functions
+  .region('us-central1')
+  .https.onRequest(async (req, res) => {
+    // CORS 헤더 설정
+    res.set('Access-Control-Allow-Origin', '*');
+    res.set('Access-Control-Allow-Methods', 'POST');
+    res.set('Access-Control-Allow-Headers', 'Content-Type');
+
+    if (req.method === 'OPTIONS') {
+      res.status(204).send('');
+      return;
+    }
+    try {
+      console.log('🔍 브랜드 목록 조회 요청 (새로운 nested 구조)');
+
+      // vehicles 컬렉션의 모든 문서 조회
+      const vehiclesSnapshot = await db.collection('vehicles').get();
+      console.log(`🔍 발견된 브랜드 수: ${vehiclesSnapshot.size}`);
+
+      const brands: Array<{
+        id: string;
+        name: string;
+        logoUrl?: string;
+        modelsCount?: number;
+      }> = [];
+
+      for (const brandDoc of vehiclesSnapshot.docs) {
+        const brandId = brandDoc.id;
+        const brandData = brandDoc.data();
+        
+        try {
+          // 각 브랜드의 모델 수 카운트
+          const modelsSnapshot = await brandDoc.ref.collection('models').get();
+          
+          brands.push({
+            id: brandId,
+            name: brandData.brandName || brandId,
+            logoUrl: brandData.logoUrl,
+            modelsCount: modelsSnapshot.size
+          });
+          
+          console.log(`📋 브랜드 처리 완료: ${brandId} (${modelsSnapshot.size}개 모델)`);
+        } catch (brandError) {
+          console.error(`❌ 브랜드 처리 실패 (${brandId}):`, brandError);
+        }
+      }
+
+      // 브랜드명으로 정렬
+      brands.sort((a, b) => a.name.localeCompare(b.name));
+
+      console.log(`✅ 브랜드 조회 완료: 총 ${brands.length}개 브랜드`);
+
+      res.status(200).json({
+        success: true,
+        brands,
+        totalCount: brands.length,
+        message: `${brands.length}개 브랜드를 찾았습니다.`
+      });
+      return;
+
+    } catch (error) {
+      console.error('❌ 브랜드 목록 조회 실패:', error);
+      
+      const errorMessage = error instanceof Error ? error.message : '알 수 없는 오류';
+      res.status(500).json({
+        success: false,
+        error: '브랜드 목록 조회 중 오류가 발생했습니다.',
+        details: errorMessage
+      });
+      return;
+    }
+  });
+
+/**
+ * 모델 목록 조회 (새로운 nested 구조 사용)
+ * 구조: /vehicles/{brandId}/models/{modelId}
+ */
+export const getModels = functions
+  .region('us-central1')
+  .https.onRequest(async (req, res) => {
+    // CORS 헤더 설정
+    res.set('Access-Control-Allow-Origin', '*');
+    res.set('Access-Control-Allow-Methods', 'POST');
+    res.set('Access-Control-Allow-Headers', 'Content-Type');
+
+    if (req.method === 'OPTIONS') {
+      res.status(204).send('');
+      return;
+    }
+
+    try {
+      console.log('🔍 모델 목록 조회 요청 (새로운 nested 구조)');
+      
+      const { brandId } = req.body.data || req.body;
+      
+      if (!brandId) {
+        res.status(400).json({
+          success: false,
+          error: 'brandId가 필요합니다.'
+        });
+        return;
+      }
+
+      console.log(`📋 모델 조회: ${brandId}`);
+
+      // 브랜드 문서 확인
+      const brandDocRef = db.collection('vehicles').doc(brandId);
+      const brandDoc = await brandDocRef.get();
+      
+      if (!brandDoc.exists) {
+        console.log(`❌ 브랜드 문서가 존재하지 않음: ${brandId}`);
+        res.status(404).json({
+          success: false,
+          models: [],
+          message: '브랜드를 찾을 수 없습니다.'
+        });
+        return;
+      }
+
+      // 모델 컬렉션 조회: /vehicles/{brandId}/models
+      const modelsSnapshot = await brandDocRef.collection('models').get();
+      console.log(`🔍 발견된 모델 수: ${modelsSnapshot.size}`);
+
+      const models: Array<{
+        id: string;
+        name: string;
+        brandId: string;
+        imageUrl?: string;
+        trimsCount?: number;
+        startYear?: number;
+        endYear?: number;
+      }> = [];
+
+      for (const modelDoc of modelsSnapshot.docs) {
+        const modelId = modelDoc.id;
+        const modelData = modelDoc.data();
+        
+        try {
+          // 각 모델의 트림 수 카운트
+          const trimsSnapshot = await modelDoc.ref.collection('trims').get();
+          
+          models.push({
+            id: modelId,
+            name: modelData.modelName || modelId,
+            brandId: brandId,
+            imageUrl: modelData.imageUrl,
+            trimsCount: trimsSnapshot.size,
+            startYear: modelData.startYear,
+            endYear: modelData.endYear
+          });
+          
+          console.log(`📋 모델 처리 완료: ${modelId} (${trimsSnapshot.size}개 트림)`);
+        } catch (modelError) {
+          console.error(`❌ 모델 처리 실패 (${modelId}):`, modelError);
+        }
+      }
+
+      // 모델명으로 정렬
+      models.sort((a, b) => a.name.localeCompare(b.name));
+
+      console.log(`✅ 모델 조회 완료: ${brandId}, 총 ${models.length}개 모델`);
+
+      res.status(200).json({
+        success: true,
+        models,
+        totalCount: models.length,
+        message: `${models.length}개 모델을 찾았습니다.`
+      });
+      return;
+
+    } catch (error) {
+      console.error('❌ 모델 목록 조회 실패:', error);
+      
+      const errorMessage = error instanceof Error ? error.message : '알 수 없는 오류';
+      res.status(500).json({
+        success: false,
+        error: '모델 목록 조회 중 오류가 발생했습니다.',
+        details: errorMessage
+      });
+      return;
     }
   });

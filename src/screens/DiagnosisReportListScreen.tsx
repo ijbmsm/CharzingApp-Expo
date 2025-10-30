@@ -95,7 +95,7 @@ const DiagnosisReportListScreen: React.FC<Props> = ({navigation}) => {
             <Text style={styles.reportType}>{report.vehicleYear}</Text>
           </View>
           <View style={styles.statusContainer}>
-            <View style={[styles.statusBadge, {backgroundColor: '#10B981'}]}>
+            <View style={[styles.statusBadge, {backgroundColor: '#06B6D4'}]}>
               <Text style={styles.statusText}>진단 완료</Text>
             </View>
           </View>
@@ -104,12 +104,12 @@ const DiagnosisReportListScreen: React.FC<Props> = ({navigation}) => {
         <View style={styles.cardContent}>
           <View style={styles.infoRow}>
             <View style={styles.infoItem}>
-              <MaterialCommunityIcons name="battery-outline" size={20} color="#666" />
+              <MaterialCommunityIcons name="battery-outline" size={20} color="#6B7280" />
               <Text style={styles.infoLabel}>SOH</Text>
               <Text style={styles.infoValue}>{report.sohPercentage}%</Text>
             </View>
             <View style={styles.infoItem}>
-              <MaterialCommunityIcons name="car-outline" size={20} color="#666" />
+              <MaterialCommunityIcons name="car-outline" size={20} color="#6B7280" />
               <Text style={styles.infoLabel}>주행거리</Text>
               <Text style={styles.infoValue}>{report.realDrivableDistance}</Text>
             </View>
@@ -118,13 +118,13 @@ const DiagnosisReportListScreen: React.FC<Props> = ({navigation}) => {
 
         <View style={styles.cardFooter}>
           <Text style={styles.dateText}>
-            진단일: {formatDate(report.diagnosisDate && typeof report.diagnosisDate === 'object' && 'toDate' in report.diagnosisDate 
-              ? (report.diagnosisDate as any).toDate() 
-              : report.diagnosisDate instanceof Date 
-                ? report.diagnosisDate 
+            진단일: {formatDate(report.diagnosisDate && typeof report.diagnosisDate === 'object' && 'toDate' in report.diagnosisDate
+              ? (report.diagnosisDate as any).toDate()
+              : report.diagnosisDate instanceof Date
+                ? report.diagnosisDate
                 : new Date())}
           </Text>
-          <MaterialCommunityIcons name="chevron-right" size={20} color="#999" />
+          <MaterialCommunityIcons name="chevron-right" size={20} color="#9CA3AF" />
         </View>
       </TouchableOpacity>
     );
@@ -150,7 +150,7 @@ const DiagnosisReportListScreen: React.FC<Props> = ({navigation}) => {
                 {/* 요약 카드 */}
                 <View style={styles.summaryCard}>
                   <View style={styles.summaryHeader}>
-                    <MaterialCommunityIcons name="file-document-multiple" size={24} color="#4495E8" />
+                    <MaterialCommunityIcons name="file-document-multiple" size={24} color="#06B6D4" />
                     <Text style={styles.summaryTitle}>내 진단 리포트</Text>
                   </View>
                   <Text style={styles.summaryDescription}>
@@ -206,7 +206,7 @@ const DiagnosisReportListScreen: React.FC<Props> = ({navigation}) => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#F5F5F5',
+    backgroundColor: '#F9FAFB',
   },
   scrollView: {
     flex: 1,
@@ -215,15 +215,15 @@ const styles = StyleSheet.create({
     padding: 16,
   },
   summaryCard: {
-    backgroundColor: 'white',
+    backgroundColor: '#FFFFFF',
     borderRadius: 12,
     padding: 20,
     marginBottom: 24,
-    elevation: 2,
     shadowColor: '#000',
-    shadowOffset: {width: 0, height: 2},
+    shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.1,
-    shadowRadius: 4,
+    shadowRadius: 3.84,
+    elevation: 5,
   },
   summaryHeader: {
     flexDirection: 'row',
@@ -232,13 +232,13 @@ const styles = StyleSheet.create({
   },
   summaryTitle: {
     fontSize: 18,
-    fontWeight: 'bold',
-    color: '#1a1a1a',
+    fontWeight: '700',
+    color: '#1F2937',
     marginLeft: 8,
   },
   summaryDescription: {
     fontSize: 14,
-    color: '#666',
+    color: '#6B7280',
     marginBottom: 16,
   },
   summaryStats: {
@@ -250,33 +250,33 @@ const styles = StyleSheet.create({
   },
   statNumber: {
     fontSize: 24,
-    fontWeight: 'bold',
-    color: '#4495E8',
+    fontWeight: '700',
+    color: '#06B6D4',
     marginBottom: 4,
   },
   statLabel: {
     fontSize: 12,
-    color: '#666',
+    color: '#6B7280',
   },
   listSection: {
     marginBottom: 20,
   },
   sectionTitle: {
     fontSize: 16,
-    fontWeight: 'bold',
-    color: '#1a1a1a',
+    fontWeight: '700',
+    color: '#1F2937',
     marginBottom: 16,
   },
   reportCard: {
-    backgroundColor: 'white',
+    backgroundColor: '#FFFFFF',
     borderRadius: 12,
     padding: 16,
     marginBottom: 12,
-    elevation: 2,
     shadowColor: '#000',
-    shadowOffset: {width: 0, height: 2},
+    shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.1,
-    shadowRadius: 4,
+    shadowRadius: 3.84,
+    elevation: 5,
   },
   cardHeader: {
     flexDirection: 'row',
@@ -289,13 +289,13 @@ const styles = StyleSheet.create({
   },
   vehicleModel: {
     fontSize: 16,
-    fontWeight: 'bold',
-    color: '#1a1a1a',
+    fontWeight: '700',
+    color: '#1F2937',
     marginBottom: 4,
   },
   reportType: {
     fontSize: 14,
-    color: '#666',
+    color: '#6B7280',
   },
   statusContainer: {
     alignItems: 'flex-end',
@@ -308,7 +308,7 @@ const styles = StyleSheet.create({
   statusText: {
     fontSize: 12,
     fontWeight: '600',
-    color: 'white',
+    color: '#FFFFFF',
   },
   cardContent: {
     marginBottom: 12,
@@ -324,14 +324,14 @@ const styles = StyleSheet.create({
   },
   infoLabel: {
     fontSize: 14,
-    color: '#666',
+    color: '#6B7280',
     marginLeft: 8,
     marginRight: 8,
   },
   infoValue: {
     fontSize: 14,
     fontWeight: '600',
-    color: '#1a1a1a',
+    color: '#1F2937',
   },
   cardFooter: {
     flexDirection: 'row',
@@ -339,11 +339,11 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     paddingTop: 12,
     borderTopWidth: 1,
-    borderTopColor: '#F1F3F4',
+    borderTopColor: '#E5E7EB',
   },
   viewReportText: {
     fontSize: 14,
-    color: '#4495E8',
+    color: '#06B6D4',
     fontWeight: '600',
   },
   emptyContainer: {
@@ -369,7 +369,7 @@ const styles = StyleSheet.create({
   },
   dateText: {
     fontSize: 12,
-    color: '#666',
+    color: '#6B7280',
   },
 });
 

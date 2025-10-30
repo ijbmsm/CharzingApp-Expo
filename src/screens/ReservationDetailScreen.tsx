@@ -152,10 +152,10 @@ const ReservationDetailScreen: React.FC = () => {
 
   const getStatusColor = (status: DiagnosisReservation['status']) => {
     switch (status) {
-      case 'pending': return '#8B5CF6';
-      case 'confirmed': return '#4F46E5';
-      case 'completed': return '#22C55E';
-      case 'cancelled': return '#EF4444';
+      case 'pending': return '#06B6D4';
+      case 'confirmed': return '#06B6D4';
+      case 'completed': return '#06B6D4';
+      case 'cancelled': return '#6B7280';
       default: return '#6B7280';
     }
   };
@@ -238,14 +238,14 @@ const ReservationDetailScreen: React.FC = () => {
                     activeOpacity={0.8}
                   >
                     <View style={styles.reportButtonContent}>
-                      <Ionicons name="document-text" size={20} color="#4F46E5" />
+                      <Ionicons name="document-text" size={20} color="#06B6D4" />
                       <Text style={styles.reportButtonText}>진단 리포트 보기</Text>
-                      <Ionicons name="chevron-forward" size={16} color="#4F46E5" />
+                      <Ionicons name="chevron-forward" size={16} color="#06B6D4" />
                     </View>
                   </TouchableOpacity>
                 ) : (
                   <View style={styles.noReportContainer}>
-                    <Ionicons name="document-outline" size={16} color="#4F46E5" />
+                    <Ionicons name="document-outline" size={16} color="#06B6D4" />
                     <Text style={styles.noReportText}>진단 리포트 준비 중</Text>
                   </View>
                 )}
@@ -309,16 +309,23 @@ const ReservationDetailScreen: React.FC = () => {
               <Text style={styles.receiptLabel}>신청일</Text>
               <Text style={styles.receiptValue}>{formatDate(currentReservation.createdAt)}</Text>
             </View>
-            
+
+            <View style={styles.receiptRow}>
+              <Text style={styles.receiptLabel}>서비스 타입</Text>
+              <Text style={styles.receiptValue}>
+                {currentReservation.serviceType === 'standard' ? '스탠다드' : '프리미엄'}
+              </Text>
+            </View>
+
             <View style={[styles.receiptRow, styles.priceRow]}>
               <Text style={[styles.receiptLabel, styles.priceLabel]}>결제금액</Text>
               <Text style={styles.priceValue}>
                 {(() => {
-                  const servicePrice = currentReservation.servicePrice;
-                  if (servicePrice) {
-                    return servicePrice.toLocaleString() + '원';
+                  if (currentReservation.servicePrice) {
+                    return currentReservation.servicePrice.toLocaleString() + '원';
                   }
-                  return '100,000원';
+                  // servicePrice가 없는 경우 serviceType에 따라 기본 가격 표시
+                  return currentReservation.serviceType === 'standard' ? '100,000원' : '200,000원';
                 })()}
               </Text>
             </View>
@@ -349,7 +356,7 @@ const ReservationDetailScreen: React.FC = () => {
                   onPress={handleModifyReservation}
                   activeOpacity={0.8}
                 >
-                  <Ionicons name="create-outline" size={24} color="#4F46E5" />
+                  <Ionicons name="create-outline" size={24} color="#06B6D4" />
                   <Text style={[styles.bottomButtonText, styles.bottomModifyText]}>
                     예약 수정
                   </Text>
@@ -362,7 +369,7 @@ const ReservationDetailScreen: React.FC = () => {
                   onPress={handleCancelReservation}
                   activeOpacity={0.8}
                 >
-                  <Ionicons name="close-outline" size={24} color="#EF4444" />
+                  <Ionicons name="close-outline" size={24} color="#6B7280" />
                   <Text style={[styles.bottomButtonText, styles.bottomCancelText]}>
                     예약 취소
                   </Text>
@@ -552,7 +559,7 @@ const styles = StyleSheet.create({
   cancelButton: {
     backgroundColor: '#FEF2F2',
     borderWidth: 1,
-    borderColor: '#EF4444',
+    borderColor: '#6B7280',
   },
   actionButtonText: {
     fontSize: 14,
@@ -562,7 +569,7 @@ const styles = StyleSheet.create({
     color: '#202632',
   },
   cancelButtonText: {
-    color: '#EF4444',
+    color: '#6B7280',
   },
   // 통합된 카드 스타일
   receiptCard: {
@@ -673,7 +680,7 @@ const styles = StyleSheet.create({
   totalAmount: {
     fontSize: 18,
     fontWeight: '700',
-    color: '#2563EB',
+    color: '#06B6D4',
   },
   addressText: {
     fontSize: 13,
@@ -731,7 +738,7 @@ const styles = StyleSheet.create({
     color: '#202632',
   },
   bottomCancelText: {
-    color: '#EF4444',
+    color: '#6B7280',
   },
 });
 

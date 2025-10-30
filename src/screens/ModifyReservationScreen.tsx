@@ -679,7 +679,7 @@ const styles = StyleSheet.create({
     marginBottom: 8,
   },
   activeProgressCircle: {
-    backgroundColor: '#4495E8',
+    backgroundColor: '#06B6D4',
   },
   progressNumber: {
     fontSize: 14,
@@ -694,7 +694,7 @@ const styles = StyleSheet.create({
     color: '#6B7280',
   },
   activeProgressLabel: {
-    color: '#4495E8',
+    color: '#06B6D4',
     fontWeight: '600',
   },
   stepContent: {
@@ -790,7 +790,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: '#4495E8',
+    backgroundColor: '#06B6D4',
     borderRadius: 12,
     paddingVertical: 16,
     gap: 8,
@@ -804,7 +804,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: '#4495E8',
+    backgroundColor: '#06B6D4',
     borderRadius: 12,
     paddingVertical: 16,
     gap: 8,

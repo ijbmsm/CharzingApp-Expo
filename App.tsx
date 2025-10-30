@@ -26,6 +26,7 @@ import googleLoginService from './src/services/googleLoginService';
 import kakaoLoginService from './src/services/kakaoLoginService';
 import analyticsService from './src/services/analyticsService';
 import * as SplashScreen from 'expo-splash-screen';
+import { useFonts } from 'expo-font';
 
 // Expo 스플래시 화면을 최대한 빨리 숨기기 (촌스러운 화면 제거)
 // 우리가 만든 커스텀 로딩 화면을 대신 사용
@@ -163,6 +164,12 @@ function App() {
   const [isAppReady, setIsAppReady] = useState(false);
   const [loadingMessage, setLoadingMessage] = useState('앱을 준비하고 있습니다...');
 
+  // LineSeed 폰트 로드
+  const [fontsLoaded] = useFonts({
+    'LINESeedSansKR-Regular': require('./assets/fonts/LINESeedSansKR-Regular.ttf'),
+    'LINESeedSansKR-Bold': require('./assets/fonts/LINESeedSansKR-Bold.ttf'),
+  });
+
   // 🔥 앱 초기화 (커스텀 로딩 준비 후 스플래시 숨기기)
   useEffect(() => {
     const initializeApp = async () => {
@@ -218,6 +225,11 @@ function App() {
   // 앱이 준비되지 않았다면 커스텀 로딩 화면 표시
   if (!isAppReady) {
     return <BundlingLoadingScreen message={loadingMessage} showProgress={true} />;
+  }
+
+  // 폰트가 로드되지 않았으면 로딩 화면 표시
+  if (!fontsLoaded) {
+    return <BundlingLoadingScreen message="폰트 로딩 중..." />;
   }
 
   return (
