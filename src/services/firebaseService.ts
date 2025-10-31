@@ -2798,10 +2798,30 @@ class FirebaseService {
         }
       }
 
+      // 이미지 URL 정규화 (토큰 제거하고 alt=media 사용)
+      const normalizeImageUrl = (url: string | undefined): string => {
+        if (!url) return '';
+
+        // 이미 올바른 형식이면 그대로 반환
+        if (url.includes('alt=media')) return url;
+
+        // Firebase Storage URL에서 토큰 제거하고 alt=media 추가
+        try {
+          const urlObj = new URL(url);
+          // 토큰 파라미터 제거
+          urlObj.searchParams.delete('token');
+          // alt=media 추가 (공개 읽기용)
+          urlObj.searchParams.set('alt', 'media');
+          return urlObj.toString();
+        } catch {
+          return url; // URL 파싱 실패 시 원본 반환
+        }
+      };
+
       // 상세 정보 구성
       const details: VehicleDetails = {
         modelName: vehicleData.name || model, // 실제 Firebase 모델명 사용
-        imageUrl: matchedVariant?.imageUrl || vehicleData.imageUrl || '', // variant 이미지 우선, 없으면 기본 이미지
+        imageUrl: normalizeImageUrl(matchedVariant?.imageUrl || vehicleData.imageUrl), // variant 이미지 우선, 없으면 기본 이미지
         battery: {
           capacity: matchedVariant?.batteryCapacity || 
                    (typeof defaultBattery.capacity === 'string' ? parseInt(defaultBattery.capacity.replace('kWh', '')) : defaultBattery.capacity) || 0,
