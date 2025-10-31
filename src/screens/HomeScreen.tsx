@@ -61,6 +61,44 @@ const VehicleCard: React.FC<VehicleCardProps> = ({ vehicle, onEdit }) => {
   const [loading, setLoading] = React.useState(true);
   const [isExpanded, setIsExpanded] = React.useState(false); // 접기/펼치기 상태
 
+  // 이미지 URL 정규화
+  const normalizeImageUrl = (url: string | undefined): string => {
+    if (!url) return '';
+
+    try {
+      // Firebase Storage URL 패턴 확인
+      if (!url.includes('firebasestorage.googleapis.com')) {
+        return url; // Firebase Storage URL이 아니면 그대로 반환
+      }
+
+      const urlObj = new URL(url);
+
+      // 버킷 이름 추출 (URL path에서 /v0/b/{bucket}/o/ 패턴)
+      const bucketMatch = urlObj.pathname.match(/\/v0\/b\/([^\/]+)\/o\//);
+      if (!bucketMatch || !bucketMatch[1]) return url;
+      const bucket = bucketMatch[1];
+
+      // 경로에서 /o/ 이후의 인코딩된 파일 경로 추출
+      const pathMatch = urlObj.pathname.match(/\/o\/(.+)/);
+      if (!pathMatch || !pathMatch[1]) return url;
+
+      // 이미 인코딩된 경로를 한번 디코딩
+      let filePath = decodeURIComponent(pathMatch[1]);
+
+      // 다시 인코딩 (정확한 인코딩 보장)
+      const encodedPath = encodeURIComponent(filePath);
+
+      // 새 URL 구성
+      const newUrl = `https://firebasestorage.googleapis.com/v0/b/${bucket}/o/${encodedPath}?alt=media`;
+
+      console.log('🔄 [VehicleCard] URL 정규화:', { original: url, normalized: newUrl });
+      return newUrl;
+    } catch (error) {
+      console.error('❌ [VehicleCard] URL 정규화 실패:', error);
+      return url; // 파싱 실패 시 원본 반환
+    }
+  };
+
   // 배터리 용량에서 숫자만 추출
   const getBatteryCapacity = (capacity?: string): string => {
     if (!capacity) return "알 수 없음";
@@ -118,40 +156,49 @@ const VehicleCard: React.FC<VehicleCardProps> = ({ vehicle, onEdit }) => {
     >
       {/* 차량 이미지 */}
       <View style={styles.vehicleImageContainer}>
-        {(vehicleDetails?.imageUrl || vehicle.imageUrl) && !imageError ? (
-          <Image
-            source={{ uri: vehicleDetails?.imageUrl || vehicle.imageUrl }}
-            style={[styles.vehicleImage, { opacity: imageLoaded ? 1 : 0 }]}
-            onLoad={() => {
-              console.log('✅ [VehicleCard] 이미지 로드 성공:', vehicleDetails?.imageUrl || vehicle.imageUrl);
-              setImageLoaded(true);
-            }}
-            onError={(error) => {
-              console.error('❌ [VehicleCard] 이미지 로드 실패:', {
-                url: vehicleDetails?.imageUrl || vehicle.imageUrl,
-                error: error.nativeEvent
-              });
-              setImageError(true);
-            }}
-          />
-        ) : null}
+        {(() => {
+          const imageUrl = normalizeImageUrl(vehicleDetails?.imageUrl || vehicle.imageUrl);
+          return imageUrl && !imageError ? (
+            <Image
+              source={{ uri: imageUrl }}
+              style={[styles.vehicleImage, { opacity: imageLoaded ? 1 : 0 }]}
+              onLoad={() => {
+                console.log('✅ [VehicleCard] 이미지 로드 성공:', imageUrl);
+                setImageLoaded(true);
+              }}
+              onError={(error) => {
+                console.error('❌ [VehicleCard] 이미지 로드 실패:', {
+                  url: imageUrl,
+                  error: error.nativeEvent
+                });
+                setImageError(true);
+              }}
+            />
+          ) : null;
+        })()}
 
         {/* 이미지 로딩 중이거나 없을 때 */}
-        {loading ||
-        (!imageLoaded &&
-          !imageError &&
-          (vehicleDetails?.imageUrl || vehicle.imageUrl)) ? (
-          <SkeletonImage
-            width="100%"
-            height="100%"
-            borderRadius={12}
-            style={styles.vehicleImagePlaceholder}
-          />
-        ) : !(vehicleDetails?.imageUrl || vehicle.imageUrl) || imageError ? (
-          <View style={styles.vehicleImagePlaceholder}>
-            <Ionicons name="car-outline" size={40} color="#9CA3AF" />
-          </View>
-        ) : null}
+        {(() => {
+          const hasImageUrl = !!(vehicleDetails?.imageUrl || vehicle.imageUrl);
+          if (loading || (!imageLoaded && !imageError && hasImageUrl)) {
+            return (
+              <SkeletonImage
+                width="100%"
+                height="100%"
+                borderRadius={12}
+                style={styles.vehicleImagePlaceholder}
+              />
+            );
+          }
+          if (!hasImageUrl || imageError) {
+            return (
+              <View style={styles.vehicleImagePlaceholder}>
+                <Ionicons name="car-outline" size={40} color="#9CA3AF" />
+              </View>
+            );
+          }
+          return null;
+        })()}
       </View>
 
       {/* 차량 정보 */}

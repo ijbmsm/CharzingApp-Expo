@@ -106,6 +106,11 @@ export default function BatteryInfoScreen() {
 
       const urlObj = new URL(url);
 
+      // 버킷 이름 추출 (URL path에서 /v0/b/{bucket}/o/ 패턴)
+      const bucketMatch = urlObj.pathname.match(/\/v0\/b\/([^\/]+)\/o\//);
+      if (!bucketMatch || !bucketMatch[1]) return url;
+      const bucket = bucketMatch[1];
+
       // 경로에서 /o/ 이후의 인코딩된 파일 경로 추출
       const pathMatch = urlObj.pathname.match(/\/o\/(.+)/);
       if (!pathMatch || !pathMatch[1]) return url;
@@ -117,8 +122,7 @@ export default function BatteryInfoScreen() {
       const encodedPath = encodeURIComponent(filePath);
 
       // 새 URL 구성
-      const bucket = urlObj.hostname.split('.')[0]; // charzing-d1600
-      const newUrl = `https://firebasestorage.googleapis.com/v0/b/${bucket}.firebasestorage.app/o/${encodedPath}?alt=media`;
+      const newUrl = `https://firebasestorage.googleapis.com/v0/b/${bucket}/o/${encodedPath}?alt=media`;
 
       console.log('🔄 URL 정규화:', { original: url, normalized: newUrl });
       return newUrl;
