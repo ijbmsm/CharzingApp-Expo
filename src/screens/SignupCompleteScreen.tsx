@@ -36,6 +36,14 @@ interface RouteParams {
     googleId: string;
     provider: 'google';
   };
+  appleUser?: {
+    uid: string;
+    email?: string;
+    displayName?: string;
+    photoURL?: string;
+    appleId: string;
+    provider: 'apple';
+  };
 }
 
 export default function SignupCompleteScreen() {
@@ -46,11 +54,11 @@ export default function SignupCompleteScreen() {
   const dispatch = useDispatch();
   const navigation = useNavigation<StackNavigationProp<RootStackParamList>>();
   const route = useRoute();
-  const { kakaoUser, googleUser } = route.params as RouteParams;
-  
+  const { kakaoUser, googleUser, appleUser } = route.params as RouteParams;
+
   // 실제 사용할 사용자 데이터 결정
-  const currentUser = kakaoUser || googleUser;
-  const provider = kakaoUser ? 'kakao' : 'google';
+  const currentUser = kakaoUser || googleUser || appleUser;
+  const provider = kakaoUser ? 'kakao' : googleUser ? 'google' : 'apple';
 
   // 기존 사용자 확인 - Firebase에서 사용자 프로필이 있는지 확인
   useEffect(() => {
@@ -119,10 +127,21 @@ export default function SignupCompleteScreen() {
     setIsLoading(true);
 
     try {
-      // Firebase에 추가 정보 저장
+      // Firebase에 추가 정보 저장 (임시: 약관 동의 로직 추가 예정)
       await firebaseService.completeRegistration(currentUser!.uid, {
+        email: currentUser!.email,
+        displayName: currentUser!.displayName || '',
+        realName: currentUser!.displayName || '', // TODO: 실명 입력 필드 추가 예정
         phoneNumber: cleanPhoneNumber,
         address: address.trim(),
+        provider: provider as 'kakao' | 'google' | 'apple',
+        photoURL: currentUser!.photoURL,
+        kakaoId: kakaoUser?.kakaoId,
+        googleId: googleUser?.googleId,
+        appleId: appleUser?.appleId,
+        agreedToTerms: true, // TODO: 약관 동의 체크박스 추가 예정
+        agreedToPrivacy: true, // TODO: 개인정보 처리방침 체크박스 추가 예정
+        agreedAt: new Date(),
       });
 
       // Redux 스토어에 완성된 사용자 정보 저장

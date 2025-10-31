@@ -191,24 +191,10 @@ export default function LoginScreen() {
 
         logger.auth('login_success', 'apple', true, undefined, firebaseUser.uid);
 
-        // Apple 로그인 시 항상 사용자 문서 확인/생성
-        try {
-          await firebaseService.upsertUserDocument(firebaseUser.uid, {
-            email: firebaseUser.email || undefined,
-            displayName: firebaseUser.displayName || 'Apple 사용자',
-            photoURL: firebaseUser.photoURL || undefined,
-            provider: 'apple',
-            appleId: firebaseUser.uid, // Apple의 경우 Firebase UID를 사용
-          });
-          logger.firebaseOperation('upsert_user_document', 'users', true, undefined, firebaseUser.uid);
-        } catch (error) {
-          logger.firebaseOperation('upsert_user_document', 'users', false, error, firebaseUser.uid);
-        }
-
         if (result.needsRegistration) {
           // 신규 사용자 - 추가 정보 입력 화면으로 이동
           logger.userAction('navigate_to_signup_complete', firebaseUser.uid, { provider: 'apple' });
-          navigation.navigate('SignupComplete', { kakaoUser: appleUser });
+          navigation.navigate('SignupComplete', { appleUser: appleUser });
         } else {
           // 기존 사용자 - 바로 로그인 완료
           logger.userAction('login_complete', firebaseUser.uid, { provider: 'apple', isExistingUser: true });

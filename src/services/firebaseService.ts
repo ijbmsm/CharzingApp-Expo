@@ -931,22 +931,54 @@ class FirebaseService {
   }
 
   /**
-   * 회원가입 완료 처리 (추가 정보 저장)
+   * 회원가입 완료 처리 (사용자 문서 최초 생성)
    */
-  async completeRegistration(uid: string, additionalInfo: { phoneNumber: string; address: string }): Promise<void> {
+  async completeRegistration(
+    uid: string,
+    registrationData: {
+      email?: string;
+      displayName: string;
+      realName: string;
+      phoneNumber: string;
+      address: string;
+      provider: 'kakao' | 'google' | 'apple';
+      photoURL?: string;
+      kakaoId?: string;
+      googleId?: string;
+      appleId?: string;
+      agreedToTerms: boolean;
+      agreedToPrivacy: boolean;
+      agreedAt: Date;
+    }
+  ): Promise<void> {
     try {
       const userDocRef = doc(this.db, 'users', uid);
-      
-      await updateDoc(userDocRef, {
-        phoneNumber: additionalInfo.phoneNumber,
-        address: additionalInfo.address,
+
+      // 새 사용자 문서 생성 (setDoc 사용)
+      await setDoc(userDocRef, {
+        uid,
+        email: registrationData.email || '',
+        displayName: registrationData.displayName,
+        realName: registrationData.realName,
+        phoneNumber: registrationData.phoneNumber,
+        address: registrationData.address,
+        provider: registrationData.provider,
+        photoURL: registrationData.photoURL || '',
+        kakaoId: registrationData.kakaoId,
+        googleId: registrationData.googleId,
+        appleId: registrationData.appleId,
+        agreedToTerms: registrationData.agreedToTerms,
+        agreedToPrivacy: registrationData.agreedToPrivacy,
+        agreedAt: registrationData.agreedAt,
         isRegistrationComplete: true,
+        createdAt: serverTimestamp(),
         updatedAt: serverTimestamp(),
+        lastLoginAt: serverTimestamp(),
       });
-      
-      devLog.log('회원가입 완료 처리:', uid);
+
+      devLog.log('✅ 회원가입 완료 - 사용자 문서 생성:', uid);
     } catch (error) {
-      devLog.error('회원가입 완료 처리 실패:', error);
+      devLog.error('❌ 회원가입 완료 처리 실패:', error);
       throw error;
     }
   }

@@ -140,45 +140,27 @@ class GoogleLoginService {
       const newIdToken = await firebaseUser.getIdToken(true);
       devLog.log('✅ 새 ID Token 발급 완료, 길이:', newIdToken.length);
 
-      // Firestore에 사용자 정보 저장 또는 업데이트
+      // 신규/기존 사용자 판별
       let isNewUser = false;
       try {
-        devLog.log('📝 Firestore 사용자 프로필 저장/업데이트 중...');
-        
+        devLog.log('📝 사용자 프로필 확인 중...');
+
         // 기존 사용자 정보 확인
         const existingProfile = await firebaseService.getUserProfile(firebaseUser.uid);
-        
+
         if (!existingProfile) {
-          // 신규 사용자 - 전체 프로필 생성
+          // 신규 사용자 - SignupComplete 화면으로 이동 필요
           isNewUser = true;
-          const displayName = userInfo.user.name || userInfo.user.email?.split('@')[0] || 'Google 사용자';
-          
-          // Google에서 제공하는 실명 정보 활용 (family_name + given_name)
-          let realName = '';
-          if (userInfo.user.familyName || userInfo.user.givenName) {
-            realName = [userInfo.user.familyName, userInfo.user.givenName].filter(Boolean).join(' ');
-          } else if (userInfo.user.name) {
-            realName = userInfo.user.name; // fallback to full name
-          }
-          
-          await firebaseService.saveUserProfile({
-            uid: firebaseUser.uid,
-            email: firebaseUser.email || userInfo.user.email || '',
-            displayName: displayName,
-            realName: realName || displayName, // realName이 없으면 displayName 사용
-            provider: 'google',
-            photoURL: userInfo.user.photo || firebaseUser.photoURL || '',
-            googleId: userInfo.user.id,
-            isRegistrationComplete: false,
-          });
-          devLog.log('✅ 신규 사용자 문서 생성 완료:', firebaseUser.uid, 'displayName:', displayName, 'realName:', realName);
+          devLog.log('✅ 신규 사용자 확인:', firebaseUser.uid);
         } else {
           // 기존 사용자 - 로그인 시간만 업데이트
           devLog.log('✅ 기존 사용자 확인, displayName:', existingProfile.displayName);
           await firebaseService.updateUserLastLogin(firebaseUser.uid);
         }
       } catch (error) {
-        devLog.log('⚠️ Firestore 사용자 정보 처리 에러:', error);
+        devLog.log('⚠️ 사용자 프로필 확인 에러:', error);
+        // 프로필 조회 실패 시 신규 사용자로 간주
+        isNewUser = true;
       }
 
       // 인증 상태를 AsyncStorage에 저장

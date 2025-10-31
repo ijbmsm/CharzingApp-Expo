@@ -204,12 +204,16 @@ class KakaoLoginService implements ILoginService {
       const firebaseResult = await this.loginWithFirebase(kakaoProfile, kakaoToken.accessToken);
 
       if (firebaseResult.success && firebaseResult.user) {
-        // 4. 사용자 문서 생성/업데이트
+        // 4. 사용자 정보 로깅
         const appUser = this.userFactory.createUser(firebaseResult.user, kakaoProfile);
-        await this.syncUserDocument(appUser, kakaoProfile);
 
         logger.auth('login_success', 'kakao', true, undefined, firebaseResult.user.uid);
         devLog.log('✅ 카카오 네이티브 SDK 로그인 성공:', appUser.displayName);
+
+        // 기존 사용자인 경우 로그인 시간 업데이트
+        if (!firebaseResult.needsRegistration) {
+          await firebaseService.updateUserLastLogin(firebaseResult.user.uid);
+        }
 
         return {
           success: true,

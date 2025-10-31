@@ -66,9 +66,8 @@ export type RootStackParamList = {
       email?: string;
       displayName?: string;
       photoURL?: string;
-      kakaoId?: string;
-      appleId?: string;
-      provider: 'kakao' | 'apple';
+      kakaoId: string;
+      provider: 'kakao';
     };
     googleUser?: {
       uid: string;
@@ -77,6 +76,14 @@ export type RootStackParamList = {
       photoURL?: string;
       googleId: string;
       provider: 'google';
+    };
+    appleUser?: {
+      uid: string;
+      email?: string;
+      displayName?: string;
+      photoURL?: string;
+      appleId: string;
+      provider: 'apple';
     };
   };
   // 상세 예약 플로우 화면들

@@ -77,54 +77,23 @@ class AppleLoginService {
       const newIdToken = await firebaseUser.getIdToken(true);
       devLog.log('✅ 새 ID Token 발급 완료, 길이:', newIdToken.length);
 
-      // Firestore에 사용자 정보 저장 또는 업데이트
+      // 신규/기존 사용자 판별
       try {
-        devLog.log('📝 Firestore 사용자 프로필 저장/업데이트 중...');
-        
+        devLog.log('📝 사용자 프로필 확인 중...');
+
         // 기존 사용자 정보 확인
         const existingProfile = await firebaseService.getUserProfile(firebaseUser.uid);
-        
+
         if (!existingProfile) {
-          // 신규 사용자 - 전체 프로필 생성
-          // Apple에서 제공하는 이름 정보 활용
-          let displayName = 'Apple 사용자';
-          let realName = '';
-          
-          if (credential.fullName) {
-            const { givenName, familyName } = credential.fullName;
-            if (givenName || familyName) {
-              // Apple에서는 보통 서구식 이름 순서 (이름 성)이므로 한국식으로 조정
-              const fullNameParts = [familyName, givenName].filter(Boolean);
-              displayName = fullNameParts.join(' ');
-              realName = fullNameParts.join(' ');
-            }
-          } else if (firebaseUser.email) {
-            // 이메일에서 이름 추출
-            displayName = firebaseUser.email.split('@')[0] || 'Apple 사용자';
-          } else if (credential.email) {
-            // credential에서 이메일 추출
-            displayName = credential.email.split('@')[0] || 'Apple 사용자';
-          }
-          
-          await firebaseService.saveUserProfile({
-            uid: firebaseUser.uid,
-            email: firebaseUser.email || credential.email || '',
-            displayName: displayName,
-            realName: realName || displayName, // realName이 없으면 displayName 사용
-            provider: 'apple',
-            photoURL: firebaseUser.photoURL || '',
-            appleId: firebaseUser.uid,
-            isRegistrationComplete: false,
-          });
-          devLog.log('✅ 신규 사용자 문서 생성 완료:', firebaseUser.uid, 'displayName:', displayName, 'realName:', realName);
+          // 신규 사용자 - SignupComplete 화면으로 이동 필요
+          devLog.log('✅ 신규 사용자 확인:', firebaseUser.uid);
         } else {
           // 기존 사용자 - 로그인 시간만 업데이트
           devLog.log('✅ 기존 사용자 확인, displayName:', existingProfile.displayName);
-          // 마지막 로그인 시간 업데이트
           await firebaseService.updateUserLastLogin(firebaseUser.uid);
         }
       } catch (error) {
-        devLog.log('⚠️ Firestore 사용자 정보 처리 에러:', error);
+        devLog.log('⚠️ 사용자 프로필 확인 에러:', error);
       }
 
       devLog.log('✅ Apple 로그인 및 Firebase Auth 세션 유지 완료');
