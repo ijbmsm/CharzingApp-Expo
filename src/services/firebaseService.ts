@@ -2802,19 +2802,33 @@ class FirebaseService {
       const normalizeImageUrl = (url: string | undefined): string => {
         if (!url) return '';
 
-        // 이미 올바른 형식이면 그대로 반환
-        if (url.includes('alt=media')) return url;
-
-        // Firebase Storage URL에서 토큰 제거하고 alt=media 추가
         try {
+          // Firebase Storage URL 패턴 확인
+          if (!url.includes('firebasestorage.googleapis.com')) {
+            return url; // Firebase Storage URL이 아니면 그대로 반환
+          }
+
           const urlObj = new URL(url);
-          // 토큰 파라미터 제거
-          urlObj.searchParams.delete('token');
-          // alt=media 추가 (공개 읽기용)
-          urlObj.searchParams.set('alt', 'media');
-          return urlObj.toString();
-        } catch {
-          return url; // URL 파싱 실패 시 원본 반환
+
+          // 경로에서 /o/ 이후의 인코딩된 파일 경로 추출
+          const pathMatch = urlObj.pathname.match(/\/o\/(.+)/);
+          if (!pathMatch || !pathMatch[1]) return url;
+
+          // 이미 인코딩된 경로를 한번 디코딩
+          let filePath = decodeURIComponent(pathMatch[1]);
+
+          // 다시 인코딩 (정확한 인코딩 보장)
+          const encodedPath = encodeURIComponent(filePath);
+
+          // 새 URL 구성
+          const bucket = urlObj.hostname.split('.')[0]; // charzing-d1600
+          const newUrl = `https://firebasestorage.googleapis.com/v0/b/${bucket}.firebasestorage.app/o/${encodedPath}?alt=media`;
+
+          devLog.log('🔄 URL 정규화:', { original: url, normalized: newUrl });
+          return newUrl;
+        } catch (error) {
+          devLog.error('❌ URL 정규화 실패:', error);
+          return url; // 파싱 실패 시 원본 반환
         }
       };
 
