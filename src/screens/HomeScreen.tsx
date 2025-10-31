@@ -1072,10 +1072,18 @@ export default function HomeScreen() {
         setShowVehicleModal(false);
         setVehicleModalEditMode(false);
 
-        console.log("🔄 forceRefreshVehicles 호출 직전, isMountedRef:", isMountedRef.current);
-        // 즉시 차량 목록 새로고침 후 알림
-        await forceRefreshVehicles();
-        console.log("✅ forceRefreshVehicles 완료");
+        console.log("🔄 차량 목록 직접 새로고침 시작");
+        // isMountedRef와 무관하게 직접 차량 목록 새로고침
+        try {
+          setVehiclesLoading(true);
+          const updatedVehicles = await firebaseService.getUserVehicles(user.uid);
+          setUserVehicles(updatedVehicles);
+          console.log("✅ 차량 목록 직접 새로고침 완료:", updatedVehicles.length, "개");
+        } catch (error) {
+          console.error("❌ 차량 목록 새로고침 실패:", error);
+        } finally {
+          setVehiclesLoading(false);
+        }
 
         // 약간의 지연을 주어 UI 업데이트 확실하게 처리
         setTimeout(() => {
@@ -1118,8 +1126,18 @@ export default function HomeScreen() {
 
         setShowVehicleModal(false);
 
-        // 즉시 차량 목록 새로고침 후 알림
-        await forceRefreshVehicles();
+        console.log("🔄 차량 목록 직접 새로고침 시작 (추가 모드)");
+        // isMountedRef와 무관하게 직접 차량 목록 새로고침
+        try {
+          setVehiclesLoading(true);
+          const updatedVehicles = await firebaseService.getUserVehicles(user.uid);
+          setUserVehicles(updatedVehicles);
+          console.log("✅ 차량 목록 직접 새로고침 완료 (추가 모드):", updatedVehicles.length, "개");
+        } catch (error) {
+          console.error("❌ 차량 목록 새로고침 실패 (추가 모드):", error);
+        } finally {
+          setVehiclesLoading(false);
+        }
 
         // 약간의 지연을 주어 UI 업데이트 확실하게 처리
         setTimeout(() => {
