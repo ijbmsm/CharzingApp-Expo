@@ -2454,7 +2454,7 @@ const VEHICLE_BATTERY_DATABASE = [
         battery: {
           manufacturers: ['LG에너지솔루션'],
           capacity: '64kWh',
-          warranty: '8년/16만km',
+          warranty: '10년/20만km',
           cellType: 'NCM',
           variant: 'Standard'
         },
@@ -2520,7 +2520,8 @@ const VEHICLE_BATTERY_DATABASE = [
           capacity: '64.8kWh',
           warranty: '8년/16만km',
           cellType: 'NCM',
-          variant: 'Standard'
+          variant: 'Standard',
+          chargingConnector:'DC콤보 7핀(급속)',
         },
         specs: {
           range: '401',
@@ -2529,7 +2530,7 @@ const VEHICLE_BATTERY_DATABASE = [
           acceleration: '7.8',
           topSpeed: '167',
           driveType: 'FWD',
-          efficiency: '5.6',
+          efficiency: '5.3',
           chargingDC: '77',
           seats: 5,
         }

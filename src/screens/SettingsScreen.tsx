@@ -276,14 +276,14 @@ const SettingsScreen: React.FC = () => {
             <Text style={styles.sectionTitle}>개인정보 및 지원</Text>
           </View>
           
-          {/* 개인정보처리방침 */}
-          <TouchableOpacity 
+          {/* 서비스 이용 정책 */}
+          <TouchableOpacity
             style={styles.linkItem}
-            onPress={() => openLink('https://www.notion.so/1e3f67248617802985bae5b23476bfba', '개인정보처리방침')}
+            onPress={() => navigation.navigate('PolicyList' as never)}
           >
             <View style={styles.linkInfo}>
-              <Text style={styles.linkTitle}>개인정보처리방침</Text>
-              <Text style={styles.linkDescription}>개인정보 수집 및 이용에 대한 정책</Text>
+              <Text style={styles.linkTitle}>서비스 이용 정책</Text>
+              <Text style={styles.linkDescription}>이용약관, 개인정보처리방침, 면책조항, 환불 정책</Text>
             </View>
             <Ionicons name="chevron-forward" size={20} color="#9CA3AF" />
           </TouchableOpacity>

@@ -20,7 +20,7 @@ export default {
     version: "1.0.1",
     sdkVersion: "54.0.0",
     orientation: "portrait",
-    icon: "./assets/images/icon.png",
+    icon: "./assets/CharzingLogo3.png",
     scheme: "charzingapp",
     userInterfaceStyle: "automatic",
     description: "한국 1위 전기차 배터리 진단 전문 서비스. 중고 전기차 구매 전 전문가가 직접 방문하여 배터리 상태를 정확히 진단하고 24시간 내 상세한 리포트를 제공합니다.",
@@ -42,7 +42,7 @@ export default {
       supportsTablet: true,
       bundleIdentifier: "com.charzingapp",
       jsEngine: "hermes",
-      icon: "./assets/images/icon.png",
+      icon: "./assets/CharzingLogo3.png",
       buildNumber: "2",
       requireFullScreen: false,
       infoPlist: {
@@ -74,10 +74,10 @@ export default {
     },
     android: {
       adaptiveIcon: {
-        foregroundImage: "./assets/favicon/CharzingLogo2.png",
+        foregroundImage: "./assets/CharzingLogo3.png",
         backgroundColor: "#ffffff"
       },
-      icon: "./assets/favicon/CharzingLogo2.png",
+      icon: "./assets/CharzingLogo3.png",
       package: "com.charzingapp",
       jsEngine: "hermes",
       versionCode: 2,

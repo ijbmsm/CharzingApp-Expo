@@ -603,6 +603,20 @@ export default function HomeScreen() {
     }
   }, []);
 
+  // userVehicles가 변경될 때 selectedVehicle도 자동으로 업데이트
+  useEffect(() => {
+    if (selectedVehicle && userVehicles.length > 0) {
+      // 선택된 차량의 최신 정보를 userVehicles에서 찾아서 업데이트
+      const updatedVehicle = userVehicles.find(
+        (v) => v.id === selectedVehicle.id
+      );
+      if (updatedVehicle) {
+        setSelectedVehicle(updatedVehicle);
+        console.log("✅ 선택된 차량 정보 자동 업데이트:", updatedVehicle.model);
+      }
+    }
+  }, [userVehicles]);
+
   // 사용자의 최신 예약 정보 로드 (메모리 누수 방지 개선)
   useEffect(() => {
     const loadLatestReservation = async () => {

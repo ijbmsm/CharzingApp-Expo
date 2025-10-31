@@ -17,6 +17,8 @@ import MyPageScreen from '../screens/MyPageScreen';
 import MyReservationsScreen from '../screens/MyReservationsScreen';
 import ReservationDetailScreen from '../screens/ReservationDetailScreen';
 import SettingsScreen from '../screens/SettingsScreen';
+import PolicyListScreen from '../screens/PolicyListScreen';
+import PolicyDetailScreen from '../screens/PolicyDetailScreen';
 import LoginScreen from '../screens/LoginScreen';
 import SplashScreen from '../screens/SplashScreen';
 import SignupCompleteScreen from '../screens/SignupCompleteScreen';
@@ -53,6 +55,11 @@ export type RootStackParamList = {
     };
   };
   Settings: undefined;
+  PolicyList: undefined;
+  PolicyDetail: {
+    title: string;
+    content: string;
+  };
   SignupComplete: {
     kakaoUser?: {
       uid: string;
@@ -316,8 +323,22 @@ export default function RootNavigator() {
             },
           }}
         />
-        <Stack.Screen 
-          name="SignupComplete" 
+        <Stack.Screen
+          name="PolicyList"
+          component={PolicyListScreen}
+          options={{
+            headerShown: false,
+          }}
+        />
+        <Stack.Screen
+          name="PolicyDetail"
+          component={PolicyDetailScreen}
+          options={{
+            headerShown: false,
+          }}
+        />
+        <Stack.Screen
+          name="SignupComplete"
           component={SignupCompleteScreen}
           options={{
             // 회원가입 완료는 모달처럼 아래에서 올라오기
