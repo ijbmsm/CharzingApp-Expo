@@ -642,12 +642,15 @@ export default function HomeScreen() {
 
   // 차량 데이터 강제 새로고침 함수
   const forceRefreshVehicles = React.useCallback(async () => {
+    console.log("🔄 forceRefreshVehicles 함수 시작, isMountedRef:", isMountedRef.current);
     if (isMountedRef.current) {
       setVehiclesLoading(true);
       try {
+        console.log("🔄 loadUserVehicles 호출 중...");
         await loadUserVehicles(isMountedRef);
         console.log("✅ 차량 목록 강제 새로고침 완료");
       } catch (error) {
+        console.error("❌ 차량 목록 새로고침 에러:", error);
         handleFirebaseError(error, {
           screenName: "HomeScreen",
           actionName: "refresh_vehicle_list",
@@ -657,6 +660,8 @@ export default function HomeScreen() {
           setVehiclesLoading(false);
         }
       }
+    } else {
+      console.log("⚠️ forceRefreshVehicles: isMountedRef.current가 false라서 스킵");
     }
   }, []);
 
@@ -1062,12 +1067,15 @@ export default function HomeScreen() {
         });
 
         logger.vehicle("edit_complete", undefined, user?.uid);
+        console.log("🔄 차량 업데이트 완료, 모달 닫기 시작");
 
         setShowVehicleModal(false);
         setVehicleModalEditMode(false);
 
+        console.log("🔄 forceRefreshVehicles 호출 직전, isMountedRef:", isMountedRef.current);
         // 즉시 차량 목록 새로고침 후 알림
         await forceRefreshVehicles();
+        console.log("✅ forceRefreshVehicles 완료");
 
         // 약간의 지연을 주어 UI 업데이트 확실하게 처리
         setTimeout(() => {
