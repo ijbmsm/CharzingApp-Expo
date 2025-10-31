@@ -58,7 +58,12 @@ const safeGetNumber = (
   defaultValue?: number
 ): number | undefined => {
   const value = obj[key];
-  return typeof value === "number" ? value : defaultValue;
+  if (typeof value === "number") return value;
+  if (typeof value === "string") {
+    const parsed = parseFloat(value);
+    return isNaN(parsed) ? defaultValue : parsed;
+  }
+  return defaultValue;
 };
 
 const safeGetArray = (obj: Record<string, unknown>, key: string): unknown[] => {
@@ -70,6 +75,24 @@ export default function BatteryInfoScreen() {
   const [batteryInfo, setBatteryInfo] = useState<BatteryInfoData | null>(null);
   const [showVehicleModal, setShowVehicleModal] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
+
+  // 연도 매칭 헬퍼 함수 - years 배열의 두 가지 형식 모두 지원
+  // 1. ["2022", "2023", "2024"] - 정상
+  // 2. ["2018 2019 2020 2021"] - 하나의 문자열에 여러 연도 (잘못된 데이터)
+  const isYearMatch = (years: unknown[], targetYear: number | string): boolean => {
+    if (!Array.isArray(years)) return false;
+    const yearStr = targetYear.toString();
+
+    return years.some((y: any) => {
+      if (typeof y === 'string') {
+        // 정확히 일치하거나, 공백으로 구분된 문자열 안에 포함된 경우
+        return y === yearStr || y.split(' ').includes(yearStr);
+      } else if (typeof y === 'number') {
+        return y.toString() === yearStr;
+      }
+      return false;
+    });
+  };
 
   // 차량 선택 핸들러 - 실제 Firebase 구조에 맞게 데이터 조회
   const handleVehicleSelect = async (vehicle: CompletedVehicle) => {
@@ -138,7 +161,7 @@ export default function BatteryInfoScreen() {
               ) {
                 const variantRecord = variant as Record<string, unknown>;
                 const years = safeGetArray(variantRecord, "years");
-                if (years.includes(vehicle.year.toString())) {
+                if (isYearMatch(years, vehicle.year)) {
                   // Hyundai 구조에서는 variant에 trimId/trimName이 없으므로 추가
                   selectedVariant = {
                     ...variantRecord,
@@ -185,7 +208,7 @@ export default function BatteryInfoScreen() {
                 const variantRecord = variant as Record<string, unknown>;
                 if (safeGetString(variantRecord, "trimId") === vehicle.trimId) {
                   const years = safeGetArray(variantRecord, "years");
-                  if (years.includes(vehicle.year.toString())) {
+                  if (isYearMatch(years, vehicle.year)) {
                     selectedVariant = variantRecord;
                     break;
                   }
@@ -414,16 +437,23 @@ export default function BatteryInfoScreen() {
                 </View>
               </View>
 
-              {/* 차량 이미지 카드 */}
-              {batteryInfo.modelData?.imageUrl && (
-                <View style={styles.vehicleImageCard}>
-                  <Image
-                    source={{ uri: batteryInfo.modelData.imageUrl }}
-                    style={styles.vehicleImage}
-                    resizeMode="contain"
-                  />
-                </View>
-              )}
+              {/* 차량 이미지 카드 - variant imageUrl 우선 사용 */}
+              {(() => {
+                const variantImageUrl = safeGetString(batteryInfo.selectedVariant, "imageUrl", "");
+                const imageUrl = variantImageUrl !== "정보 없음" && variantImageUrl
+                  ? variantImageUrl
+                  : batteryInfo.modelData?.imageUrl;
+
+                return imageUrl ? (
+                  <View style={styles.vehicleImageCard}>
+                    <Image
+                      source={{ uri: imageUrl }}
+                      style={styles.vehicleImage}
+                      resizeMode="contain"
+                    />
+                  </View>
+                ) : null;
+              })()}
 
               {/* 배터리 메인 정보 - 실제 Firebase 데이터 */}
               <View style={styles.batteryMainCard}>
@@ -504,8 +534,8 @@ export default function BatteryInfoScreen() {
                     </Text>
                   </View>
                   <View style={styles.performanceItem}>
-                    <Ionicons name="flash" size={20} color="#06B6D4" />
-                    <Text style={styles.performanceLabel}>충전 성능</Text>
+                    <Ionicons name="battery-charging" size={20} color="#06B6D4" />
+                    <Text style={styles.performanceLabel}>충전 커넥터 규격</Text>
                     <Text style={styles.performanceValue}>
                       {typeof batteryInfo.selectedVariant.specifications ===
                         "object" &&
@@ -513,16 +543,9 @@ export default function BatteryInfoScreen() {
                         ? safeGetString(
                             batteryInfo.selectedVariant
                               .specifications as Record<string, unknown>,
-                            "chargingSpeed"
+                            "chargingConnector"
                           )
-                        : safeGetString(batteryInfo.selectedVariant, "chargingSpeed", "정보 없음")}
-                    </Text>
-                  </View>
-                  <View style={styles.performanceItem}>
-                    <Ionicons name="battery-charging" size={20} color="#06B6D4" />
-                    <Text style={styles.performanceLabel}>충전 커넥터 규격</Text>
-                    <Text style={styles.performanceValue}>
-                      {safeGetString(batteryInfo.selectedVariant, "chargingConnector", "정보 없음")}
+                        : safeGetString(batteryInfo.selectedVariant, "chargingConnector", "정보 없음")}
                     </Text>
                   </View>
                   <View style={styles.performanceItem}>
@@ -564,12 +587,27 @@ export default function BatteryInfoScreen() {
                     <Ionicons name="speedometer" size={20} color="#06B6D4" />
                     <Text style={styles.performanceLabel}>최고속도</Text>
                     <Text style={styles.performanceValue}>
-                      {safeGetNumber(batteryInfo.selectedVariant, "topSpeed")
-                        ? `${safeGetNumber(
-                            batteryInfo.selectedVariant,
+                      {(() => {
+                        // specifications에서 먼저 확인
+                        if (
+                          typeof batteryInfo.selectedVariant.specifications ===
+                            "object" &&
+                          batteryInfo.selectedVariant.specifications !== null
+                        ) {
+                          const topSpeed = safeGetNumber(
+                            batteryInfo.selectedVariant
+                              .specifications as Record<string, unknown>,
                             "topSpeed"
-                          )}km/h`
-                        : "정보 없음"}
+                          );
+                          if (topSpeed) return `${topSpeed}km/h`;
+                        }
+                        // variant 레벨에서 확인
+                        const topSpeed = safeGetNumber(
+                          batteryInfo.selectedVariant,
+                          "topSpeed"
+                        );
+                        return topSpeed ? `${topSpeed}km/h` : "정보 없음";
+                      })()}
                     </Text>
                   </View>
                   <View style={styles.performanceItem}>

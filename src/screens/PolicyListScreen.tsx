@@ -208,10 +208,10 @@ const PolicyListScreen: React.FC = () => {
   const navigation = useNavigation();
 
   const handlePolicyPress = (policy: PolicyItem) => {
-    navigation.navigate('PolicyDetail' as never, {
+    (navigation as any).navigate('PolicyDetail', {
       title: policy.title,
       content: policy.content,
-    } as never);
+    });
   };
 
   return (

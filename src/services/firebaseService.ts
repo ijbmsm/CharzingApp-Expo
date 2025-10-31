@@ -2698,29 +2698,110 @@ class FirebaseService {
       // 기본 배터리 정보
       const defaultBattery = vehicleData.defaultBattery || {};
       
-      // 트림별 상세 정보 찾기
+      // 연도 매칭 헬퍼 함수 - years 배열의 두 가지 형식 모두 지원
+      // 1. ["2022", "2023", "2024"] - 정상
+      // 2. ["2018 2019 2020 2021"] - 하나의 문자열에 여러 연도 (잘못된 데이터)
+      const isYearMatch = (years: any, targetYear: number): boolean => {
+        if (!years || !Array.isArray(years)) return false;
+        const yearStr = targetYear.toString();
+
+        return years.some((y: any) => {
+          if (typeof y === 'string') {
+            // 정확히 일치하거나, 공백으로 구분된 문자열 안에 포함된 경우
+            return y === yearStr || y.split(' ').includes(yearStr);
+          } else if (typeof y === 'number') {
+            return y === targetYear;
+          }
+          return false;
+        });
+      };
+
+      // 트림별 상세 정보 찾기 - 브랜드별 다른 구조 지원
       let matchedTrim = null;
       let matchedVariant = null;
 
       if (vehicleData.trims && Array.isArray(vehicleData.trims)) {
-        // 트림 매칭 (대소문자 무시)
-        matchedTrim = vehicleData.trims.find((t: FirebaseTrim) => {
-          if (!trim) return true; // 트림이 없으면 첫 번째 트림 사용
-          return t.name?.toLowerCase() === trim.toLowerCase();
-        }) || vehicleData.trims[0]; // 매칭되지 않으면 첫 번째 트림 사용
+        // 방법 1: Hyundai/KIA 구조 - trims에 trimId와 name이 있고, variants는 연식별
+        for (const t of vehicleData.trims) {
+          if (t.trimId && t.name && t.driveType && t.yearRange && t.variants) {
+            // Hyundai 스타일 확인됨
+            if (!trim || t.name?.toLowerCase() === trim.toLowerCase() || t.trimId === trim) {
+              matchedTrim = t;
 
-        if (matchedTrim && matchedTrim.variants && Array.isArray(matchedTrim.variants)) {
-          // 연도별 variant 매칭
-          matchedVariant = matchedTrim.variants.find((v: FirebaseVariant) => {
-            return v.years && v.years.includes(year.toString());
-          }) || matchedTrim.variants[0]; // 매칭되지 않으면 첫 번째 variant 사용
+              // 연도별 variant 매칭
+              if (t.variants && Array.isArray(t.variants)) {
+                matchedVariant = t.variants.find((v: FirebaseVariant) => {
+                  return isYearMatch(v.years, year);
+                });
+
+                if (!matchedVariant) {
+                  matchedVariant = t.variants[0]; // 연도 매칭 실패 시 첫 번째 variant
+                }
+              }
+              break;
+            }
+          }
+        }
+
+        // 방법 2: Audi/BMW/Mercedes 구조 - trimGroup.variants[]에 trimId와 trimName이 있음
+        if (!matchedVariant) {
+          for (const trimGroup of vehicleData.trims) {
+            if (trimGroup.variants && Array.isArray(trimGroup.variants) && !trimGroup.trimId) {
+              // Audi 스타일 확인됨
+              for (const v of trimGroup.variants) {
+                if (v.trimId && v.trimName) {
+                  // 트림 매칭 확인
+                  const trimMatches = !trim ||
+                                     v.trimName?.toLowerCase() === trim.toLowerCase() ||
+                                     v.trimId === trim;
+
+                  // 연도 매칭 확인 (헬퍼 함수 사용)
+                  const yearMatches = isYearMatch(v.years, year);
+
+                  if (trimMatches && yearMatches) {
+                    matchedVariant = v;
+                    break;
+                  }
+                }
+              }
+
+              if (matchedVariant) break;
+            }
+          }
+
+          // Audi 스타일에서 트림은 매칭되었지만 연도가 안 맞는 경우
+          if (!matchedVariant && trim) {
+            for (const trimGroup of vehicleData.trims) {
+              if (trimGroup.variants && Array.isArray(trimGroup.variants) && !trimGroup.trimId) {
+                for (const v of trimGroup.variants) {
+                  if (v.trimId && v.trimName) {
+                    const trimMatches = v.trimName?.toLowerCase() === trim.toLowerCase() ||
+                                       v.trimId === trim;
+                    if (trimMatches) {
+                      matchedVariant = v; // 트림만 맞으면 사용
+                      break;
+                    }
+                  }
+                }
+                if (matchedVariant) break;
+              }
+            }
+          }
+        }
+
+        // 여전히 못 찾았으면 첫 번째 variant 사용
+        if (!matchedVariant) {
+          if (vehicleData.trims[0]?.variants && vehicleData.trims[0].variants.length > 0) {
+            matchedVariant = vehicleData.trims[0].variants[0];
+            matchedTrim = vehicleData.trims[0];
+          }
         }
       }
 
       // 상세 정보 구성
       const details: VehicleDetails = {
         modelName: vehicleData.name || model, // 실제 Firebase 모델명 사용
-        imageUrl: vehicleData.imageUrl || '', // Firebase Storage 이미지 URL
+        imageUrl: matchedVariant?.imageUrl || vehicleData.imageUrl || '', // variant 이미지 우선, 없으면 기본 이미지
         battery: {
           capacity: matchedVariant?.batteryCapacity || 
                    (typeof defaultBattery.capacity === 'string' ? parseInt(defaultBattery.capacity.replace('kWh', '')) : defaultBattery.capacity) || 0,
@@ -2733,25 +2814,34 @@ class FirebaseService {
         },
         performance: {
           range: matchedVariant?.range || defaultBattery.range || 0,
-          topSpeed: matchedVariant?.topSpeed || 0,
-          power: matchedVariant?.specifications?.power ? parseInt(matchedVariant.specifications.power.replace(/마력|HP|kW/g, '')) : 
-                matchedVariant?.power ? parseInt(matchedVariant.power.replace(/마력|HP|kW/g, '')) : 
-                matchedVariant?.powerMax ? parseInt(matchedVariant.powerMax.replace(/마력|HP|kW/g, '')) : 
+          topSpeed: matchedVariant?.specifications?.topSpeed ?
+                   (typeof matchedVariant.specifications.topSpeed === 'string' ?
+                    parseInt(matchedVariant.specifications.topSpeed) : matchedVariant.specifications.topSpeed) :
+                   matchedVariant?.topSpeed || 0,
+          power: matchedVariant?.specifications?.power ? parseInt(matchedVariant.specifications.power.replace(/마력|HP|kW/g, '')) :
+                matchedVariant?.power ? parseInt(matchedVariant.power.replace(/마력|HP|kW/g, '')) :
+                matchedVariant?.powerMax ? parseInt(matchedVariant.powerMax.replace(/마력|HP|kW/g, '')) :
                 (defaultBattery.powerMax && typeof defaultBattery.powerMax !== 'undefined') ? parseInt(String(defaultBattery.powerMax).replace(/마력|HP|kW/g, '')) :
                 (defaultBattery.power && typeof defaultBattery.power !== 'undefined') ? parseInt(String(defaultBattery.power)) : 0,
-          torque: matchedVariant?.specifications?.torque ? parseInt(matchedVariant.specifications.torque.replace('Nm', '')) : 
-                 matchedVariant?.torque ? parseInt(matchedVariant.torque.replace('Nm', '')) : 
+          torque: matchedVariant?.specifications?.torque ? parseInt(matchedVariant.specifications.torque.replace('Nm', '')) :
+                 matchedVariant?.torque ? parseInt(matchedVariant.torque.replace('Nm', '')) :
                  (defaultBattery.torqueMax && typeof defaultBattery.torqueMax !== 'undefined') ? parseInt(String(defaultBattery.torqueMax).replace('Nm', '')) :
                  (defaultBattery.torque && typeof defaultBattery.torque !== 'undefined') ? parseInt(String(defaultBattery.torque)) : 0,
-          efficiency: matchedVariant?.specifications?.efficiency ? parseFloat(matchedVariant.specifications.efficiency.replace('kWh/100km', '')) : 
-                     matchedVariant?.efficiency ? parseFloat(matchedVariant.efficiency.replace('kWh/100km', '')) : 
+          efficiency: matchedVariant?.specifications?.efficiency ? parseFloat(matchedVariant.specifications.efficiency.replace('kWh/100km', '')) :
+                     matchedVariant?.efficiency ? parseFloat(matchedVariant.efficiency.replace('kWh/100km', '')) :
                      (defaultBattery.efficiency && typeof defaultBattery.efficiency !== 'undefined') ? parseFloat(String(defaultBattery.efficiency)) : 0,
           acceleration: matchedVariant?.specifications?.acceleration ? parseFloat(matchedVariant.specifications.acceleration.replace('초 (0-100km/h)', '')) :
                        typeof matchedVariant?.acceleration === 'number' ? matchedVariant.acceleration :
-                       typeof matchedVariant?.acceleration === 'string' ? 
+                       typeof matchedVariant?.acceleration === 'string' ?
                        parseFloat(matchedVariant.acceleration.replace('초 (0-100km/h)', '')) :
                        (defaultBattery.acceleration && typeof defaultBattery.acceleration !== 'undefined') ? parseFloat(String(defaultBattery.acceleration)) : 0,
-          driveType: matchedVariant?.driveType || matchedTrim?.driveType || defaultBattery.driveType || '알 수 없음'
+          driveType: matchedVariant?.driveType || matchedTrim?.driveType || defaultBattery.driveType || '알 수 없음',
+          chargingSpeed: matchedVariant?.specifications?.chargingSpeed ||
+                        matchedVariant?.chargingSpeed ||
+                        defaultBattery.chargingSpeed || undefined,
+          chargingConnector: matchedVariant?.specifications?.chargingConnector ||
+                            matchedVariant?.chargingConnector ||
+                            defaultBattery.chargingConnector || undefined
         }
       };
 

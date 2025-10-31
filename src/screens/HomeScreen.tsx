@@ -215,17 +215,7 @@ const VehicleCard: React.FC<VehicleCardProps> = ({ vehicle, onEdit }) => {
                 </Text>
               </View>
 
-              {/* 6. 충전 성능 */}
-              <View style={styles.vehicleCardReceiptRow}>
-                <Text style={styles.vehicleCardDetails}>충전 성능</Text>
-                <Text style={styles.vehicleCardDetails}>
-                  {loading
-                    ? "로딩중..."
-                    : vehicleDetails?.performance.chargingSpeed || "알 수 없음"}
-                </Text>
-              </View>
-
-              {/* 7. 충전 커넥터 규격 */}
+              {/* 6. 충전 커넥터 규격 */}
               <View style={styles.vehicleCardReceiptRow}>
                 <Text style={styles.vehicleCardDetails}>충전 커넥터 규격</Text>
                 <Text style={styles.vehicleCardDetails}>
@@ -235,7 +225,7 @@ const VehicleCard: React.FC<VehicleCardProps> = ({ vehicle, onEdit }) => {
                 </Text>
               </View>
 
-              {/* 8. 가속력 */}
+              {/* 7. 가속력 */}
               <View style={styles.vehicleCardReceiptRow}>
                 <Text style={styles.vehicleCardDetails}>가속력</Text>
                 <Text style={styles.vehicleCardDetails}>
@@ -245,7 +235,7 @@ const VehicleCard: React.FC<VehicleCardProps> = ({ vehicle, onEdit }) => {
                 </Text>
               </View>
 
-              {/* 9. 최고속도 */}
+              {/* 8. 최고속도 */}
               <View style={styles.vehicleCardReceiptRow}>
                 <Text style={styles.vehicleCardDetails}>최고속도</Text>
                 <Text style={styles.vehicleCardDetails}>
@@ -257,7 +247,7 @@ const VehicleCard: React.FC<VehicleCardProps> = ({ vehicle, onEdit }) => {
                 </Text>
               </View>
 
-              {/* 10. 최대출력 */}
+              {/* 9. 최대출력 */}
               <View style={styles.vehicleCardReceiptRow}>
                 <Text style={styles.vehicleCardDetails}>최대출력</Text>
                 <Text style={styles.vehicleCardDetails}>
@@ -269,7 +259,7 @@ const VehicleCard: React.FC<VehicleCardProps> = ({ vehicle, onEdit }) => {
                 </Text>
               </View>
 
-              {/* 11. 최대토크 */}
+              {/* 10. 최대토크 */}
               <View style={styles.vehicleCardReceiptRow}>
                 <Text style={styles.vehicleCardDetails}>최대토크</Text>
                 <Text style={styles.vehicleCardDetails}>
