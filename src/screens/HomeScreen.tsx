@@ -83,8 +83,19 @@ const VehicleCard: React.FC<VehicleCardProps> = ({ vehicle, onEdit }) => {
           vehicle.year,
           vehicle.trim
         );
+        console.log(`🖼️ [VehicleCard] 차량 이미지 URL:`, {
+          vehicleId: vehicle.id,
+          make: vehicle.make,
+          model: vehicle.model,
+          year: vehicle.year,
+          trim: vehicle.trim,
+          detailsImageUrl: details?.imageUrl,
+          vehicleImageUrl: vehicle.imageUrl,
+          finalUrl: details?.imageUrl || vehicle.imageUrl || 'NONE'
+        });
         setVehicleDetails(details);
       } catch (error) {
+        console.error('❌ [VehicleCard] 차량 상세 정보 로드 실패:', error);
         handleFirebaseError(error, {
           screenName: "HomeScreen",
           actionName: "load_vehicle_details",
@@ -111,8 +122,17 @@ const VehicleCard: React.FC<VehicleCardProps> = ({ vehicle, onEdit }) => {
           <Image
             source={{ uri: vehicleDetails?.imageUrl || vehicle.imageUrl }}
             style={[styles.vehicleImage, { opacity: imageLoaded ? 1 : 0 }]}
-            onLoad={() => setImageLoaded(true)}
-            onError={() => setImageError(true)}
+            onLoad={() => {
+              console.log('✅ [VehicleCard] 이미지 로드 성공:', vehicleDetails?.imageUrl || vehicle.imageUrl);
+              setImageLoaded(true);
+            }}
+            onError={(error) => {
+              console.error('❌ [VehicleCard] 이미지 로드 실패:', {
+                url: vehicleDetails?.imageUrl || vehicle.imageUrl,
+                error: error.nativeEvent
+              });
+              setImageError(true);
+            }}
           />
         ) : null}
 

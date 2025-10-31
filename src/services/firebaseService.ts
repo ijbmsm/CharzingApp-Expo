@@ -2847,6 +2847,11 @@ class FirebaseService {
 
       devLog.log(`🔍 매칭된 트림:`, matchedTrim?.name);
       devLog.log(`🔍 매칭된 variant:`, matchedVariant);
+      devLog.log(`🖼️ 이미지 URL 정보:`, {
+        variantImageUrl: matchedVariant?.imageUrl,
+        modelImageUrl: vehicleData.imageUrl,
+        finalImageUrl: details.imageUrl
+      });
       devLog.log(`🔍 variant에 torque 있나?:`, matchedVariant?.torque);
       devLog.log(`🔍 variant에 efficiency 있나?:`, matchedVariant?.efficiency);
       devLog.log(`🔍 variant의 모든 키:`, matchedVariant ? Object.keys(matchedVariant) : 'variant 없음');
