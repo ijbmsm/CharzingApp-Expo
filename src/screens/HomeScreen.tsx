@@ -157,8 +157,11 @@ const VehicleCard: React.FC<VehicleCardProps> = ({ vehicle, onEdit }) => {
       {/* 차량 이미지 */}
       <View style={styles.vehicleImageContainer}>
         {(() => {
-          const imageUrl = normalizeImageUrl(vehicleDetails?.imageUrl || vehicle.imageUrl);
-          return imageUrl && !imageError ? (
+          // vehicleDetails가 로드된 후에만 이미지 표시 (vehicle.imageUrl은 이전 차량 URL일 수 있음)
+          const imageUrl = vehicleDetails?.imageUrl
+            ? normalizeImageUrl(vehicleDetails.imageUrl)
+            : '';
+          return imageUrl && !imageError && !loading ? (
             <Image
               source={{ uri: imageUrl }}
               style={[styles.vehicleImage, { opacity: imageLoaded ? 1 : 0 }]}
@@ -179,7 +182,7 @@ const VehicleCard: React.FC<VehicleCardProps> = ({ vehicle, onEdit }) => {
 
         {/* 이미지 로딩 중이거나 없을 때 */}
         {(() => {
-          const hasImageUrl = !!(vehicleDetails?.imageUrl || vehicle.imageUrl);
+          const hasImageUrl = !!vehicleDetails?.imageUrl;
           if (loading || (!imageLoaded && !imageError && hasImageUrl)) {
             return (
               <SkeletonImage
