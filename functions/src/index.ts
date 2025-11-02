@@ -118,21 +118,9 @@ export const kakaoLoginHttp = functions
           });
           firebaseUID = userRecord.uid;
           isNewUser = true;
-          
-          console.log('✅ 신규 카카오 사용자 생성 (Firebase 자동 UID):', firebaseUID);
-          
-          // Firestore에 사용자 문서 생성
-          await db.collection('users').doc(firebaseUID).set({
-            kakaoId: userInfo.id,
-            email: userInfo.email,
-            displayName: userInfo.nickname || userInfo.email?.split('@')[0] || '카카오 사용자',
-            photoURL: userInfo.profileImageUrl,
-            provider: 'kakao',
-            createdAt: admin.firestore.FieldValue.serverTimestamp(),
-            lastLoginAt: admin.firestore.FieldValue.serverTimestamp(),
-            updatedAt: admin.firestore.FieldValue.serverTimestamp(),
-            isRegistrationComplete: false,
-          });
+
+          console.log('✅ 신규 카카오 사용자 생성 (Firebase Auth만, Firestore 문서는 SignupComplete에서 생성):', firebaseUID);
+          console.log('🔄 클라이언트에서 SignupComplete 화면으로 이동 필요');
         } catch (createError: any) {
           if (createError.code === 'auth/email-already-exists') {
             console.log('🔄 이메일이 이미 존재함. 기존 사용자에 카카오 연동 추가:', userInfo.email);
@@ -145,9 +133,10 @@ export const kakaoLoginHttp = functions
             
             // 기존 사용자에 카카오 정보 추가/업데이트
             const userDoc = await db.collection('users').doc(firebaseUID).get();
-            
+
             if (userDoc.exists) {
               // 기존 Firestore 문서 업데이트 (카카오 정보 추가)
+              isNewUser = false;
               await db.collection('users').doc(firebaseUID).update({
                 kakaoId: userInfo.id,
                 photoURL: userInfo.profileImageUrl || existingUserRecord.photoURL,
@@ -163,27 +152,10 @@ export const kakaoLoginHttp = functions
               });
               console.log('✅ 기존 사용자에 카카오 정보 추가 완료');
             } else {
-              // Firestore 문서가 없으면 새로 생성
-              await db.collection('users').doc(firebaseUID).set({
-                kakaoId: userInfo.id,
-                email: userInfo.email,
-                displayName: userInfo.nickname || existingUserRecord.displayName || '사용자',
-                photoURL: userInfo.profileImageUrl || existingUserRecord.photoURL,
-                provider: 'multi', // 다중 provider
-                providers: {
-                  kakao: {
-                    id: userInfo.id,
-                    nickname: userInfo.nickname,
-                    profileImageUrl: userInfo.profileImageUrl,
-                    linkedAt: admin.firestore.FieldValue.serverTimestamp()
-                  }
-                },
-                createdAt: admin.firestore.FieldValue.serverTimestamp(),
-                lastLoginAt: admin.firestore.FieldValue.serverTimestamp(),
-                updatedAt: admin.firestore.FieldValue.serverTimestamp(),
-                isRegistrationComplete: false,
-              });
-              console.log('✅ 기존 Auth 사용자에 Firestore 문서 생성 (카카오 연동)');
+              // Firestore 문서가 없음 → 신규 사용자로 처리
+              isNewUser = true;
+              console.log('🆕 Firebase Auth는 있지만 Firestore 문서 없음 → 신규 사용자로 처리');
+              console.log('🔄 클라이언트에서 SignupComplete 화면으로 이동 필요');
             }
           } else {
             throw createError;
@@ -475,7 +447,7 @@ export const googleLogin = functions
       
       console.log('🔍 사용자 존재 여부:', isNewUser ? '신규 사용자' : '기존 사용자', 'UID:', firebaseUID);
 
-      // 사용자 정보 저장/업데이트
+      // 기존 사용자만 Firestore 업데이트 (신규 사용자는 SignupComplete에서 생성)
       const userData = {
         googleId: userInfo.id,
         email: userInfo.email,
@@ -486,16 +458,12 @@ export const googleLogin = functions
         updatedAt: admin.firestore.FieldValue.serverTimestamp(),
       };
 
-      if (isNewUser) {
-        await userDocRef.set({
-          ...userData,
-          createdAt: admin.firestore.FieldValue.serverTimestamp(),
-          isRegistrationComplete: false,
-        });
-        console.log('✅ 신규 Google 사용자 생성:', firebaseUID);
-      } else {
+      if (!isNewUser) {
         await userDocRef.update(userData);
         console.log('✅ 기존 Google 사용자 정보 업데이트:', firebaseUID);
+      } else {
+        console.log('✅ 신규 Google 사용자 (Firebase Auth만, Firestore 문서는 SignupComplete에서 생성):', firebaseUID);
+        console.log('🔄 클라이언트에서 SignupComplete 화면으로 이동 필요');
       }
 
       // Firebase Custom Token 생성
@@ -585,27 +553,23 @@ export const createCustomTokenFromApple = functions
         
         console.log('🔍 사용자 존재 여부:', isNewUser ? '신규 사용자' : '기존 사용자', 'UID:', firebaseUID);
 
-        // 사용자 정보 저장/업데이트
-        const userData = {
-          appleId: firebaseUID, // Apple ID 대신 Firebase UID 저장
-          email: userInfo.email,
-          displayName: userInfo.displayName,
-          photoURL: userInfo.photoURL,
-          provider: 'apple',
-          lastLoginAt: admin.firestore.FieldValue.serverTimestamp(),
-          updatedAt: admin.firestore.FieldValue.serverTimestamp(),
-        };
+        // 기존 사용자만 Firestore 업데이트 (신규 사용자는 SignupComplete에서 생성)
+        if (!isNewUser) {
+          const userData = {
+            appleId: firebaseUID,
+            email: userInfo.email,
+            displayName: userInfo.displayName,
+            photoURL: userInfo.photoURL,
+            provider: 'apple',
+            lastLoginAt: admin.firestore.FieldValue.serverTimestamp(),
+            updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+          };
 
-        if (isNewUser) {
-          await userDocRef.set({
-            ...userData,
-            createdAt: admin.firestore.FieldValue.serverTimestamp(),
-            isRegistrationComplete: false,
-          });
-          console.log('✅ 신규 Apple 사용자 생성:', firebaseUID);
-        } else {
           await userDocRef.update(userData);
           console.log('✅ 기존 Apple 사용자 정보 업데이트:', firebaseUID);
+        } else {
+          console.log('✅ 신규 Apple 사용자 (Firebase Auth만, Firestore 문서는 SignupComplete에서 생성):', firebaseUID);
+          console.log('🔄 클라이언트에서 SignupComplete 화면으로 이동 필요');
         }
 
         // Firebase Custom Token 생성 (실제 Firebase UID 사용)

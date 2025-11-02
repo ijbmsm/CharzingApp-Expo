@@ -940,7 +940,6 @@ class FirebaseService {
       displayName: string;
       realName: string;
       phoneNumber: string;
-      address: string;
       provider: 'kakao' | 'google' | 'apple';
       photoURL?: string;
       kakaoId?: string;
@@ -954,14 +953,13 @@ class FirebaseService {
     try {
       const userDocRef = doc(this.db, 'users', uid);
 
-      // 새 사용자 문서 생성 (setDoc 사용)
+      // 새 사용자 문서 생성 (setDoc 사용) + 기본 알림 설정
       await setDoc(userDocRef, {
         uid,
         email: registrationData.email || '',
         displayName: registrationData.displayName,
         realName: registrationData.realName,
         phoneNumber: registrationData.phoneNumber,
-        address: registrationData.address,
         provider: registrationData.provider,
         photoURL: registrationData.photoURL || '',
         kakaoId: registrationData.kakaoId,
@@ -971,12 +969,20 @@ class FirebaseService {
         agreedToPrivacy: registrationData.agreedToPrivacy,
         agreedAt: registrationData.agreedAt,
         isRegistrationComplete: true,
+        // 기본 알림 설정
+        notificationSettings: {
+          enabled: true,
+          reservation: true,
+          report: true,
+          announcement: true,
+          marketing: false,
+        },
         createdAt: serverTimestamp(),
         updatedAt: serverTimestamp(),
         lastLoginAt: serverTimestamp(),
       });
 
-      devLog.log('✅ 회원가입 완료 - 사용자 문서 생성:', uid);
+      devLog.log('✅ 회원가입 완료 - 사용자 문서 + 기본 알림 설정 생성:', uid);
     } catch (error) {
       devLog.error('❌ 회원가입 완료 처리 실패:', error);
       throw error;

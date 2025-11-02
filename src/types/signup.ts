@@ -29,7 +29,6 @@ export type SocialUser = KakaoUser | GoogleUser | AppleUser;
 export interface SignupFormData {
   realName: string;
   phoneNumber: string;
-  address: string;
   agreedToTerms: boolean;
   agreedToPrivacy: boolean;
 }
@@ -54,14 +53,12 @@ export interface ValidationResult {
 export interface ValidationErrors {
   realName?: string;
   phoneNumber?: string;
-  address?: string;
   agreements?: string;
 }
 
 export const VALIDATION_MESSAGES = {
   REQUIRED_NAME: '이름을 입력해주세요.',
   REQUIRED_PHONE: '전화번호를 입력해주세요.',
-  REQUIRED_ADDRESS: '주소를 입력해주세요.',
   INVALID_PHONE: '올바른 전화번호 형식을 입력해주세요. (예: 01012345678)',
   REQUIRED_TERMS: '이용약관에 동의해주세요.',
   REQUIRED_PRIVACY: '개인정보 처리방침에 동의해주세요.',

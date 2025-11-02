@@ -46,6 +46,8 @@ export default {
       buildNumber: "2",
       requireFullScreen: false,
       infoPlist: {
+        KAKAO_APP_KEY: process.env.EXPO_PUBLIC_KAKAO_NATIVE_APP_KEY,
+        KAKAO_APP_SCHEME: "charzingapp",
         NSLocationWhenInUseUsageDescription: "이 앱은 지도를 표시하고 주변 위치 기반 기능을 위해 현재 위치 접근이 필요합니다.",
         NSUserNotificationUsageDescription: "예약 상태 변경 및 진단 결과 알림을 위해 푸시 알림 권한이 필요합니다.",
         NSCameraUsageDescription: "진단 리포트 사진 촬영을 위해 카메라 접근 권한이 필요합니다.",

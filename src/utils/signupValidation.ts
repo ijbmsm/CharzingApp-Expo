@@ -31,11 +31,6 @@ export function validateSignupForm(formData: SignupFormData): ValidationResult {
     }
   }
 
-  // 주소 검증
-  if (!formData.address.trim()) {
-    errors.address = VALIDATION_MESSAGES.REQUIRED_ADDRESS;
-  }
-
   // 약관 동의 검증
   if (!formData.agreedToTerms) {
     errors.agreements = VALIDATION_MESSAGES.REQUIRED_TERMS;

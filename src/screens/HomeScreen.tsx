@@ -1351,14 +1351,6 @@ export default function HomeScreen() {
                 <Text style={styles.statusMessage}>
                   아직 등록된 차량이 없습니다
                 </Text>
-                <TouchableOpacity
-                  style={styles.addVehicleButton}
-                  onPress={handleAddVehicleCard}
-                  activeOpacity={0.8}
-                >
-                  <Ionicons name="add" size={20} color="#FFFFFF" />
-                  <Text style={styles.addVehicleButtonText}>차량 추가</Text>
-                </TouchableOpacity>
               </View>
             ) : userVehicles[0] ? (
               <VehicleCard

@@ -135,14 +135,19 @@ class NotificationService {
 
         // 토큰을 Firestore에 저장
         await firebaseService.saveUserPushToken(userId, token);
-        
-        // 기존 설정이 없는 경우에만 기본 알림 설정 저장
-        const existingSettings = await firebaseService.getUserNotificationSettings(userId);
-        if (!existingSettings) {
-          devLog.log('🆕 신규 사용자: 기본 알림 설정 저장');
-          await this.saveNotificationSettings(userId, DEFAULT_NOTIFICATION_SETTINGS);
+
+        // users 문서가 존재하는 경우에만 알림 설정 저장
+        const userProfile = await firebaseService.getUserProfile(userId);
+        if (!userProfile) {
+          devLog.log('🆕 신규 사용자: 알림 설정 저장 건너뛰기 (SignupComplete에서 저장 예정)');
         } else {
-          devLog.log('✅ 기존 사용자: 알림 설정 유지됨');
+          const existingSettings = await firebaseService.getUserNotificationSettings(userId);
+          if (!existingSettings) {
+            devLog.log('✅ 기존 사용자: 기본 알림 설정 저장');
+            await this.saveNotificationSettings(userId, DEFAULT_NOTIFICATION_SETTINGS);
+          } else {
+            devLog.log('✅ 기존 사용자: 알림 설정 유지됨');
+          }
         }
 
         // 실시간 인앱 알림 리스너 시작 (푸시 토큰과 독립적으로)
@@ -151,14 +156,19 @@ class NotificationService {
       } else {
         devLog.log('⚠️  푸시 알림은 실제 디바이스에서만 작동합니다.');
         devLog.log('📱 실제 디바이스에서 앱을 실행하면 푸시 토큰이 자동으로 생성됩니다.');
-        
-        // 기존 설정이 없는 경우에만 기본 알림 설정 저장 (토큰 없이)
-        const existingSettings = await firebaseService.getUserNotificationSettings(userId);
-        if (!existingSettings) {
-          devLog.log('🆕 신규 사용자 (에뮬레이터): 기본 알림 설정 저장');
-          await this.saveNotificationSettings(userId, DEFAULT_NOTIFICATION_SETTINGS);
+
+        // users 문서가 존재하는 경우에만 알림 설정 저장 (토큰 없이)
+        const userProfile = await firebaseService.getUserProfile(userId);
+        if (!userProfile) {
+          devLog.log('🆕 신규 사용자 (에뮬레이터): 알림 설정 저장 건너뛰기 (SignupComplete에서 저장 예정)');
         } else {
-          devLog.log('✅ 기존 사용자 (에뮬레이터): 알림 설정 유지됨');
+          const existingSettings = await firebaseService.getUserNotificationSettings(userId);
+          if (!existingSettings) {
+            devLog.log('✅ 기존 사용자 (에뮬레이터): 기본 알림 설정 저장');
+            await this.saveNotificationSettings(userId, DEFAULT_NOTIFICATION_SETTINGS);
+          } else {
+            devLog.log('✅ 기존 사용자 (에뮬레이터): 알림 설정 유지됨');
+          }
         }
 
         // 실시간 인앱 알림 리스너 시작 (푸시 토큰 없어도 동작)

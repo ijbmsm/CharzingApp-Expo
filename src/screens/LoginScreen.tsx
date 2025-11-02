@@ -77,10 +77,23 @@ export default function LoginScreen() {
           logger.userAction('navigate_to_signup_complete', firebaseUser.uid, { provider: 'kakao' });
           navigation.navigate('SignupComplete', { kakaoUser: kakaoUser });
         } else {
-          // 기존 사용자 - 바로 로그인 완료
+          // 기존 사용자 - Firestore에서 프로필 조회 후 로그인 완료
           logger.userAction('login_complete', firebaseUser.uid, { provider: 'kakao', isExistingUser: true });
-          dispatch(setUser(kakaoUser));
-          
+
+          try {
+            const userProfile = await firebaseService.getUserProfile(firebaseUser.uid);
+            const completeUserData = {
+              ...kakaoUser,
+              realName: userProfile?.realName || kakaoUser.displayName,
+              phoneNumber: userProfile?.phoneNumber,
+              displayName: userProfile?.displayName || kakaoUser.displayName,
+            };
+            dispatch(setUser(completeUserData));
+          } catch (error) {
+            console.error('프로필 조회 실패, 기본 정보로 로그인:', error);
+            dispatch(setUser(kakaoUser));
+          }
+
           // 로그인 완료 후 이전 화면으로 돌아가기
           logger.userAction('navigate_back_after_login', firebaseUser.uid);
           if (navigation.canGoBack()) {
@@ -108,9 +121,13 @@ export default function LoginScreen() {
 
 
   const handleBackPress = () => {
-    if (navigation.canGoBack()) {
-      navigation.goBack();
-    }
+    // 스택 리셋하여 메인 화면으로 이동
+    navigation.dispatch(
+      CommonActions.reset({
+        index: 0,
+        routes: [{ name: 'Main' }],
+      })
+    );
   };
 
   const handleGoogleLogin = useCallback(async () => {
@@ -140,10 +157,23 @@ export default function LoginScreen() {
           logger.userAction('navigate_to_signup_complete', firebaseUser.uid, { provider: 'google' });
           navigation.navigate('SignupComplete', { googleUser: googleUser });
         } else {
-          // 기존 사용자 - 바로 로그인 완료
+          // 기존 사용자 - Firestore에서 프로필 조회 후 로그인 완료
           logger.userAction('login_complete', firebaseUser.uid, { provider: 'google', isExistingUser: true });
-          dispatch(setUser(googleUser));
-          
+
+          try {
+            const userProfile = await firebaseService.getUserProfile(firebaseUser.uid);
+            const completeUserData = {
+              ...googleUser,
+              realName: userProfile?.realName || googleUser.displayName,
+              phoneNumber: userProfile?.phoneNumber,
+              displayName: userProfile?.displayName || googleUser.displayName,
+            };
+            dispatch(setUser(completeUserData));
+          } catch (error) {
+            console.error('프로필 조회 실패, 기본 정보로 로그인:', error);
+            dispatch(setUser(googleUser));
+          }
+
           // 로그인 완료 후 이전 화면으로 돌아가기
           logger.userAction('navigate_back_after_login', firebaseUser.uid);
           if (navigation.canGoBack()) {
@@ -196,10 +226,23 @@ export default function LoginScreen() {
           logger.userAction('navigate_to_signup_complete', firebaseUser.uid, { provider: 'apple' });
           navigation.navigate('SignupComplete', { appleUser: appleUser });
         } else {
-          // 기존 사용자 - 바로 로그인 완료
+          // 기존 사용자 - Firestore에서 프로필 조회 후 로그인 완료
           logger.userAction('login_complete', firebaseUser.uid, { provider: 'apple', isExistingUser: true });
-          dispatch(setUser(appleUser));
-          
+
+          try {
+            const userProfile = await firebaseService.getUserProfile(firebaseUser.uid);
+            const completeUserData = {
+              ...appleUser,
+              realName: userProfile?.realName || appleUser.displayName,
+              phoneNumber: userProfile?.phoneNumber,
+              displayName: userProfile?.displayName || appleUser.displayName,
+            };
+            dispatch(setUser(completeUserData));
+          } catch (error) {
+            console.error('프로필 조회 실패, 기본 정보로 로그인:', error);
+            dispatch(setUser(appleUser));
+          }
+
           // 로그인 완료 후 이전 화면으로 돌아가기
           logger.userAction('navigate_back_after_login', firebaseUser.uid);
           if (navigation.canGoBack()) {
@@ -226,9 +269,13 @@ export default function LoginScreen() {
   }, [showLoading, hideLoading, dispatch, navigation, logger]);
 
   const handleSkipLogin = () => {
-    if (navigation.canGoBack()) {
-      navigation.goBack();
-    }
+    // 스택 리셋하여 메인 화면으로 이동
+    navigation.dispatch(
+      CommonActions.reset({
+        index: 0,
+        routes: [{ name: 'Main' }],
+      })
+    );
   };
 
   const handleAutoLoginToggle = (value: boolean) => {

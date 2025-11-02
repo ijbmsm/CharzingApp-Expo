@@ -39,30 +39,16 @@ export class UserProfileManager implements IUserProfileManager {
   }
 
   /**
-   * 기본 사용자 프로필 생성
+   * 기본 사용자 프로필 생성 (메모리에만 존재, Firestore 저장 안 함)
+   * SignupCompleteScreen에서 회원가입 완료 시 Firestore에 저장됨
    */
   async createDefaultProfile(firebaseUser: FirebaseUser, provider: string): Promise<AppUser> {
-    this.log(`${provider} 사용자 기본 프로필 생성 시작`);
+    this.log(`${provider} 사용자 기본 프로필 생성 (메모리만, Firestore 저장 안 함)`);
 
     try {
       const defaultProfile = this.buildDefaultProfileData(firebaseUser, provider);
-      
-      // Firestore에 프로필 저장
-      await firebaseService.saveUserProfile({
-        uid: firebaseUser.uid,
-        email: defaultProfile.email || '',
-        displayName: defaultProfile.displayName,
-        realName: defaultProfile.displayName, // 초기값은 displayName과 동일
-        provider: provider as any,
-        photoURL: defaultProfile.photoURL || '',
-        isRegistrationComplete: false,
-        // 프로바이더별 ID 설정
-        ...(provider === 'apple' && { appleId: firebaseUser.uid }),
-        ...(provider === 'google' && { googleId: firebaseUser.uid }),
-        ...(provider === 'kakao' && { kakaoId: firebaseUser.uid }),
-      });
 
-      this.log(`${provider} 사용자 프로필이 Firestore에 저장되었습니다.`);
+      this.log(`${provider} 사용자 임시 프로필 생성 완료 (SignupComplete에서 Firestore 저장 예정)`);
       return defaultProfile;
 
     } catch (error) {

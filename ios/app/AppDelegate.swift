@@ -1,7 +1,6 @@
 import Expo
 import React
 import ReactAppDependencyProvider
-import kakao_login
 
 @UIApplicationMain
 public class AppDelegate: ExpoAppDelegate {
@@ -39,11 +38,6 @@ public class AppDelegate: ExpoAppDelegate {
     open url: URL,
     options: [UIApplication.OpenURLOptionsKey: Any] = [:]
   ) -> Bool {
-    // 카카오 로그인 URL 처리
-    if RNKakaoLogins.isKakaoTalkLoginUrl(url) {
-      return RNKakaoLogins.handleOpen(url)
-    }
-    
     return super.application(app, open: url, options: options) || RCTLinkingManager.application(app, open: url, options: options)
   }
 

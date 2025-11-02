@@ -1,7 +1,5 @@
-import React from 'react';
-import { View, ViewStyle, DimensionValue } from 'react-native';
-import { MotiView } from 'moti';
-import { Easing } from 'react-native-reanimated';
+import React, { useEffect, useRef } from 'react';
+import { View, ViewStyle, DimensionValue, Animated, Easing } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 
 interface ShimmerViewProps {
@@ -19,24 +17,35 @@ const ShimmerView: React.FC<ShimmerViewProps> = ({
   style,
   children
 }) => {
+  const translateX = useRef(new Animated.Value(-300)).current;
+
+  useEffect(() => {
+    const animation = Animated.loop(
+      Animated.timing(translateX, {
+        toValue: 300,
+        duration: 2000,
+        easing: Easing.linear,
+        useNativeDriver: true,
+      })
+    );
+
+    animation.start();
+
+    return () => {
+      animation.stop();
+    };
+  }, [translateX]);
+
   return (
     <View style={[{ width, height, borderRadius, overflow: 'hidden' }, style]}>
-      <MotiView
-        from={{ translateX: -300 }}
-        animate={{ translateX: 300 }}
-        transition={{
-          type: 'timing',
-          duration: 2000,
-          loop: true,
-          repeatReverse: false,
-          easing: Easing.linear,
-        }}
+      <Animated.View
         style={{
           position: 'absolute',
           top: 0,
           left: 0,
           right: 0,
           bottom: 0,
+          transform: [{ translateX }],
         }}
       >
         <LinearGradient
@@ -49,13 +58,13 @@ const ShimmerView: React.FC<ShimmerViewProps> = ({
             height: '100%',
           }}
         />
-      </MotiView>
+      </Animated.View>
       {children && (
-        <View style={{ 
-          position: 'absolute', 
-          top: 0, 
-          left: 0, 
-          right: 0, 
+        <View style={{
+          position: 'absolute',
+          top: 0,
+          left: 0,
+          right: 0,
           bottom: 0,
           backgroundColor: 'transparent'
         }}>
