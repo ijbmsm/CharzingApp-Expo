@@ -11,7 +11,7 @@ import {
   Dimensions,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { MotiView, AnimatePresence } from 'moti';
+import * as Animatable from 'react-native-animatable';
 import { convertToLineSeedFont } from '../../../styles/fonts';
 import { type VehicleGroup, type VehicleVariant } from '../types';
 
@@ -107,12 +107,10 @@ const ModelSelectionStep: React.FC<ModelSelectionStepProps> = ({
                           group.variants[0]?.variantName === '트림 로딩 중...';
 
     return (
-      <MotiView
+      <Animatable.View
         key={group.id}
-        from={{ opacity: 0, translateY: 20 }}
-        animate={{ opacity: 1, translateY: 0 }}
-        transition={{ type: 'timing', duration: 300 }}
-        style={styles.groupContainer}
+      animation="fadeIn"
+      style={styles.groupContainer}
       >
         {/* 그룹 헤더 */}
         <TouchableOpacity
@@ -157,36 +155,27 @@ const ModelSelectionStep: React.FC<ModelSelectionStepProps> = ({
         </TouchableOpacity>
 
         {/* 확장된 트림 목록 */}
-        <AnimatePresence>
           {isExpanded && !isLoadingTrims && (
-            <MotiView
-              from={{ height: 0, opacity: 0 }}
-              animate={{ height: 'auto', opacity: 1 }}
-              exit={{ height: 0, opacity: 0 }}
-              transition={{ type: 'timing', duration: 300 }}
+            <Animatable.View
+              animation="fadeIn"
               style={styles.expandedContent}
             >
               {group.variants.map(variant => renderVehicleItem(variant, group))}
-            </MotiView>
+            </Animatable.View>
           )}
-        </AnimatePresence>
-      </MotiView>
+      </Animatable.View>
     );
   };
 
   return (
-    <MotiView
-      from={{ opacity: 0, translateX: 20 }}
-      animate={{ opacity: 1, translateX: 0 }}
-      transition={{ type: 'timing', duration: 300 }}
+    <Animatable.View
+      animation="fadeIn"
       style={styles.container}
     >
       {/* 검색 입력 */}
-      <MotiView
-        from={{ opacity: 0, translateY: -10 }}
-        animate={{ opacity: 1, translateY: 0 }}
-        transition={{ type: 'timing', duration: 400, delay: 100 }}
-        style={styles.searchContainer}
+      <Animatable.View
+      animation="fadeIn"
+      style={styles.searchContainer}
       >
         <View style={styles.searchInputContainer}>
           <Ionicons name="search" size={20} color="#9CA3AF" />
@@ -204,7 +193,7 @@ const ModelSelectionStep: React.FC<ModelSelectionStepProps> = ({
             </TouchableOpacity>
           )}
         </View>
-      </MotiView>
+      </Animatable.View>
 
       {/* 차량 목록 */}
       <ScrollView 
@@ -233,7 +222,7 @@ const ModelSelectionStep: React.FC<ModelSelectionStepProps> = ({
           filteredVehicleGroups.map(group => renderVehicleGroup(group))
         )}
       </ScrollView>
-    </MotiView>
+    </Animatable.View>
   );
 };
 

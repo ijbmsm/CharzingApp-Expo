@@ -13,7 +13,7 @@ import {
   KeyboardAvoidingView,
   Platform,
 } from 'react-native';
-import { MotiView } from 'moti';
+import * as Animatable from 'react-native-animatable';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -885,15 +885,8 @@ const ReservationScreen: React.FC = () => {
         
         {/* 프로그레스 바 */}
         <View style={styles.progressBarContainer}>
-          <MotiView
-            style={styles.progressBar}
-            animate={{
-              width: `${(currentStep / 6) * 100}%`,
-            }}
-            transition={{
-              type: 'timing',
-              duration: 600,
-            }}
+          <View
+            style={[styles.progressBar, { width: `${(currentStep / 6) * 100}%` }]}
           />
         </View>
       </View>
@@ -906,10 +899,10 @@ const ReservationScreen: React.FC = () => {
       >
         {/* 1단계: 차량 선택 */}
         {currentStep === 1 && (
-          <MotiView
-            from={{ opacity: 0, translateY: 20 }}
-            animate={{ opacity: 1, translateY: 0 }}
-            transition={{ type: 'timing', duration: 800, delay: 200 }}
+          <Animatable.View
+            animation="fadeInUp"
+            duration={800}
+            delay={200}
             style={[styles.vehicleSelectionContainer, { pointerEvents: 'box-none' }]}
           >
             <VehicleAccordionSelector
@@ -1039,7 +1032,7 @@ const ReservationScreen: React.FC = () => {
                 <Ionicons name="chevron-forward" size={18} color="#9CA3AF" />
               </View>
             </View>
-          </MotiView>
+          </Animatable.View>
         )}
 
         <ScrollView 
@@ -1050,17 +1043,8 @@ const ReservationScreen: React.FC = () => {
 
         {/* 1단계: 차량 & 서비스 선택 (Step 2 이상에서만 표시) */}
         {currentStep > 1 && (
-          <MotiView
-            style={styles.stepContainer}
-            animate={{
-              opacity: 1,
-              translateY: 0,
-              height: currentStep > 1 ? 100 : 0,
-            }}
-            transition={{
-              type: 'timing',
-              duration: 350,
-            }}
+          <View
+            style={[styles.stepContainer, { opacity: 1, height: currentStep > 1 ? 100 : 0 }]}
           >
             <TouchableOpacity 
               style={styles.stepCard}
@@ -1081,21 +1065,15 @@ const ReservationScreen: React.FC = () => {
                 </View>
               )}
             </TouchableOpacity>
-          </MotiView>
+          </View>
         )}
 
         {/* 2단계: 주소 선택 */}
-        <MotiView
-          style={styles.stepContainer}
-          animate={{
+        <View
+          style={[styles.stepContainer, {
             opacity: currentStep >= 2 ? 1 : 0,
-            translateY: currentStep === 2 ? 0 : currentStep > 2 ? 0 : 50,
             height: currentStep === 2 ? 'auto' : currentStep > 2 ? 100 : 0,
-          }}
-          transition={{
-            type: 'timing',
-            duration: 350,
-          }}
+          }]}
         >
           {currentStep >= 2 && (
             <TouchableOpacity 
@@ -1131,20 +1109,14 @@ const ReservationScreen: React.FC = () => {
               )}
             </TouchableOpacity>
           )}
-        </MotiView>
+        </View>
 
         {/* 3단계: 날짜/시간 선택 */}
-        <MotiView
-          style={styles.stepContainer}
-          animate={{
+        <View
+          style={[styles.stepContainer, {
             opacity: currentStep >= 3 ? 1 : 0,
-            translateY: currentStep === 3 ? 0 : currentStep > 3 ? 0 : 50,
             height: currentStep === 3 ? 'auto' : currentStep > 3 ? 100 : 0,
-          }}
-          transition={{
-            type: 'timing',
-            duration: 350,
-          }}
+          }]}
         >
           {currentStep >= 3 && (
             <TouchableOpacity 
@@ -1239,20 +1211,14 @@ const ReservationScreen: React.FC = () => {
               )}
             </TouchableOpacity>
           )}
-        </MotiView>
+        </View>
 
         {/* 4단계: 연락처 정보 */}
-        <MotiView
-          style={styles.stepContainer}
-          animate={{
+        <View
+          style={[styles.stepContainer, {
             opacity: currentStep >= 4 ? 1 : 0,
-            translateY: currentStep === 4 ? 0 : currentStep > 4 ? 0 : 50,
             height: currentStep === 4 ? 'auto' : currentStep > 4 ? 100 : 0,
-          }}
-          transition={{
-            type: 'timing',
-            duration: 350,
-          }}
+          }]}
         >
           {currentStep >= 4 && (
             <TouchableOpacity 
@@ -1322,20 +1288,14 @@ const ReservationScreen: React.FC = () => {
               )}
             </TouchableOpacity>
           )}
-        </MotiView>
+        </View>
 
         {/* 5단계: 서비스 타입 선택 */}
-        <MotiView
-          style={styles.stepContainer}
-          animate={{
+        <View
+          style={[styles.stepContainer, {
             opacity: currentStep >= 5 ? 1 : 0,
-            translateY: currentStep === 5 ? 0 : currentStep > 5 ? 0 : 50,
             height: currentStep === 5 ? 'auto' : currentStep > 5 ? 100 : 0,
-          }}
-          transition={{
-            type: 'timing',
-            duration: 350,
-          }}
+          }]}
         >
           {currentStep >= 5 && (
             <TouchableOpacity 
@@ -1435,20 +1395,14 @@ const ReservationScreen: React.FC = () => {
               )}
             </TouchableOpacity>
           )}
-        </MotiView>
+        </View>
 
         {/* 6단계: 예약 확인 */}
-        <MotiView
-          style={styles.stepContainer}
-          animate={{
+        <View
+          style={[styles.stepContainer, {
             opacity: currentStep >= 6 ? 1 : 0,
-            translateY: currentStep === 6 ? 0 : 50,
             height: currentStep === 6 ? 'auto' : 0,
-          }}
-          transition={{
-            type: 'timing',
-            duration: 350,
-          }}
+          }]}
         >
           {currentStep === 6 && vehicleData && serviceData && addressData && dateTimeData && contactData && serviceType && (
             <TouchableOpacity 
@@ -1519,7 +1473,7 @@ const ReservationScreen: React.FC = () => {
               </View>
             </TouchableOpacity>
           )}
-        </MotiView>
+        </View>
       </ScrollView>
 
       {/* 하단 버튼 */}
@@ -1786,6 +1740,7 @@ const styles = StyleSheet.create({
   },
   stepContainer: {
     marginHorizontal: 20,
+    marginTop: 16,
     marginBottom: 16,
   },
   stepCard: {

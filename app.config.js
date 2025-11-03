@@ -93,6 +93,10 @@ export default {
         "WRITE_EXTERNAL_STORAGE"
       ],
       softwareKeyboardLayoutMode: "pan",
+      androidNavigationBar: {
+        visible: "translucent",
+        backgroundColor: "#00000000"
+      },
       intentFilters: [
         {
           action: "VIEW",

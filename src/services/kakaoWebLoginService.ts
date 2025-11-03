@@ -5,7 +5,8 @@
  * Strategy Pattern: 네이티브 SDK 실패 시 자동 폴백
  */
 
-import { makeRedirectUri, startAsync, AuthRequest } from 'expo-auth-session';
+import * as AuthSession from 'expo-auth-session';
+import * as WebBrowser from 'expo-web-browser';
 import { Platform } from 'react-native';
 import { getAuth, signInWithCustomToken } from 'firebase/auth';
 import Constants from 'expo-constants';
@@ -127,7 +128,7 @@ class KakaoWebLoginService implements ILoginService {
    */
   async login(): Promise<LoginResult> {
     try {
-      devLog.log('🔐 카카오 웹 기반 로그인 시작');
+      devLog.log('🌐🌐🌐 [FALLBACK] 카카오 웹 기반 로그인 시작 (네이티브 SDK 아님!)');
       logger.auth('login_attempt', 'kakao_web');
 
       // 초기화 확인
@@ -187,32 +188,23 @@ class KakaoWebLoginService implements ILoginService {
    * OAuth 2.0 Authorization Code 요청
    */
   private async requestAuthorizationCode(): Promise<string> {
-    const redirectUri = makeRedirectUri({ 
+    const redirectUri = AuthSession.makeRedirectUri({
       scheme: 'charzingapp',
-      useProxy: Platform.OS === 'web'
-    });
-
-    const request = new AuthRequest({
-      clientId: this.kakaoRestApiKey,
-      scopes: ['profile_nickname', 'account_email'],
-      redirectUri,
-      responseType: 'code',
-      additionalParameters: {},
-      extraParams: {}
+      preferLocalhost: Platform.OS === 'web'
     });
 
     const authUrl = `https://kauth.kakao.com/oauth/authorize?client_id=${this.kakaoRestApiKey}&redirect_uri=${encodeURIComponent(redirectUri)}&response_type=code&scope=profile_nickname,account_email`;
 
-    const result = await startAsync({
-      authUrl,
-      returnUrl: redirectUri
-    });
+    const result = await WebBrowser.openAuthSessionAsync(authUrl, redirectUri);
 
-    if (result.type !== 'success') {
+    if (result.type !== 'success' || !result.url) {
       throw new Error('카카오 인증이 취소되었습니다');
     }
 
-    const authCode = result.params?.code;
+    // URL에서 code 파라미터 추출
+    const url = new URL(result.url);
+    const authCode = url.searchParams.get('code');
+
     if (!authCode) {
       throw new Error('카카오 인증 코드를 받을 수 없습니다');
     }
@@ -224,9 +216,9 @@ class KakaoWebLoginService implements ILoginService {
    * Authorization Code를 Access Token으로 교환
    */
   private async exchangeCodeForToken(authCode: string): Promise<string> {
-    const redirectUri = makeRedirectUri({ 
+    const redirectUri = AuthSession.makeRedirectUri({
       scheme: 'charzingapp',
-      useProxy: Platform.OS === 'web'
+      preferLocalhost: Platform.OS === 'web'
     });
 
     const response = await fetch('https://kauth.kakao.com/oauth/token', {

@@ -15,7 +15,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { useSelector, useDispatch } from 'react-redux';
 import { useNavigation } from '@react-navigation/native';
 import { StackNavigationProp } from '@react-navigation/stack';
-import { MotiView } from 'moti';
+import * as Animatable from 'react-native-animatable';
 import { RootState } from '../store';
 import { logout, updateUserProfile } from '../store/slices/authSlice';
 import Header from '../components/Header';
@@ -129,11 +129,10 @@ const AuthenticatedMyPage: React.FC<{
         showsVerticalScrollIndicator={false}
       >
         {/* 메인 프로필 섹션 */}
-        <MotiView
+        <Animatable.View
           style={styles.profileCard}
-          from={{ opacity: 0, translateY: 20 }}
-          animate={{ opacity: 1, translateY: 0 }}
-          transition={{ type: 'timing', duration: 500 }}
+          animation="fadeInUp"
+          duration={500}
         >
           <View style={styles.profileHeader}>
             <Text style={styles.profileTitle}>내 정보</Text>
@@ -172,13 +171,13 @@ const AuthenticatedMyPage: React.FC<{
               </View>
             </View>
           </View>
-        </MotiView>
+        </Animatable.View>
 
         {/* 액션 그리드 - 홈 스타일 */}
-        <MotiView
-          from={{ opacity: 0, translateY: 20 }}
-          animate={{ opacity: 1, translateY: 0 }}
-          transition={{ type: 'timing', duration: 500, delay: 200 }}
+        <Animatable.View
+          animation="fadeInUp"
+          duration={500}
+          delay={200}
           style={styles.actionGridContainer}
         >
           <TouchableOpacity
@@ -204,7 +203,7 @@ const AuthenticatedMyPage: React.FC<{
             <Text style={styles.actionTitle}>로그아웃</Text>
             <Text style={styles.actionSubtitle}>계정 종료</Text>
           </TouchableOpacity>
-        </MotiView>
+        </Animatable.View>
       </ScrollView>
 
       {/* 편집 모달 */}
@@ -304,11 +303,10 @@ const MyPageScreen: React.FC = () => {
           showsVerticalScrollIndicator={false}
         >
           {/* 로그인 필요 섹션 */}
-          <MotiView
+          <Animatable.View
             style={styles.loginCard}
-            from={{ opacity: 0, translateY: 20 }}
-            animate={{ opacity: 1, translateY: 0 }}
-            transition={{ type: 'timing', duration: 500 }}
+            animation="fadeInUp"
+            duration={500}
           >
             <View style={styles.loginIconContainer}>
               <Ionicons name="person-circle-outline" size={64} color="#9CA3AF" />
@@ -325,14 +323,14 @@ const MyPageScreen: React.FC = () => {
             >
               <Text style={styles.loginButtonText}>로그인하기</Text>
             </TouchableOpacity>
-          </MotiView>
+          </Animatable.View>
 
           {/* 비활성화된 그리드 */}
-          <MotiView
+          <Animatable.View
             style={styles.disabledSection}
-            from={{ opacity: 0, translateY: 20 }}
-            animate={{ opacity: 1, translateY: 0 }}
-            transition={{ type: 'timing', duration: 500, delay: 200 }}
+            animation="fadeInUp"
+            duration={500}
+            delay={200}
           >
             <TouchableOpacity
               style={[styles.actionItem, styles.disabledActionItem]}
@@ -355,7 +353,7 @@ const MyPageScreen: React.FC = () => {
               <Text style={[styles.actionTitle, styles.disabledText]}>로그아웃</Text>
               <Text style={[styles.actionSubtitle, styles.disabledText]}>로그인 필요</Text>
             </TouchableOpacity>
-          </MotiView>
+          </Animatable.View>
         </ScrollView>
       </SafeAreaView>
     );

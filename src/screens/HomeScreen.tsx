@@ -39,7 +39,7 @@ import {
   showUserError,
 } from "../services/errorHandler";
 import { convertToLineSeedFont } from "../styles/fonts";
-import { MotiView } from "moti";
+import * as Animatable from "react-native-animatable";
 import {
   SkeletonVehicleCard,
   SkeletonText,
@@ -63,11 +63,11 @@ const VehicleCard: React.FC<VehicleCardProps> = ({ vehicle, onEdit }) => {
 
   // 이미지 URL 정규화
   const normalizeImageUrl = (url: string | undefined): string => {
-    if (!url) return '';
+    if (!url) return "";
 
     try {
       // Firebase Storage URL 패턴 확인
-      if (!url.includes('firebasestorage.googleapis.com')) {
+      if (!url.includes("firebasestorage.googleapis.com")) {
         return url; // Firebase Storage URL이 아니면 그대로 반환
       }
 
@@ -91,10 +91,13 @@ const VehicleCard: React.FC<VehicleCardProps> = ({ vehicle, onEdit }) => {
       // 새 URL 구성
       const newUrl = `https://firebasestorage.googleapis.com/v0/b/${bucket}/o/${encodedPath}?alt=media`;
 
-      console.log('🔄 [VehicleCard] URL 정규화:', { original: url, normalized: newUrl });
+      console.log("🔄 [VehicleCard] URL 정규화:", {
+        original: url,
+        normalized: newUrl,
+      });
       return newUrl;
     } catch (error) {
-      console.error('❌ [VehicleCard] URL 정규화 실패:', error);
+      console.error("❌ [VehicleCard] URL 정규화 실패:", error);
       return url; // 파싱 실패 시 원본 반환
     }
   };
@@ -129,11 +132,11 @@ const VehicleCard: React.FC<VehicleCardProps> = ({ vehicle, onEdit }) => {
           trim: vehicle.trim,
           detailsImageUrl: details?.imageUrl,
           vehicleImageUrl: vehicle.imageUrl,
-          finalUrl: details?.imageUrl || vehicle.imageUrl || 'NONE'
+          finalUrl: details?.imageUrl || vehicle.imageUrl || "NONE",
         });
         setVehicleDetails(details);
       } catch (error) {
-        console.error('❌ [VehicleCard] 차량 상세 정보 로드 실패:', error);
+        console.error("❌ [VehicleCard] 차량 상세 정보 로드 실패:", error);
         handleFirebaseError(error, {
           screenName: "HomeScreen",
           actionName: "load_vehicle_details",
@@ -148,10 +151,9 @@ const VehicleCard: React.FC<VehicleCardProps> = ({ vehicle, onEdit }) => {
   }, [vehicle.id, vehicle.make, vehicle.model, vehicle.year, vehicle.trim]);
 
   return (
-    <MotiView
-      from={loading ? { opacity: 1, scale: 1 } : { opacity: 0, scale: 0.95 }}
-      animate={{ opacity: 1, scale: 1 }}
-      transition={{ type: "timing", duration: loading ? 0 : 300 }}
+    <Animatable.View
+      animation={loading ? undefined : "zoomIn"}
+      duration={300}
       style={styles.vehicleCard}
     >
       {/* 차량 이미지 */}
@@ -160,19 +162,19 @@ const VehicleCard: React.FC<VehicleCardProps> = ({ vehicle, onEdit }) => {
           // vehicleDetails가 로드된 후에만 이미지 표시 (vehicle.imageUrl은 이전 차량 URL일 수 있음)
           const imageUrl = vehicleDetails?.imageUrl
             ? normalizeImageUrl(vehicleDetails.imageUrl)
-            : '';
+            : "";
           return imageUrl && !imageError && !loading ? (
             <Image
               source={{ uri: imageUrl }}
               style={[styles.vehicleImage, { opacity: imageLoaded ? 1 : 0 }]}
               onLoad={() => {
-                console.log('✅ [VehicleCard] 이미지 로드 성공:', imageUrl);
+                console.log("✅ [VehicleCard] 이미지 로드 성공:", imageUrl);
                 setImageLoaded(true);
               }}
               onError={(error) => {
-                console.error('❌ [VehicleCard] 이미지 로드 실패:', {
+                console.error("❌ [VehicleCard] 이미지 로드 실패:", {
                   url: imageUrl,
-                  error: error.nativeEvent
+                  error: error.nativeEvent,
                 });
                 setImageError(true);
               }}
@@ -221,11 +223,13 @@ const VehicleCard: React.FC<VehicleCardProps> = ({ vehicle, onEdit }) => {
 
         {/* 배터리 및 성능 정보 (영수증 스타일) - 접기/펼치기 가능 */}
         {isExpanded && (
-          <MotiView
-            from={{ height: 0, opacity: 0 }}
-            animate={{ height: "auto", opacity: 1 }}
-            exit={{ height: 0, opacity: 0 }}
-            transition={{ type: "timing", duration: 300 }}
+          <Animatable.View
+            animation={{
+              from: { opacity: 0, translateY: -20 },
+              to: { opacity: 1, translateY: 0 },
+            }}
+            duration={400}
+            easing="ease-out-cubic"
             style={{ overflow: "hidden" }}
           >
             <View style={styles.vehicleCardReceiptSection}>
@@ -291,7 +295,8 @@ const VehicleCard: React.FC<VehicleCardProps> = ({ vehicle, onEdit }) => {
                 <Text style={styles.vehicleCardDetails}>
                   {loading
                     ? "로딩중..."
-                    : vehicleDetails?.performance.chargingConnector || "알 수 없음"}
+                    : vehicleDetails?.performance.chargingConnector ||
+                      "알 수 없음"}
                 </Text>
               </View>
 
@@ -341,7 +346,7 @@ const VehicleCard: React.FC<VehicleCardProps> = ({ vehicle, onEdit }) => {
                 </Text>
               </View>
             </View>
-          </MotiView>
+          </Animatable.View>
         )}
 
         {/* 차량 정보 펼치기/접기 버튼 - 항상 맨 아래 */}
@@ -359,7 +364,7 @@ const VehicleCard: React.FC<VehicleCardProps> = ({ vehicle, onEdit }) => {
           />
         </TouchableOpacity>
       </View>
-    </MotiView>
+    </Animatable.View>
   );
 };
 
@@ -645,7 +650,10 @@ export default function HomeScreen() {
 
   // 차량 데이터 강제 새로고침 함수
   const forceRefreshVehicles = React.useCallback(async () => {
-    console.log("🔄 forceRefreshVehicles 함수 시작, isMountedRef:", isMountedRef.current);
+    console.log(
+      "🔄 forceRefreshVehicles 함수 시작, isMountedRef:",
+      isMountedRef.current
+    );
     if (isMountedRef.current) {
       setVehiclesLoading(true);
       try {
@@ -664,7 +672,9 @@ export default function HomeScreen() {
         }
       }
     } else {
-      console.log("⚠️ forceRefreshVehicles: isMountedRef.current가 false라서 스킵");
+      console.log(
+        "⚠️ forceRefreshVehicles: isMountedRef.current가 false라서 스킵"
+      );
     }
   }, []);
 
@@ -1079,9 +1089,15 @@ export default function HomeScreen() {
         // isMountedRef와 무관하게 직접 차량 목록 새로고침
         try {
           setVehiclesLoading(true);
-          const updatedVehicles = await firebaseService.getUserVehicles(user.uid);
+          const updatedVehicles = await firebaseService.getUserVehicles(
+            user.uid
+          );
           setUserVehicles(updatedVehicles);
-          console.log("✅ 차량 목록 직접 새로고침 완료:", updatedVehicles.length, "개");
+          console.log(
+            "✅ 차량 목록 직접 새로고침 완료:",
+            updatedVehicles.length,
+            "개"
+          );
         } catch (error) {
           console.error("❌ 차량 목록 새로고침 실패:", error);
         } finally {
@@ -1133,9 +1149,15 @@ export default function HomeScreen() {
         // isMountedRef와 무관하게 직접 차량 목록 새로고침
         try {
           setVehiclesLoading(true);
-          const updatedVehicles = await firebaseService.getUserVehicles(user.uid);
+          const updatedVehicles = await firebaseService.getUserVehicles(
+            user.uid
+          );
           setUserVehicles(updatedVehicles);
-          console.log("✅ 차량 목록 직접 새로고침 완료 (추가 모드):", updatedVehicles.length, "개");
+          console.log(
+            "✅ 차량 목록 직접 새로고침 완료 (추가 모드):",
+            updatedVehicles.length,
+            "개"
+          );
         } catch (error) {
           console.error("❌ 차량 목록 새로고침 실패 (추가 모드):", error);
         } finally {
@@ -1174,10 +1196,10 @@ export default function HomeScreen() {
 
     return (
       <View style={[styles.carouselCardContainer, { width: screenWidth }]}>
-        <MotiView
-          from={{ opacity: 0, scale: 0.9 }}
-          animate={{ opacity: 1, scale: 1 }}
-          transition={{ type: "timing", duration: 300, delay: index * 100 }}
+        <Animatable.View
+          animation="zoomIn"
+          duration={300}
+          delay={index * 100}
           style={[
             styles.carouselServiceCard,
             item.isPremium && styles.carouselPremiumCard,
@@ -1245,7 +1267,7 @@ export default function HomeScreen() {
               선택하기
             </Text>
           </TouchableOpacity>
-        </MotiView>
+        </Animatable.View>
       </View>
     );
   };
@@ -1303,10 +1325,10 @@ export default function HomeScreen() {
         }
       >
         {/* 메인 상태 섹션 - "내 지갑" 스타일 */}
-        <MotiView
-          from={{ opacity: 0, translateY: 20 }}
-          animate={{ opacity: 1, translateY: 0 }}
-          transition={{ type: "timing", duration: 500, delay: 200 }}
+        <Animatable.View
+          animation="fadeInUp"
+          duration={500}
+          delay={200}
           style={styles.mainStatusSection}
         >
           <View style={styles.statusHeader}>
@@ -1363,13 +1385,13 @@ export default function HomeScreen() {
               />
             ) : null}
           </View>
-        </MotiView>
+        </Animatable.View>
 
         {/* 메인 진단 예약 버튼 - "충전하기" 스타일 */}
-        <MotiView
-          from={{ opacity: 0, translateY: 20 }}
-          animate={{ opacity: 1, translateY: 0 }}
-          transition={{ type: "timing", duration: 500, delay: 400 }}
+        <Animatable.View
+          animation="fadeInUp"
+          duration={500}
+          delay={400}
           style={styles.mainActionButton}
         >
           <TouchableOpacity
@@ -1379,13 +1401,13 @@ export default function HomeScreen() {
           >
             <Text style={styles.diagnosisButtonText}>진단 예약하기</Text>
           </TouchableOpacity>
-        </MotiView>
+        </Animatable.View>
 
         {/* 프리미엄 서비스 프로모션 카드 */}
-        <MotiView
-          from={{ opacity: 0, translateY: 20 }}
-          animate={{ opacity: 1, translateY: 0 }}
-          transition={{ type: "timing", duration: 500, delay: 600 }}
+        <Animatable.View
+          animation="fadeInUp"
+          duration={500}
+          delay={600}
           style={styles.promotionCard}
         >
           <View style={styles.promotionContent}>
@@ -1402,14 +1424,14 @@ export default function HomeScreen() {
               <Ionicons name="analytics" size={40} color="#06B6D4" />
             </View>
           </View>
-        </MotiView>
+        </Animatable.View>
 
         {/* 하단 액션 그리드 - 3개 아이콘 */}
         {isAuthenticated && (
-          <MotiView
-            from={{ opacity: 0, translateY: 20 }}
-            animate={{ opacity: 1, translateY: 0 }}
-            transition={{ type: "timing", duration: 500, delay: 800 }}
+          <Animatable.View
+            animation="fadeInUp"
+            duration={500}
+            delay={800}
             style={styles.actionGrid}
           >
             <TouchableOpacity
@@ -1435,7 +1457,7 @@ export default function HomeScreen() {
               <Text style={styles.actionTitle}>내 예약</Text>
               <Text style={styles.actionSubtitle}>관리하기</Text>
             </TouchableOpacity>
-          </MotiView>
+          </Animatable.View>
         )}
       </ScrollView>
 
@@ -1998,8 +2020,7 @@ const styles = StyleSheet.create({
     backgroundColor: "#FFFFFF",
     borderRadius: 16,
     marginHorizontal: 16,
-    marginTop: 8,
-    marginBottom: 8,
+    marginTop: 16,
     padding: 20,
     shadowColor: "#000",
     shadowOffset: {
@@ -2034,6 +2055,8 @@ const styles = StyleSheet.create({
     alignItems: "center",
     paddingTop: 24,
     paddingBottom: 0,
+    minHeight: 250, // 모든 상태(차량 있음/없음/로딩)에서 동일한 높이 유지
+    justifyContent: "center", // 내용을 수직 중앙 정렬
   },
   statusMessage: convertToLineSeedFont({
     fontSize: 16,
@@ -2041,8 +2064,8 @@ const styles = StyleSheet.create({
     textAlign: "center",
   }),
   mainActionButton: {
+    marginTop: 16,
     marginHorizontal: 16,
-    marginBottom: 12,
   },
   diagnosisButton: {
     backgroundColor: "#06B6D4",
@@ -2067,7 +2090,7 @@ const styles = StyleSheet.create({
     backgroundColor: "#ffffff",
     borderRadius: 16,
     marginHorizontal: 16,
-    marginBottom: 20,
+    marginTop: 16,
     padding: 20,
     shadowColor: "#000",
     shadowOffset: {
@@ -2076,7 +2099,7 @@ const styles = StyleSheet.create({
     },
     shadowOpacity: 0.1,
     shadowRadius: 4,
-
+    elevation: 3,
   },
   promotionContent: {
     flexDirection: "row",
@@ -2105,6 +2128,7 @@ const styles = StyleSheet.create({
   actionGrid: {
     flexDirection: "row",
     justifyContent: "flex-start",
+    marginTop: 16,
     marginHorizontal: 16,
     marginBottom: 20,
   },

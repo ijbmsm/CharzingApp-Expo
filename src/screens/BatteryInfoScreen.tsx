@@ -13,7 +13,7 @@ import {
   Image,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
-import { MotiView } from "moti";
+import * as Animatable from "react-native-animatable";
 import { useFocusEffect } from "@react-navigation/native";
 import Header from "../components/Header";
 import VehicleAccordionSelector from "../components/VehicleAccordionSelector";
@@ -425,10 +425,10 @@ export default function BatteryInfoScreen() {
       >
         {/* 차량 선택 전 안내 */}
         {!batteryInfo && (
-          <MotiView
-            from={{ opacity: 0, translateY: 20 }}
-            animate={{ opacity: 1, translateY: 0 }}
-            transition={{ type: "timing", duration: 500, delay: 200 }}
+          <Animatable.View
+            animation="fadeInUp"
+            duration={500}
+            delay={200}
             style={styles.noVehicleContainer}
           >
             <View style={styles.noVehicleIconContainer}>
@@ -450,7 +450,7 @@ export default function BatteryInfoScreen() {
               <Ionicons name="add" size={20} color="#FFFFFF" />
               <Text style={styles.selectVehicleButtonText}>차량 선택하기</Text>
             </TouchableOpacity>
-          </MotiView>
+          </Animatable.View>
         )}
 
         {/* 배터리 정보 섹션 - 실제 Firebase 데이터 사용 */}
@@ -458,10 +458,10 @@ export default function BatteryInfoScreen() {
           !batteryInfo.loading &&
           batteryInfo.modelData &&
           batteryInfo.selectedVariant && (
-            <MotiView
-              from={{ opacity: 0, translateY: 20 }}
-              animate={{ opacity: 1, translateY: 0 }}
-              transition={{ type: "timing", duration: 500, delay: 400 }}
+            <Animatable.View
+              animation="fadeInUp"
+              duration={500}
+              delay={400}
               style={styles.batteryInfoSection}
             >
               <View style={styles.sectionHeader}>
@@ -687,7 +687,7 @@ export default function BatteryInfoScreen() {
                   </View>
                 </View>
               </View>
-            </MotiView>
+            </Animatable.View>
           )}
 
         {/* 로딩 상태 - 스켈레톤 */}
@@ -718,9 +718,8 @@ export default function BatteryInfoScreen() {
 
         {/* 에러 상태 */}
         {batteryInfo?.error && (
-          <MotiView
-            from={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
+          <Animatable.View
+            animation="fadeIn"
             style={styles.errorContainer}
           >
             <Ionicons name="alert-circle" size={48} color="#EF4444" />
@@ -734,7 +733,7 @@ export default function BatteryInfoScreen() {
             >
               <Text style={styles.retryButtonText}>다시 시도</Text>
             </TouchableOpacity>
-          </MotiView>
+          </Animatable.View>
         )}
       </ScrollView>
 
@@ -777,6 +776,7 @@ const styles = StyleSheet.create({
     paddingTop: 8,
   },
   batteryInfoSection: {
+    marginTop: 16,
     marginHorizontal: 16,
     marginBottom: 16,
   },
@@ -805,6 +805,7 @@ const styles = StyleSheet.create({
   noVehicleContainer: {
     backgroundColor: "#FFFFFF",
     borderRadius: 16,
+    marginTop: 8,
     marginHorizontal: 16,
     marginBottom: 16,
     alignItems: "center",

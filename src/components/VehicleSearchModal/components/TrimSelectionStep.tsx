@@ -8,7 +8,7 @@ import {
   Image,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { MotiView } from 'moti';
+import * as Animatable from 'react-native-animatable';
 import { convertToLineSeedFont } from '../../../styles/fonts';
 import { type VehicleVariant, type VehicleGroup } from '../types';
 
@@ -77,10 +77,8 @@ const TrimSelectionStep: React.FC<TrimSelectionStepProps> = ({
   );
 
   return (
-    <MotiView
-      from={{ opacity: 0, translateX: 20 }}
-      animate={{ opacity: 1, translateX: 0 }}
-      transition={{ type: 'timing', duration: 300 }}
+    <Animatable.View
+      animation="fadeIn"
       style={styles.container}
     >
       {/* 선택된 모델 정보 */}
@@ -125,7 +123,7 @@ const TrimSelectionStep: React.FC<TrimSelectionStepProps> = ({
         
         {selectedGroup.variants.map(variant => renderTrimItem(variant))}
       </ScrollView>
-    </MotiView>
+    </Animatable.View>
   );
 };
 

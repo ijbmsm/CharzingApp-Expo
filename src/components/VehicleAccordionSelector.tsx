@@ -12,7 +12,7 @@ import {
   Dimensions,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { MotiView } from 'moti';
+import * as Animatable from 'react-native-animatable';
 import { LinearGradient } from 'expo-linear-gradient';
 import { convertToLineSeedFont } from '../styles/fonts';
 import firebaseService from '../services/firebaseService';
@@ -501,11 +501,11 @@ const VehicleAccordionSelector: React.FC<VehicleAccordionSelectorProps> = ({
   const renderBrandList = () => (
     <View style={styles.listContainer}>
       {brands.map((brand, index) => (
-        <MotiView
+        <Animatable.View
           key={brand.id}
-          from={{ opacity: 0, translateX: -20 }}
-          animate={{ opacity: 1, translateX: 0 }}
-          transition={{ type: 'timing', duration: 200, delay: index * 30 }}
+          animation="fadeInLeft"
+          duration={200}
+          delay={index * 30}
         >
           <TouchableOpacity
             style={[
@@ -524,7 +524,7 @@ const VehicleAccordionSelector: React.FC<VehicleAccordionSelectorProps> = ({
               color={selectedBrand?.id === brand.id ? "#06B6D4" : "#9CA3AF"} 
             />
           </TouchableOpacity>
-        </MotiView>
+        </Animatable.View>
       ))}
     </View>
   );
@@ -532,11 +532,11 @@ const VehicleAccordionSelector: React.FC<VehicleAccordionSelectorProps> = ({
   const renderModelList = () => (
     <View style={styles.listContainer}>
       {models.map((model, index) => (
-        <MotiView
+        <Animatable.View
           key={model.id}
-          from={{ opacity: 0, translateX: -20 }}
-          animate={{ opacity: 1, translateX: 0 }}
-          transition={{ type: 'timing', duration: 200, delay: index * 30 }}
+          animation="fadeInLeft"
+          duration={200}
+          delay={index * 30}
         >
           <TouchableOpacity
             style={[
@@ -555,7 +555,7 @@ const VehicleAccordionSelector: React.FC<VehicleAccordionSelectorProps> = ({
               color={selectedModel?.id === model.id ? "#06B6D4" : "#9CA3AF"} 
             />
           </TouchableOpacity>
-        </MotiView>
+        </Animatable.View>
       ))}
     </View>
   );
@@ -570,11 +570,11 @@ const VehicleAccordionSelector: React.FC<VehicleAccordionSelectorProps> = ({
           // console.log(`🔍 트림명: ${trim.trimName}, trimId: ${trim.trimId}`);
           
           return (
-        <MotiView
+        <Animatable.View
           key={`${trim.trimId}-${trim.years?.join('-') || index}`}
-          from={{ opacity: 0, translateX: -20 }}
-          animate={{ opacity: 1, translateX: 0 }}
-          transition={{ type: 'timing', duration: 200, delay: index * 30 }}
+          animation="fadeInLeft"
+          duration={200}
+          delay={index * 30}
         >
           <TouchableOpacity
             style={[
@@ -600,7 +600,7 @@ const VehicleAccordionSelector: React.FC<VehicleAccordionSelectorProps> = ({
               color={selectedTrim?.trimId === trim.trimId ? "#06B6D4" : "#9CA3AF"} 
             />
           </TouchableOpacity>
-        </MotiView>
+        </Animatable.View>
           );
         })}
       </View>
@@ -645,10 +645,9 @@ const VehicleAccordionSelector: React.FC<VehicleAccordionSelectorProps> = ({
         
         {/* Inline Complete Button */}
         {selectedYear && (
-          <MotiView
-            from={{ opacity: 0, translateY: 20, scale: 0.9 }}
-            animate={{ opacity: 1, translateY: 0, scale: 1 }}
-            transition={{ type: 'timing', duration: 400 }}
+          <Animatable.View
+            animation="zoomIn"
+            duration={400}
             style={styles.inlineCompleteContainer}
           >
             <TouchableOpacity
@@ -669,7 +668,7 @@ const VehicleAccordionSelector: React.FC<VehicleAccordionSelectorProps> = ({
                 </Text>
               </LinearGradient>
             </TouchableOpacity>
-          </MotiView>
+          </Animatable.View>
         )}
       </View>
     );
@@ -718,10 +717,9 @@ const VehicleAccordionSelector: React.FC<VehicleAccordionSelectorProps> = ({
     if (activeTab === 'brand' && !canGoNext() && !canGoPrev()) return null;
     
     return (
-      <MotiView
-        from={{ opacity: 0, translateY: 20 }}
-        animate={{ opacity: 1, translateY: 0 }}
-        transition={{ type: 'timing', duration: 300 }}
+      <Animatable.View
+        animation="fadeInUp"
+        duration={300}
         style={styles.floatingNav}
       >
         {canGoPrev() && (
@@ -751,7 +749,7 @@ const VehicleAccordionSelector: React.FC<VehicleAccordionSelectorProps> = ({
             <Ionicons name="chevron-forward" size={20} color="#FFFFFF" />
           </TouchableOpacity>
         )}
-      </MotiView>
+      </Animatable.View>
     );
   };
 
@@ -853,7 +851,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     backgroundColor: '#F9FAFB',
-    borderRadius: 12,
+    borderRadius: 8,
     paddingHorizontal: 14,
     paddingVertical: 10,
     marginRight: 8,
@@ -918,15 +916,10 @@ const styles = StyleSheet.create({
     marginBottom: 16,
   },
   listContainer: {
-    backgroundColor: '#FFFFFF',
-    borderRadius: 12,
+    marginTop: 8,
     overflow: 'hidden',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.1,
-    shadowRadius: 2,
-    elevation: 2,
   },
+
   listItem: {
     flexDirection: 'row',
     alignItems: 'center',

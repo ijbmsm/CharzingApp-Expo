@@ -130,7 +130,7 @@ const MyPageIcon = ({ color, size }: { color: string; size: number }) => (
 
 function MainTabs() {
   const insets = useSafeAreaInsets();
-  
+
   return (
     <Tab.Navigator
       screenOptions={{
@@ -141,8 +141,13 @@ function MainTabs() {
           backgroundColor: '#FFFFFF',
           borderTopWidth: 1,
           borderTopColor: '#E5E7EB',
-          paddingBottom: Math.max(insets.bottom, 8),
+          paddingBottom: Platform.OS === 'android'
+            ? Math.max(insets.bottom, 16) // Android는 최소 16px
+            : Math.max(insets.bottom, 8),  // iOS는 최소 8px
           paddingTop: 8,
+          height: Platform.OS === 'android'
+            ? 68 + insets.bottom // Android는 탭바 높이 + insets
+            : 68 + insets.bottom, // iOS도 동일하게 명시적 높이 지정
           elevation: 10,
           shadowOpacity: 0.1,
           shadowColor: '#000',

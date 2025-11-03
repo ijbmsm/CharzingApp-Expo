@@ -18,7 +18,7 @@ import Pdf from "react-native-pdf";
 import { NativeStackScreenProps } from "@react-navigation/native-stack";
 import { RootStackParamList } from "../navigation/RootNavigator";
 import { Ionicons } from "@expo/vector-icons";
-import { MotiView } from "moti";
+import * as Animatable from "react-native-animatable";
 import { LinearGradient } from "expo-linear-gradient";
 import { convertToLineSeedFont } from "../styles/fonts";
 import Header from "../components/Header";
@@ -265,10 +265,9 @@ const VehicleDiagnosisReportScreen: React.FC<Props> = ({
 
         <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
           {/* 차량 기본 정보 */}
-          <MotiView
-            from={{ opacity: 0, translateY: 20 }}
-            animate={{ opacity: 1, translateY: 0 }}
-            transition={{ type: "timing", duration: 400 }}
+          <Animatable.View
+            animation="fadeInUp"
+            duration={400}
             style={styles.vehicleSection}
           >
             <LinearGradient
@@ -493,13 +492,13 @@ const VehicleDiagnosisReportScreen: React.FC<Props> = ({
                 </View>
               </View>
             </LinearGradient>
-          </MotiView>
+          </Animatable.View>
 
           {/* 기능 버튼들 */}
-          <MotiView
-            from={{ opacity: 0, translateY: 20 }}
-            animate={{ opacity: 1, translateY: 0 }}
-            transition={{ type: "timing", duration: 400, delay: 200 }}
+          <Animatable.View
+            animation="fadeInUp"
+            duration={400}
+            delay={200}
             style={styles.actionContainer}
           >
             <TouchableOpacity
@@ -648,7 +647,7 @@ const VehicleDiagnosisReportScreen: React.FC<Props> = ({
                 </Text>
               </TouchableOpacity>
             )}
-          </MotiView>
+          </Animatable.View>
 
         </ScrollView>
 

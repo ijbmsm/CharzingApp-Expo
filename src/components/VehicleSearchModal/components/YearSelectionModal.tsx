@@ -10,7 +10,7 @@ import {
   Alert,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { MotiView } from 'moti';
+import * as Animatable from 'react-native-animatable';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { convertToLineSeedFont } from '../../../styles/fonts';
 import { type Vehicle, type VehicleVariant, type VehicleGroup } from '../types';
@@ -127,12 +127,10 @@ const YearSelectionModal: React.FC<YearSelectionModalProps> = ({
           showsVerticalScrollIndicator={false}
         >
           {selectedVariant.availableYears?.map((year) => (
-            <MotiView
+            <Animatable.View
               key={year}
-              from={{ opacity: 0, translateX: 20 }}
-              animate={{ opacity: 1, translateX: 0 }}
-              transition={{ type: 'timing', duration: 300, delay: year * 50 }}
-            >
+      animation="fadeIn"
+      >
               <TouchableOpacity
                 style={styles.yearItem}
                 onPress={() => handleSelectVehicle(year)}
@@ -150,7 +148,7 @@ const YearSelectionModal: React.FC<YearSelectionModalProps> = ({
                 </View>
                 <Ionicons name="chevron-forward" size={20} color="#9CA3AF" />
               </TouchableOpacity>
-            </MotiView>
+            </Animatable.View>
           ))}
         </ScrollView>
 

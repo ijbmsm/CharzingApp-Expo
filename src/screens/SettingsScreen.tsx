@@ -119,7 +119,7 @@ const SettingsScreen: React.FC = () => {
               devLog.log('회원탈퇴 시작...');
 
               // Firestore에서 사용자 데이터 삭제
-              await firebaseService.deleteUser(user.uid);
+              await firebaseService.deleteUserAccount(user.uid);
 
               // Firebase Auth 로그아웃
               await firebaseService.signOut();

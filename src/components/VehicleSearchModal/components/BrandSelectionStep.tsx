@@ -9,7 +9,7 @@ import {
   Image,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { MotiView } from 'moti';
+import * as Animatable from 'react-native-animatable';
 import { convertToLineSeedFont } from '../../../styles/fonts';
 import { getBrandLogo } from '../utils/brandMapping';
 import { type BrandData } from '../types';
@@ -61,10 +61,8 @@ const BrandSelectionStep: React.FC<BrandSelectionStepProps> = ({
   };
 
   return (
-    <MotiView
-      from={{ opacity: 0, scale: 0.95 }}
-      animate={{ opacity: 1, scale: 1 }}
-      transition={{ type: 'timing', duration: 400 }}
+    <Animatable.View
+      animation="fadeIn"
       style={styles.container}
     >
       {firestoreLoading ? (
@@ -83,7 +81,7 @@ const BrandSelectionStep: React.FC<BrandSelectionStepProps> = ({
       ) : (
         renderBrandGrid()
       )}
-    </MotiView>
+    </Animatable.View>
   );
 };
 

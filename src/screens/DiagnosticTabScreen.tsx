@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { View, StyleSheet, Text, TouchableOpacity, ScrollView, Image, Dimensions } from 'react-native';
-import { MotiView } from 'moti';
+import * as Animatable from 'react-native-animatable';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { useSelector } from 'react-redux';
@@ -131,10 +131,10 @@ export default function DiagnosticTabScreen() {
         {!selectedVehicle ? (
           /* 빈 화면 상태 */
           <View style={styles.emptyContainer}>
-            <MotiView
-              from={{ opacity: 0, translateY: 20 }}
-              animate={{ opacity: 1, translateY: 0 }}
-              transition={{ type: 'timing', duration: 800, delay: 500 }}
+            <Animatable.View
+              animation="fadeInUp"
+              duration={800}
+              delay={500}
               style={styles.welcomeContainer}
             >
               <Text style={styles.welcomeTitle}>내 차량을{'\n'}선택해 주세요</Text>
@@ -144,7 +144,7 @@ export default function DiagnosticTabScreen() {
               >
                 <Ionicons name="add" size={28} color="#9CA3AF" />
               </TouchableOpacity>
-            </MotiView>
+            </Animatable.View>
           </View>
         ) : (
           /* 차량 선택 후 상태 */
@@ -156,12 +156,11 @@ export default function DiagnosticTabScreen() {
             >
               <Ionicons name="arrow-back" size={24} color="#1F2937" />
             </TouchableOpacity>
-            
+
             {/* 차량 이미지 - 전체 너비로 상단에 고정 */}
-            <MotiView
-              from={{ opacity: 0, translateY: -20 }}
-              animate={{ opacity: 1, translateY: 0 }}
-              transition={{ type: 'timing', duration: 400 }}
+            <Animatable.View
+              animation="fadeInDown"
+              duration={400}
               style={styles.vehicleImageHeader}
             >
               {(() => {
@@ -229,28 +228,28 @@ export default function DiagnosticTabScreen() {
                     );
                   }
                 })()}
-            </MotiView>
-            
+            </Animatable.View>
+
             {/* 스크롤 가능한 콘텐츠 영역 */}
-            <ScrollView 
+            <ScrollView
               style={styles.scrollContainer}
               showsVerticalScrollIndicator={false}
               contentContainerStyle={styles.vehicleContentContainer}
             >
               {/* 차량 상세 정보 */}
               {vehicleDetails && (
-                <MotiView
-                  from={{ opacity: 0, translateY: 15 }}
-                  animate={{ opacity: 1, translateY: 0 }}
-                  transition={{ type: 'timing', duration: 300, delay: 200 }}
+                <Animatable.View
+                  animation="fadeInUp"
+                  duration={600}
+                  delay={200}
                   style={styles.vehicleDetailContainer}
                 >
                   {/* 배터리 정보 */}
                   {vehicleDetails.batteryData.battery && (
-                    <MotiView
-                      from={{ opacity: 0 }}
-                      animate={{ opacity: 1 }}
-                      transition={{ type: 'timing', duration: 250, delay: 300 }}
+                    <Animatable.View
+                      animation="fadeIn"
+                      duration={250}
+                      delay={300}
                       style={styles.infoSection}
                     >
                       <View style={styles.infoHeader}>
@@ -295,15 +294,15 @@ export default function DiagnosticTabScreen() {
                           </View>
                         )}
                       </View>
-                    </MotiView>
+                    </Animatable.View>
                   )}
 
                   {/* 성능 정보 */}
                   {vehicleDetails.batteryData.specs && (
-                    <MotiView
-                      from={{ opacity: 0 }}
-                      animate={{ opacity: 1 }}
-                      transition={{ type: 'timing', duration: 250, delay: 400 }}
+                    <Animatable.View
+                      animation="fadeIn"
+                      duration={250}
+                      delay={400}
                       style={styles.infoSection}
                     >
                       <View style={styles.infoHeader}>
@@ -366,15 +365,15 @@ export default function DiagnosticTabScreen() {
                           </View>
                         )}
                       </View>
-                    </MotiView>
+                    </Animatable.View>
                   )}
-                </MotiView>
+                </Animatable.View>
               )}
-              
-              <MotiView
-                from={{ opacity: 0, translateY: 15 }}
-                animate={{ opacity: 1, translateY: 0 }}
-                transition={{ type: 'timing', duration: 300, delay: 300 }}
+
+              <Animatable.View
+                animation="fadeInUp"
+                duration={300}
+                delay={300}
                 style={styles.actionContainer}
               >
                 <TouchableOpacity
@@ -387,7 +386,7 @@ export default function DiagnosticTabScreen() {
                   <Text style={styles.diagnosisButtonText}>진단 예약하기</Text>
                   <Ionicons name="arrow-forward" size={20} color="#FFFFFF" />
                 </TouchableOpacity>
-              </MotiView>
+              </Animatable.View>
             </ScrollView>
           </View>
         )}
