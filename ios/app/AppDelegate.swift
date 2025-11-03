@@ -1,6 +1,8 @@
 import Expo
 import React
 import ReactAppDependencyProvider
+import KakaoSDKCommon
+import KakaoSDKAuth
 
 @UIApplicationMain
 public class AppDelegate: ExpoAppDelegate {
@@ -13,6 +15,14 @@ public class AppDelegate: ExpoAppDelegate {
     _ application: UIApplication,
     didFinishLaunchingWithOptions launchOptions: [UIApplication.LaunchOptionsKey: Any]? = nil
   ) -> Bool {
+    // Kakao SDK 초기화
+    if let kakaoAppKey = Bundle.main.object(forInfoDictionaryKey: "KAKAO_APP_KEY") as? String {
+      KakaoSDK.initSDK(appKey: kakaoAppKey)
+      print("✅ Kakao SDK 초기화 완료: \(kakaoAppKey)")
+    } else {
+      print("⚠️ KAKAO_APP_KEY를 Info.plist에서 찾을 수 없습니다")
+    }
+
     let delegate = ReactNativeDelegate()
     let factory = ExpoReactNativeFactory(delegate: delegate)
     delegate.dependencyProvider = RCTAppDependencyProvider()

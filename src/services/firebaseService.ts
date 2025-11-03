@@ -954,7 +954,7 @@ class FirebaseService {
       const userDocRef = doc(this.db, 'users', uid);
 
       // 새 사용자 문서 생성 (setDoc 사용) + 기본 알림 설정
-      await setDoc(userDocRef, {
+      const userData: any = {
         uid,
         email: registrationData.email || '',
         displayName: registrationData.displayName,
@@ -962,9 +962,6 @@ class FirebaseService {
         phoneNumber: registrationData.phoneNumber,
         provider: registrationData.provider,
         photoURL: registrationData.photoURL || '',
-        kakaoId: registrationData.kakaoId,
-        googleId: registrationData.googleId,
-        appleId: registrationData.appleId,
         agreedToTerms: registrationData.agreedToTerms,
         agreedToPrivacy: registrationData.agreedToPrivacy,
         agreedAt: registrationData.agreedAt,
@@ -980,7 +977,20 @@ class FirebaseService {
         createdAt: serverTimestamp(),
         updatedAt: serverTimestamp(),
         lastLoginAt: serverTimestamp(),
-      });
+      };
+
+      // undefined가 아닌 경우에만 ID 필드 추가 (Firestore는 undefined 허용 안 함)
+      if (registrationData.kakaoId !== undefined) {
+        userData.kakaoId = registrationData.kakaoId;
+      }
+      if (registrationData.googleId !== undefined) {
+        userData.googleId = registrationData.googleId;
+      }
+      if (registrationData.appleId !== undefined) {
+        userData.appleId = registrationData.appleId;
+      }
+
+      await setDoc(userDocRef, userData);
 
       devLog.log('✅ 회원가입 완료 - 사용자 문서 + 기본 알림 설정 생성:', uid);
     } catch (error) {

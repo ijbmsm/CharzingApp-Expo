@@ -2,6 +2,7 @@
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
   <dict>
+    <!-- 기본 앱 정보 -->
     <key>CADisableMinimumFrameDurationOnPhone</key>
     <true/>
     <key>CFBundleAllowMixedLocalizations</key>
@@ -22,10 +23,18 @@
     <string>$(PRODUCT_BUNDLE_PACKAGE_TYPE)</string>
     <key>CFBundleShortVersionString</key>
     <string>1.1.0</string>
+    <key>CFBundleVersion</key>
+    <string>2</string>
     <key>CFBundleSignature</key>
     <string>????</string>
+
+    <key>KAKAO_APP_KEY</key>
+    <string>f6965d2b8a05c3aa81d6682a29c433d2</string>
+
+    <!-- URL Schemes: Google / App / Kakao / Expo -->
     <key>CFBundleURLTypes</key>
     <array>
+      <!-- 1. Google Sign-In -->
       <dict>
         <key>CFBundleURLName</key>
         <string>google-signin</string>
@@ -34,43 +43,72 @@
           <string>com.googleusercontent.apps.91035459357-lc3tir17pmmomf793bnce1qmstns4rh7</string>
         </array>
       </dict>
+
+      <array>
+        <dict>
+          <key>CFBundleURLSchemes</key>
+          <array>
+            <string>kakaof6965d2b8a05c3aa82</string>
+            <string>charzingapp</string>
+          </array>
+        </dict>
+      </array>
+
+
+      <!-- 2. 앱 자체 스킴 -->
       <dict>
         <key>CFBundleURLName</key>
-        <string>bundleidentifier</string>
+        <string>com.charzingapp</string>
         <key>CFBundleURLSchemes</key>
         <array>
           <string>com.charzingapp</string>
+          <string>charzingapp</string>
+          <string>exp+charzingapp-expo</string>
+        </array>
+      </dict>
+
+      <!-- 3. Kakao Login -->
+      <dict>
+        <key>CFBundleURLName</key>
+        <string>kakao-login</string>
+        <key>CFBundleURLSchemes</key>
+        <array>
           <string>kakaof6965d2b8a05c3aa81d6682a29c433d2</string>
         </array>
       </dict>
-      <key>LSApplicationQueriesSchemes</key>
-      <array>
-        <string>kakaokompassauth</string>
-        <string>storykompassauth</string>
-        <string>kakaolink</string>
-        <string>com.googleusercontent.apps.91035459357-lc3tir17pmmomf793bnce1qmstns4rh7</string>
-      </array>
 
+      <!-- 4. Expo Linking -->
+      <dict>
+        <key>CFBundleURLSchemes</key>
+        <array>
+          <string>exp+charzingapp-expo</string>
+        </array>
+      </dict>
     </array>
-    <key>CFBundleVersion</key>
-    <string>2</string>
-    <key>ITSAppUsesNonExemptEncryption</key>
-    <false/>
-    <key>KAKAO_APP_KEY</key>
-    <string>f6965d2b8a05c3aa81d6682a29c433d2</string>
-    <key>KAKAO_APP_SCHEME</key>
-    <string>charzingapp</string>
+
+    <!-- Kakao 관련 Query Schemes -->
+    <key>LSApplicationQueriesSchemes</key>
+    <array>
+      <string>kakaokompassauth</string>
+      <string>storykompassauth</string>
+      <string>kakaolink</string>
+    </array>
+
+    <!-- iOS 최소 버전 및 기기 설정 -->
     <key>LSMinimumSystemVersion</key>
     <string>12.0</string>
     <key>LSRequiresIPhoneOS</key>
     <true/>
-    <key>NSAppTransportSecurity</key>
-    <dict>
-      <key>NSAllowsArbitraryLoads</key>
-      <false/>
-      <key>NSAllowsLocalNetworking</key>
-      <true/>
-    </dict>
+    <key>UIRequiredDeviceCapabilities</key>
+    <array>
+      <string>arm64</string>
+    </array>
+    <key>UIRequiresFullScreen</key>
+    <false/>
+
+
+
+    <!-- 권한 설명 -->
     <key>NSCameraUsageDescription</key>
     <string>진단 리포트 사진 촬영을 위해 카메라 접근 권한이 필요합니다.</string>
     <key>NSLocationAlwaysAndWhenInUseUsageDescription</key>
@@ -81,22 +119,10 @@
     <string>이 앱은 지도를 표시하고 주변 위치 기반 기능을 위해 현재 위치 접근이 필요합니다.</string>
     <key>NSPhotoLibraryUsageDescription</key>
     <string>진단 관련 사진을 저장하고 불러오기 위해 사진 라이브러리 접근 권한이 필요합니다.</string>
-    <key>NSUserActivityTypes</key>
-    <array>
-      <string>$(PRODUCT_BUNDLE_IDENTIFIER).expo.index_route</string>
-    </array>
     <key>NSUserNotificationUsageDescription</key>
     <string>예약 상태 변경 및 진단 결과 알림을 위해 푸시 알림 권한이 필요합니다.</string>
-    <key>RCTNewArchEnabled</key>
-    <true/>
-    <key>UILaunchStoryboardName</key>
-    <string>SplashScreen</string>
-    <key>UIRequiredDeviceCapabilities</key>
-    <array>
-      <string>arm64</string>
-    </array>
-    <key>UIRequiresFullScreen</key>
-    <false/>
+
+    <!-- 화면 설정 -->
     <key>UIStatusBarStyle</key>
     <string>UIStatusBarStyleDefault</string>
     <key>UISupportedInterfaceOrientations</key>
@@ -115,5 +141,28 @@
     <string>Automatic</string>
     <key>UIViewControllerBasedStatusBarAppearance</key>
     <false/>
+
+    <!-- Swift / Expo 설정 -->
+    <key>RCTNewArchEnabled</key>
+    <true/>
+    <key>UILaunchStoryboardName</key>
+    <string>SplashScreen</string>
+    <key>ITSAppUsesNonExemptEncryption</key>
+    <false/>
+    <key>NSAppTransportSecurity</key>
+    <dict>
+      <key>NSAllowsArbitraryLoads</key>
+      <false/>
+      <key>NSAllowsLocalNetworking</key>
+      <true/>
+    </dict>
+
+    <!-- User Activity (Expo Linking) -->
+    <key>NSUserActivityTypes</key>
+    <array>
+      <string>$(PRODUCT_BUNDLE_IDENTIFIER).expo.index_route</string>
+    </array>
+
   </dict>
 </plist>
+
