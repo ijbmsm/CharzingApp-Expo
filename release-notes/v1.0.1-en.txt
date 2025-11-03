@@ -1,0 +1,20 @@
+Version 1.0.1 Update
+
+New Features
+- Social login support with KakaoTalk, Google, and Apple for easier sign-up
+- Added vehicle information registration and management
+- Improved battery diagnosis reservation system
+- Real-time reservation status tracking
+
+Improvements
+- Enhanced app performance and stability
+- Improved user interface
+- Optimized login process
+- Stabilized notification system
+
+Bug Fixes
+- Resolved intermittent login errors
+- Fixed vehicle image loading issues
+- Improved screen transition errors
+
+Start your safe electric vehicle life with Charzing.

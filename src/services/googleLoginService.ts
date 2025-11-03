@@ -43,13 +43,7 @@ class GoogleLoginService {
         iosClientId: '91035459357-lc3tir17pmmomf793bnce1qmstns4rh7.apps.googleusercontent.com',
         offlineAccess: true,
         forceCodeForRefreshToken: true,
-        hostedDomain: '',
-        scopes: [
-          'email',
-          'profile',
-          'https://www.googleapis.com/auth/userinfo.email',
-          'https://www.googleapis.com/auth/userinfo.profile'
-        ],
+        scopes: ['email', 'profile'],
       });
 
       this.isInitialized = true;

@@ -1,0 +1,26 @@
+Version 1.1.0 Major Update
+
+New Features
+Start quickly with convenient social login. Sign up and log in seamlessly using your KakaoTalk, Google, or Apple account.
+
+Manage your vehicle at a glance. Register your vehicle information and check battery status and diagnosis history in real-time.
+
+Booking made easier. Select your preferred date and location for our customized battery diagnosis service where experts come to you.
+
+Never miss an update with real-time notifications. Receive push notifications for every step from booking confirmation to diagnosis completion.
+
+Improvements
+Faster and more stable app performance for a seamless user experience.
+
+Intuitive interface redesigned for easy use by everyone.
+
+Enhanced battery information search to quickly find your vehicle details.
+
+Bug Fixes
+Resolved errors that occurred during the login process.
+
+Fixed issues where vehicle images were not displaying properly.
+
+Improved intermittent errors during screen transitions.
+
+Start managing your electric vehicle battery with Charzing.
