@@ -20,14 +20,14 @@ export default {
     version: "1.1.0",
     sdkVersion: "54.0.0",
     orientation: "portrait",
-    icon: "./assets/CharzingLogo3.png",
+    icon: "./src/assets/charzingLogo/ios/AppIcon~ios-marketing.png",
     scheme: "charzingapp",
     userInterfaceStyle: "automatic",
     description: "한국 1위 전기차 배터리 진단 전문 서비스. 중고 전기차 구매 전 전문가가 직접 방문하여 배터리 상태를 정확히 진단하고 24시간 내 상세한 리포트를 제공합니다.",
     githubUrl: "https://github.com/ijbmsm/CharzingApp-Expo",
     splash: {
       image: "./assets/images/splash.png",
-      backgroundColor: "#202632",
+      backgroundColor: "#FFFFFF",
       resizeMode: "contain",
       hideExponentText: true
     },
@@ -42,7 +42,7 @@ export default {
       supportsTablet: true,
       bundleIdentifier: "com.charzingapp",
       jsEngine: "hermes",
-      icon: "./assets/CharzingLogo3.png",
+      icon: "./src/assets/charzingLogo/ios/AppIcon~ios-marketing.png",
       buildNumber: "2",
       requireFullScreen: false,
       infoPlist: {
@@ -75,11 +75,11 @@ export default {
       associatedDomains: ["applinks:charzing.kr"]
     },
     android: {
+      icon: "./src/assets/charzingLogo/android/play_store_512.png",
       adaptiveIcon: {
-        foregroundImage: "./assets/CharzingLogo3.png",
-        backgroundColor: "#ffffff"
+        foregroundImage: "./src/assets/charzingLogo/android/play_store_512.png",
+        backgroundColor: "#FFFFFF"
       },
-      icon: "./assets/CharzingLogo3.png",
       package: "com.charzingapp",
       jsEngine: "hermes",
       versionCode: 2,
@@ -122,7 +122,7 @@ export default {
     web: {
       bundler: "metro",
       output: "static",
-      favicon: "./assets/favicon/favicon-32x32.png"
+      favicon: "./assets/favicon/favicon-96x96.png"
     },
     plugins: [
       "expo-dev-client",

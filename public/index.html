@@ -1,0 +1,55 @@
+<!DOCTYPE html>
+<html lang="%LANG_ISO_CODE%">
+  <head>
+    <meta charset="utf-8" />
+    <meta httpEquiv="X-UA-Compatible" content="IE=edge" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no" />
+    <title>%WEB_TITLE%</title>
+
+    <style id="expo-reset">
+      /* These styles make the body full-height */
+      html,
+      body {
+        height: 100%;
+      }
+      /* These styles disable body scrolling if you are using <ScrollView> */
+      body {
+        overflow: hidden;
+      }
+      /* These styles make the root element full-height */
+      #root {
+        display: flex;
+        height: 100%;
+        flex: 1;
+      }
+    </style>
+    <style id="bootsplash-style">
+      #bootsplash {
+        position: absolute;
+        top: 0;
+        bottom: 0;
+        left: 0;
+        right: 0;
+        overflow: hidden;
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        background-color: #ffffff;
+      }
+      #bootsplash-logo {
+        content: url("data:image/svg+xml;base64,iVBORw0KGgoAAAANSUhEUgAAASwAAAEsCAMAAABOo35HAAACylBMVEX///8IttT9/v6d2OL+///e3+D+/v/f4OGf2eMGttTi4+Sg2eMAtNP7+/vk9/ogvtia1+H8/v4Jt9Te8vX5+fnh4uMAstHC5+2C2un0+vup3Ob+/v7d3t/9/v8As9IHttT9/f2b1+EAstIIt9T8/Pyc1+Kb1+Ls7e35/P3j5OX29vbt7u7n5+jm5+ju7+/n6Onu+Pqz4emc2OLr+fsBs9Lz9PT8/P3I6e+b2OIFtdQtwdpJyN8FtdP1/P0JttTq6uvr6+zl5ebk5OX19fX+/f719vb6+/v29fb9/f7s7O3l5ufj9Peq3eb1+/ur3uaw3+f6/f72+/z7/f295euh2ePN6/Dy+vvX7/OR3uum2+S54uqe2eLn9fis5vCn3OUCtdP2/P0JtdPU7vL7/f77/v6m3OXX8/jm9/oAtNKj2uSB2ej3/f0kv9lv1OZ31uf4/f5Jyd+66vIBtNP3/P38/v/e3t/d3uDd3+D19fbf4ODe39///v/t7e709PT09fX+//695OvV7vL2+/3D5+3v+PrT7fKv3+jW7vLc8fX2/PwevNey4Ojz+vvW7/Py+fr5/f2m2+Wu3+fO6/BUzOCz4ejP6/Gz4Oiz4Ond8fW+5euD2unt+Pn6/v7E5+3f8vWv5/H0/P0Ot9RIyN8hvtjH6e/z+/2D2ej4/P0EtdM5xNwdvNeW4O3w+v3w+vzb9Pi14eldzuK76vPz+fsNt9St3uf3/PyC2el41+cPt9Ss3udMyeAGtdQNt9U5w9xVzOHo9fi56vP2/P4MttQfvthLyd+04eny+fvW8/i66vMtwNoJtdTj8/e56vK76vKt5vC46vIPt9Xj8/al2+R41udezuOX4O0Qt9UNttTp9vgswNo7xd3K7/U8xd0jvdgkvdgsv9rJ7/UlvdjE7fXW8/dXzeGA2egmvtnE7fTn+PsCtNPp+Pvc9Pl+2ehZzeLuXcufAAAACXBIWXMAAAsTAAALEwEAmpwYAAAFUklEQVR4nO3d9W9bVxiH8dfO8bUd123ibt26a4idpE0xhZSZmZm7lVZcu3XMzMzMzMzMzMzM/8NkVdpWTZN6f4ju19Lz+QuuHr335Oqck8QMAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAICKMbF/OmT9J1pFqBvXrfvo6pCN7t6ta53J69ocz2ZjoTswG2/uatr8nvFsLC4hlo339E2YP0klVVksO0m5Vk+hVGWxniara1wtVnyciRrbnI2LyTaPNU0T4oImmKZucoMVj2e7maS67oqxumt+mzZ0EVvey2JdGkxRuloxVnXaFKWJRaxWkWayiNUq0kwWsVpFmskiVqtIM1nEahVpJotYrSLNZBGrVaSZrF3XwObfrvN7KG4r95A8Zz3cjlCM1dk0jYnrOXSMaarTew+zPTQPd8zsqLicQ0xWZ7HRkl2xyupGSNXKjpB9CcvqOscOios4ONZZupVvfr/JsexhYV+SjMWy2djkfr5JfmT9S92RI0dV7x6y6lEj+/U3dZ5v5jeM3y1k4xvKz6E+VwAAAAAAAEClcZ4AZ5XAeSahAnJ5ntnsXlPah2zKCbN3PIsy5+zyeb0XpapCljrngnm9yk8jzFnTeWtqilWJ0FUVa5ZfeLYJz5Zn8xcXq1KphIBUqqq4+CyTnS1nZ/SukSi1Q6qm93zdWqsvVWpVrjVnlWlytkBgsdpZ4wLV0TrupE5Sg5VIpBrPnSVZy9kpcoOVSFRdIhrreK0VqyxVvFIxlrOZvdXewkQi1enimYK1nJ06vU9CTp/pswS/TD3ruJfimrVXR2LtKmIFQKwAiBUAsQIgVgDECoBYARArAGIFQKwAiBUAsSo+lrNpUxV3HaZOk9zPaprRqLf51zijSTCWueicol6smmNqBVuZs30GJuR0OlFxsMxZrzVyi1bV8l6SsczZDWrHO6maAZqtzNlLj2qd76QaH7hPNJY5e3d9H6FaqT7rX1dtZebsqkVFjRtH5TtHxffa67Yy8+yTuwcWl6QELCkOfPFp5VZmzm4+86K5jTVhK3aae/o+D2q3svId4aalJw/YI2QDjl3aJHNv+v/tuPTqQvbPk4hzvucfHXIsz/MrIRUAAAAAAAjE5WoF5Cph18GPivwpVb9W5EH+X86zK9YuW3jZnuFauOzlVeblTJmL2gFvnX/a3vkOIcu/dttTVx9gUeV3MWff/7B3hxXJSCZkkeSK0vA/19p2kxW1n78uFeoLhWToCoVIsvTpdxY1UTn7/Nv88KSM4fmvvjHRdcvZb1/kM0khmfxnv4ieHebsx5JUq2QyU/pDc7Ry9vtP+0eSUiK/fnmXZK1auz0v1iqZjOz7odWaHOdW36O1YpVlSh/UCp5Me3bHk4qTdeudgvfgo7ZuUxu9WG02rRP81opa2+f3F/ga3VmkTbu2mrHaKU4WsXYZsQIgVgDECoBYARArAGIFQKwAiBUAsQIgVgDECoBYlR/Lt76DFXcdBvcV/P/IzoYNydcnxdTnhwxTPAyL2vsluViZ0hbBt9Bsu237eJDYVmlh0P2vSMZyNmyr2vFOpvTYs4pvoVnO3nhkqNQSHxn60b2SZ6xWrrWhpSBUK1JoeUi1lTnbb3PLLRmRdauQGdqyeT/Nl7DMs403vZMfVF8fCV19/eOlazdsFDxg/ZvnvG0vPFHKtwldPv/cdW/72r9/73J2zZtbtg5uF67rXx3y8DM3mvz17pwzt7Jv25D1XenKP3DkuVqJh8xJ/kW2/3KeHw2ZXwH/3RAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAACAVaC/AMKu/LbzflsbAAAAAElFTkSuQmCC");
+        width: 150px;
+        height: 150px;
+      }
+    </style>
+  </head>
+
+  <body>
+    <noscript> You need to enable JavaScript to run this app. </noscript>
+
+    <div id="root"></div>
+    <div id="bootsplash">
+      <div id="bootsplash-logo"></div>
+    </div>
+  </body>
+</html>

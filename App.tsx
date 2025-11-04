@@ -27,6 +27,7 @@ import kakaoLoginService from './src/services/kakaoLoginService';
 import analyticsService from './src/services/analyticsService';
 import * as SplashScreen from 'expo-splash-screen';
 import { useFonts } from 'expo-font';
+import RNBootSplash from 'react-native-bootsplash';
 
 // Expo 스플래시 화면을 최대한 빨리 숨기기 (촌스러운 화면 제거)
 // 우리가 만든 커스텀 로딩 화면을 대신 사용
@@ -174,17 +175,21 @@ function App() {
   useEffect(() => {
     const initializeApp = async () => {
       console.log('🚀 앱 초기화 시작...');
-      
+
       try {
         // 0. Expo 스플래시 화면 즉시 숨기기 (최소 지연)
         await SplashScreen.hideAsync();
         console.log('✅ Expo 스플래시 화면 숨김 완료');
-        
+
+        // 1. BootSplash 숨기기 (번들링 로딩 화면)
+        await RNBootSplash.hide({ fade: true });
+        console.log('✅ BootSplash 숨김 완료');
+
         // 2. Firebase 초기화
         setLoadingMessage('Firebase 연결 중...');
         console.log('🚀 Firebase 초기화 시작...');
         const success = await firebaseFacade.initialize();
-        
+
         if (success) {
           console.log('✅ Firebase 초기화 성공');
         } else {

@@ -495,12 +495,13 @@ export default function BatteryInfoScreen() {
                 ) : null;
               })()}
 
-              {/* 배터리 메인 정보 - 실제 Firebase 데이터 */}
+              {/* 배터리 메인 정보 - 배터리 제조사와 완충 시 주행거리 */}
               <View style={styles.batteryMainCard}>
                 <View style={styles.batteryIconContainer}>
                   <Ionicons name="battery-full" size={32} color="#06B6D4" />
                 </View>
                 <View style={styles.batteryMainInfo}>
+                  <Text style={styles.batteryLabel}>배터리 제조사</Text>
                   <Text style={styles.batteryManufacturer}>
                     {safeGetString(batteryInfo.selectedVariant, "supplier") !==
                     "정보 없음"
@@ -518,7 +519,8 @@ export default function BatteryInfoScreen() {
                           "supplier"
                         )}
                   </Text>
-                  <Text style={styles.batteryType}>
+                  {/* 셀 타입 - 주석 처리 */}
+                  {/* <Text style={styles.batteryType}>
                     {safeGetString(
                       batteryInfo.modelData.defaultBattery,
                       "cellType"
@@ -532,12 +534,18 @@ export default function BatteryInfoScreen() {
                           "type"
                         )}{" "}
                     배터리
+                  </Text> */}
+                </View>
+                <View style={styles.batteryRangeInfo}>
+                  <Text style={styles.batteryLabel}>완충 시 주행거리</Text>
+                  <Text style={styles.batteryRangeValue}>
+                    {safeGetString(batteryInfo.selectedVariant, "range")}km
                   </Text>
                 </View>
               </View>
 
-              {/* 차량 기본 정보 */}
-              <View style={styles.performanceCard}>
+              {/* 차량 기본 정보 - 주석 처리 (완충 시 주행거리를 위로 이동) */}
+              {/* <View style={styles.performanceCard}>
                 <Text style={styles.detailsTitle}>차량 기본 정보</Text>
                 <View style={styles.performanceGrid}>
                   <View style={styles.performanceItem}>
@@ -546,8 +554,10 @@ export default function BatteryInfoScreen() {
                     <Text style={styles.performanceValue}>
                       {safeGetString(batteryInfo.selectedVariant, "range")}km
                     </Text>
-                  </View>
-                  <View style={styles.performanceItem}>
+                  </View> */}
+
+                  {/* 전비 - 주석 처리 */}
+                  {/* <View style={styles.performanceItem}>
                     <Ionicons name="leaf" size={20} color="#06B6D4" />
                     <Text style={styles.performanceLabel}>전비</Text>
                     <Text style={styles.performanceValue}>
@@ -561,8 +571,10 @@ export default function BatteryInfoScreen() {
                           )
                         : "정보 없음"}
                     </Text>
-                  </View>
-                  <View style={styles.performanceItem}>
+                  </View> */}
+
+                  {/* 배터리 용량 - 주석 처리 */}
+                  {/* <View style={styles.performanceItem}>
                     <Ionicons name="battery-full" size={20} color="#06B6D4" />
                     <Text style={styles.performanceLabel}>배터리 용량</Text>
                     <Text style={styles.performanceValue}>
@@ -572,8 +584,10 @@ export default function BatteryInfoScreen() {
                       )}
                       kWh
                     </Text>
-                  </View>
-                  <View style={styles.performanceItem}>
+                  </View> */}
+
+                  {/* 충전 커넥터 규격 - 주석 처리 */}
+                  {/* <View style={styles.performanceItem}>
                     <Ionicons name="battery-charging" size={20} color="#06B6D4" />
                     <Text style={styles.performanceLabel}>충전 커넥터 규격</Text>
                     <Text style={styles.performanceValue}>
@@ -587,8 +601,10 @@ export default function BatteryInfoScreen() {
                           )
                         : safeGetString(batteryInfo.selectedVariant, "chargingConnector", "정보 없음")}
                     </Text>
-                  </View>
-                  <View style={styles.performanceItem}>
+                  </View> */}
+
+                  {/* 배터리 보증 - 주석 처리 */}
+                  {/* <View style={styles.performanceItem}>
                     <Ionicons name="shield-checkmark" size={20} color="#06B6D4" />
                     <Text style={styles.performanceLabel}>배터리 보증</Text>
                     <Text style={styles.performanceValue}>
@@ -599,10 +615,10 @@ export default function BatteryInfoScreen() {
                     </Text>
                   </View>
                 </View>
-              </View>
+              </View> */}
 
-              {/* 성능 정보 - 브랜드별 다른 구조 지원 */}
-              <View style={[styles.performanceCard, { marginTop: 16 }]}>
+              {/* 성능 정보 - 모두 주석 처리 */}
+              {/* <View style={[styles.performanceCard, { marginTop: 16 }]}>
                 <Text style={styles.detailsTitle}>성능 사양</Text>
                 <View style={styles.performanceGrid}>
                   <View style={styles.performanceItem}>
@@ -686,7 +702,7 @@ export default function BatteryInfoScreen() {
                     </Text>
                   </View>
                 </View>
-              </View>
+              </View> */}
             </Animatable.View>
           )}
 
@@ -884,16 +900,28 @@ const styles = StyleSheet.create({
   batteryMainInfo: {
     flex: 1,
   },
+  batteryLabel: convertToLineSeedFont({
+    fontSize: 12,
+    color: "#6B7280",
+    marginBottom: 4,
+  }),
   batteryManufacturer: convertToLineSeedFont({
     fontSize: 18,
     fontWeight: "bold",
     color: "#202632",
-    marginBottom: 2,
   }),
   batteryType: convertToLineSeedFont({
     fontSize: 14,
     color: "#6B7280",
     marginBottom: 8,
+  }),
+  batteryRangeInfo: {
+    alignItems: "flex-end",
+  },
+  batteryRangeValue: convertToLineSeedFont({
+    fontSize: 18,
+    fontWeight: "bold",
+    color: "#06B6D4",
   }),
   batteryCapacity: convertToLineSeedFont({
     fontSize: 24,

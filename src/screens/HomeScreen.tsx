@@ -59,7 +59,6 @@ const VehicleCard: React.FC<VehicleCardProps> = ({ vehicle, onEdit }) => {
   const [vehicleDetails, setVehicleDetails] =
     React.useState<VehicleDetails | null>(null);
   const [loading, setLoading] = React.useState(true);
-  const [isExpanded, setIsExpanded] = React.useState(false); // 접기/펼치기 상태
 
   // 이미지 URL 정규화
   const normalizeImageUrl = (url: string | undefined): string => {
@@ -216,23 +215,13 @@ const VehicleCard: React.FC<VehicleCardProps> = ({ vehicle, onEdit }) => {
             </Text>
             <Text style={styles.vehicleCardDetails}>
               {vehicle.year}년 {vehicle.trim ? `${vehicle.trim} ` : ""}
-              {vehicleDetails?.modelName || vehicle.model}
+              
             </Text>
           </View>
         </View>
 
-        {/* 배터리 및 성능 정보 (영수증 스타일) - 접기/펼치기 가능 */}
-        {isExpanded && (
-          <Animatable.View
-            animation={{
-              from: { opacity: 0, translateY: -20 },
-              to: { opacity: 1, translateY: 0 },
-            }}
-            duration={400}
-            easing="ease-out-cubic"
-            style={{ overflow: "hidden" }}
-          >
-            <View style={styles.vehicleCardReceiptSection}>
+        {/* 배터리 및 성능 정보 (영수증 스타일) - 항상 표시 */}
+        <View style={styles.vehicleCardReceiptSection}>
               {/* 1. 배터리 제조사 */}
               <View style={styles.vehicleCardReceiptRow}>
                 <Text style={styles.vehicleCardDetails}>배터리 제조사</Text>
@@ -243,29 +232,7 @@ const VehicleCard: React.FC<VehicleCardProps> = ({ vehicle, onEdit }) => {
                 </Text>
               </View>
 
-              {/* 2. 셀 타입 */}
-              <View style={styles.vehicleCardReceiptRow}>
-                <Text style={styles.vehicleCardDetails}>셀 타입</Text>
-                <Text style={styles.vehicleCardDetails}>
-                  {loading
-                    ? "로딩중..."
-                    : vehicleDetails?.battery.cellType || "알 수 없음"}
-                </Text>
-              </View>
-
-              {/* 3. 배터리 용량 */}
-              <View style={styles.vehicleCardReceiptRow}>
-                <Text style={styles.vehicleCardDetails}>배터리 용량</Text>
-                <Text style={styles.vehicleCardDetails}>
-                  {loading
-                    ? "로딩중..."
-                    : vehicleDetails?.battery.capacity
-                    ? `${vehicleDetails.battery.capacity}kWh`
-                    : "알 수 없음"}
-                </Text>
-              </View>
-
-              {/* 4. 완충 시 주행거리 */}
+              {/* 2. 완충 시 주행거리 */}
               <View style={styles.vehicleCardReceiptRow}>
                 <Text style={styles.vehicleCardDetails}>완충 시 주행거리</Text>
                 <Text style={styles.vehicleCardDetails}>
@@ -277,41 +244,60 @@ const VehicleCard: React.FC<VehicleCardProps> = ({ vehicle, onEdit }) => {
                 </Text>
               </View>
 
-              {/* 5. 전비 */}
-              <View style={styles.vehicleCardReceiptRow}>
+              {/* 3. 셀 타입 - 주석 처리 */}
+              {/* <View style={styles.vehicleCardReceiptRow}>
+                <Text style={styles.vehicleCardDetails}>셀 타입</Text>
+                <Text style={styles.vehicleCardDetails}>
+                  {loading
+                    ? "로딩중..."
+                    : vehicleDetails?.battery.cellType || "알 수 없음"}
+                </Text>
+              </View> */}
+
+              {/* 4. 배터리 용량 - 주석 처리 */}
+              {/* <View style={styles.vehicleCardReceiptRow}>
+                <Text style={styles.vehicleCardDetails}>배터리 용량</Text>
+                <Text style={styles.vehicleCardDetails}>
+                  {loading
+                    ? "로딩중..."
+                    : vehicleDetails?.battery.capacity
+                    ? `${vehicleDetails.battery.capacity}kWh`
+                    : "알 수 없음"}
+                </Text>
+              </View> */}
+
+              {/* 5. 전비 - 주석 처리 */}
+              {/* <View style={styles.vehicleCardReceiptRow}>
                 <Text style={styles.vehicleCardDetails}>전비</Text>
                 <Text style={styles.vehicleCardDetails}>
                   {loading
                     ? "로딩중..."
-                    : vehicleDetails?.performance.efficiency
-                    ? `${vehicleDetails.performance.efficiency}km/kWh`
-                    : "알 수 없음"}
+                    : vehicleDetails?.performance.efficiency || "알 수 없음"}
                 </Text>
-              </View>
+              </View> */}
 
-              {/* 6. 충전 커넥터 규격 */}
-              <View style={styles.vehicleCardReceiptRow}>
+              {/* 6. 충전 커넥터 규격 - 주석 처리 */}
+              {/* <View style={styles.vehicleCardReceiptRow}>
                 <Text style={styles.vehicleCardDetails}>충전 커넥터 규격</Text>
                 <Text style={styles.vehicleCardDetails}>
                   {loading
                     ? "로딩중..."
-                    : vehicleDetails?.performance.chargingConnector ||
-                      "알 수 없음"}
+                    : vehicleDetails?.performance.chargingConnector || "알 수 없음"}
                 </Text>
-              </View>
+              </View> */}
 
-              {/* 7. 가속력 */}
-              <View style={styles.vehicleCardReceiptRow}>
+              {/* 7. 가속력 (0-100km/h) - 주석 처리 */}
+              {/* <View style={styles.vehicleCardReceiptRow}>
                 <Text style={styles.vehicleCardDetails}>가속력</Text>
                 <Text style={styles.vehicleCardDetails}>
                   {loading
                     ? "로딩중..."
                     : vehicleDetails?.performance.acceleration || "알 수 없음"}
                 </Text>
-              </View>
+              </View> */}
 
-              {/* 8. 최고속도 */}
-              <View style={styles.vehicleCardReceiptRow}>
+              {/* 8. 최고속도 - 주석 처리 */}
+              {/* <View style={styles.vehicleCardReceiptRow}>
                 <Text style={styles.vehicleCardDetails}>최고속도</Text>
                 <Text style={styles.vehicleCardDetails}>
                   {loading
@@ -320,49 +306,28 @@ const VehicleCard: React.FC<VehicleCardProps> = ({ vehicle, onEdit }) => {
                     ? `${vehicleDetails.performance.topSpeed}km/h`
                     : "알 수 없음"}
                 </Text>
-              </View>
+              </View> */}
 
-              {/* 9. 최대출력 */}
-              <View style={styles.vehicleCardReceiptRow}>
+              {/* 9. 최대출력 - 주석 처리 */}
+              {/* <View style={styles.vehicleCardReceiptRow}>
                 <Text style={styles.vehicleCardDetails}>최대출력</Text>
                 <Text style={styles.vehicleCardDetails}>
                   {loading
                     ? "로딩중..."
-                    : vehicleDetails?.performance.power
-                    ? `${vehicleDetails.performance.power}kW`
-                    : "알 수 없음"}
+                    : vehicleDetails?.performance.power || "알 수 없음"}
                 </Text>
-              </View>
+              </View> */}
 
-              {/* 10. 최대토크 */}
-              <View style={styles.vehicleCardReceiptRow}>
+              {/* 10. 최대토크 - 주석 처리 */}
+              {/* <View style={styles.vehicleCardReceiptRow}>
                 <Text style={styles.vehicleCardDetails}>최대토크</Text>
                 <Text style={styles.vehicleCardDetails}>
                   {loading
                     ? "로딩중..."
-                    : vehicleDetails?.performance.torque
-                    ? `${vehicleDetails.performance.torque}Nm`
-                    : "알 수 없음"}
+                    : vehicleDetails?.performance.torque || "알 수 없음"}
                 </Text>
-              </View>
-            </View>
-          </Animatable.View>
-        )}
-
-        {/* 차량 정보 펼치기/접기 버튼 - 항상 맨 아래 */}
-        <TouchableOpacity
-          style={styles.vehicleCardExpandButton}
-          onPress={() => setIsExpanded(!isExpanded)}
-        >
-          <Text style={styles.vehicleCardExpandText}>
-            {isExpanded ? "차량 정보 접기" : "차량 정보 보기"}
-          </Text>
-          <Ionicons
-            name={isExpanded ? "chevron-up" : "chevron-down"}
-            size={16}
-            color="#666"
-          />
-        </TouchableOpacity>
+              </View> */}
+        </View>
       </View>
     </Animatable.View>
   );
@@ -2035,7 +2000,6 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "center",
-    marginBottom: 16,
   },
   statusTitle: convertToLineSeedFont({
     fontSize: 18,

@@ -31,6 +31,10 @@
     <key>KAKAO_APP_KEY</key>
     <string>f6965d2b8a05c3aa81d6682a29c433d2</string>
 
+    <key>REVERSED_CLIENT_ID</key>
+    <string>com.googleusercontent.apps.91035459357-lc3tir17pmmomf793bnce1qmstns4rh7</string>
+
+
     <!-- URL Schemes: Google / App / Kakao / Expo -->
     <key>CFBundleURLTypes</key>
     <array>
@@ -44,15 +48,15 @@
         </array>
       </dict>
 
-      <array>
-        <dict>
-          <key>CFBundleURLSchemes</key>
-          <array>
-            <string>kakaof6965d2b8a05c3aa82</string>
-            <string>charzingapp</string>
-          </array>
-        </dict>
-      </array>
+
+      <dict>
+        <key>CFBundleURLSchemes</key>
+        <array>
+          <string>kakaof6965d2b8a05c3aa81d6682a29c433d2</string>
+          <string>charzingapp</string>
+        </array>
+      </dict>
+
 
 
       <!-- 2. 앱 자체 스킴 -->
