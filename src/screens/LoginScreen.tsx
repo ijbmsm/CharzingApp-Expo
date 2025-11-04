@@ -30,6 +30,7 @@ interface KakaoUser {
   profileImageUrl?: string;
 }
 import { RootStackParamList } from '../navigation/RootNavigator';
+import { getAuth, signOut as firebaseSignOut } from 'firebase/auth';
 
 type NavigationProp = StackNavigationProp<RootStackParamList>;
 type LoginRouteProp = RouteProp<RootStackParamList, 'Login'>;
@@ -40,12 +41,24 @@ export default function LoginScreen() {
   const navigation = useNavigation<NavigationProp>();
   const route = useRoute<LoginRouteProp>();
   const { autoLoginEnabled } = useSelector((state: RootState) => state.auth);
-  
+
   const showBackButton = route.params?.showBackButton ?? false;
   const message = route.params?.message;
 
   // 카카오 로그인 초기화는 App.tsx에서 이미 처리됨
 
+  // 다른 provider로 로그인 시도 전에 기존 세션 정리
+  const clearPreviousSession = async () => {
+    try {
+      const auth = getAuth();
+      if (auth.currentUser) {
+        await firebaseSignOut(auth);
+        console.log('🧹 기존 Firebase 세션 정리 완료');
+      }
+    } catch (error) {
+      console.error('❌ 세션 정리 실패:', error);
+    }
+  };
 
   // 카카오 로그인 (useCallback으로 최적화)
   const handleKakaoLogin = useCallback(async () => {
@@ -54,6 +67,9 @@ export default function LoginScreen() {
     dispatch(setLoading(true));
 
     try {
+      // 기존 세션 정리
+      await clearPreviousSession();
+
       // 카카오 로그인 서비스 초기화 및 실행
       await kakaoLoginService.initialize();
       const result = await kakaoLoginService.login();
@@ -136,6 +152,9 @@ export default function LoginScreen() {
     dispatch(setLoading(true));
 
     try {
+      // 기존 세션 정리
+      await clearPreviousSession();
+
       const result = await googleLoginService.login();
       
       if (result.success && result.user) {
@@ -205,6 +224,9 @@ export default function LoginScreen() {
     dispatch(setLoading(true));
 
     try {
+      // 기존 세션 정리
+      await clearPreviousSession();
+
       const result = await appleLoginService.login();
       
       if (result.success && result.user) {
