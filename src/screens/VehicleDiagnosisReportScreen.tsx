@@ -306,29 +306,88 @@ const VehicleDiagnosisReportScreen: React.FC<Props> = ({
                 </View>
               </View>
 
-              {/* 배터리 상태 요약 */}
-              <View style={styles.batteryOverview}>
-                <View style={styles.sohContainer}>
-                  <Text
-                    style={[
-                      styles.sohLabel,
-                      convertToLineSeedFont(styles.sohLabel),
-                    ]}
-                  >
-                    배터리 성능 (SOH)
-                  </Text>
-                  <View style={styles.sohDisplay}>
-                    <Text
+              {/* 배터리 성능 (SOH) - 원형 프로그레스 */}
+              <View style={styles.sohMainSection}>
+                <Text
+                  style={[
+                    styles.sohMainLabel,
+                    convertToLineSeedFont(styles.sohMainLabel),
+                  ]}
+                >
+                  배터리 성능 (SOH)
+                </Text>
+                <View style={styles.circularProgressContainer}>
+                  {/* 배경 원 (회색) */}
+                  <View style={styles.circularProgressBackground}>
+                    {/* 애니메이션 프로그레스 원 */}
+                    <Animated.View
                       style={[
-                        styles.sohValue,
-                        { color: getHealthColor(report.sohPercentage) },
-                        convertToLineSeedFont(styles.sohValue),
+                        styles.circularProgressBar,
+                        {
+                          transform: [
+                            {
+                              rotate: animatedValue.interpolate({
+                                inputRange: [0, 100],
+                                outputRange: ['0deg', '360deg'],
+                              }),
+                            },
+                          ],
+                        },
                       ]}
                     >
-                      {report.sohPercentage}%
-                    </Text>
+                      <LinearGradient
+                        colors={[
+                          getHealthColor(report.sohPercentage),
+                          getHealthColor(report.sohPercentage) + 'CC',
+                          getHealthColor(report.sohPercentage) + '88',
+                        ]}
+                        start={{ x: 0, y: 0 }}
+                        end={{ x: 1, y: 1 }}
+                        style={styles.progressGradient}
+                      />
+                    </Animated.View>
+
+                    {/* 중앙 흰색 원 */}
+                    <View style={styles.circularProgressInner}>
+                      {/* SOH 값 표시 */}
+                      <Text
+                        style={[
+                          styles.sohPercentValue,
+                          { color: getHealthColor(report.sohPercentage) },
+                          convertToLineSeedFont(styles.sohPercentValue),
+                        ]}
+                      >
+                        {report.sohPercentage}
+                      </Text>
+                      <Text
+                        style={[
+                          styles.sohPercentUnit,
+                          convertToLineSeedFont(styles.sohPercentUnit),
+                        ]}
+                      >
+                        %
+                      </Text>
+                      <Text
+                        style={[
+                          styles.sohHealthStatus,
+                          convertToLineSeedFont(styles.sohHealthStatus),
+                        ]}
+                      >
+                        {report.sohPercentage >= 95
+                          ? '매우 우수'
+                          : report.sohPercentage >= 90
+                          ? '양호'
+                          : report.sohPercentage >= 85
+                          ? '보통'
+                          : '점검 필요'}
+                      </Text>
+                    </View>
                   </View>
                 </View>
+              </View>
+
+              {/* 배터리 상태 요약 */}
+              <View style={styles.batteryOverview}>
 
                 <View style={styles.quickStats}>
                   <View style={styles.statItem}>
@@ -1477,6 +1536,81 @@ const styles = StyleSheet.create({
     color: "#FFFFFF",
   },
 
+  // SOH Main Section (Circular Progress)
+  sohMainSection: {
+    marginBottom: 32,
+  },
+  sohMainLabel: {
+    fontSize: 16,
+    fontWeight: "600",
+    color: "#374151",
+    marginBottom: 24,
+  },
+  circularProgressContainer: {
+    alignItems: "center",
+    justifyContent: "center",
+    paddingVertical: 20,
+  },
+  circularProgressBackground: {
+    width: 240,
+    height: 240,
+    borderRadius: 120,
+    backgroundColor: "#F3F4F6",
+    alignItems: "center",
+    justifyContent: "center",
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.12,
+    shadowRadius: 16,
+    elevation: 8,
+  },
+  circularProgressBar: {
+    position: "absolute",
+    width: 240,
+    height: 240,
+    borderRadius: 120,
+    borderWidth: 20,
+    borderColor: "transparent",
+    borderTopColor: "#10B981", // 임시, 실제로는 동적으로 설정됨
+  },
+  progressGradient: {
+    width: "100%",
+    height: "100%",
+    borderRadius: 120,
+  },
+  circularProgressInner: {
+    width: 200,
+    height: 200,
+    borderRadius: 100,
+    backgroundColor: "#FFFFFF",
+    alignItems: "center",
+    justifyContent: "center",
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.08,
+    shadowRadius: 12,
+    elevation: 4,
+  },
+  sohPercentValue: {
+    fontSize: 64,
+    fontWeight: "900",
+    lineHeight: 72,
+    letterSpacing: -2,
+  },
+  sohPercentUnit: {
+    fontSize: 28,
+    fontWeight: "600",
+    color: "#9CA3AF",
+    marginTop: -8,
+  },
+  sohHealthStatus: {
+    fontSize: 16,
+    fontWeight: "600",
+    color: "#6B7280",
+    marginTop: 8,
+    letterSpacing: 0.5,
+  },
+
   // SOH Section
   sohSection: {
     alignItems: "center",
@@ -1675,6 +1809,8 @@ const styles = StyleSheet.create({
   },
   sohContainer: {
     alignItems: "center",
+    flexDirection: "row",
+    justifyContent: "space-between",
     marginBottom: 24,
     paddingHorizontal: 20,
   },
@@ -1688,10 +1824,9 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "center",
-    gap: 16,
   },
   sohValue: {
-    fontSize: 48,
+    fontSize: 60,
     fontWeight: "700",
   },
   sohBadge: {
