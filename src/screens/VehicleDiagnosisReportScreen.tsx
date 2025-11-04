@@ -254,7 +254,7 @@ const VehicleDiagnosisReportScreen: React.FC<Props> = ({
   }
 
   return (
-    <LinearGradient colors={["#F8FAFC", "#FFFFFF"]} style={styles.container}>
+    <LinearGradient colors={["#F8FAFC", "#F8FAFC"]} style={styles.container}>
       <SafeAreaView style={styles.safeArea}>
         <Header
           title="진단 리포트"
@@ -306,82 +306,46 @@ const VehicleDiagnosisReportScreen: React.FC<Props> = ({
                 </View>
               </View>
 
-              {/* 배터리 성능 (SOH) - 원형 프로그레스 */}
+              {/* 배터리 성능 (SOH) - 카드 디자인 */}
               <View style={styles.sohMainSection}>
-                <Text
-                  style={[
-                    styles.sohMainLabel,
-                    convertToLineSeedFont(styles.sohMainLabel),
-                  ]}
-                >
-                  배터리 성능 (SOH)
-                </Text>
-                <View style={styles.circularProgressContainer}>
-                  {/* 배경 원 (회색) */}
-                  <View style={styles.circularProgressBackground}>
-                    {/* 애니메이션 프로그레스 원 */}
-                    <Animated.View
+                <View style={styles.sohCard}>
+                  <View style={styles.sohContent}>
+                    <Text
                       style={[
-                        styles.circularProgressBar,
-                        {
-                          transform: [
-                            {
-                              rotate: animatedValue.interpolate({
-                                inputRange: [0, 100],
-                                outputRange: ['0deg', '360deg'],
-                              }),
-                            },
-                          ],
-                        },
+                        styles.sohMainLabel,
+                        convertToLineSeedFont(styles.sohMainLabel),
                       ]}
                     >
-                      <LinearGradient
-                        colors={[
-                          getHealthColor(report.sohPercentage),
-                          getHealthColor(report.sohPercentage) + 'CC',
-                          getHealthColor(report.sohPercentage) + '88',
-                        ]}
-                        start={{ x: 0, y: 0 }}
-                        end={{ x: 1, y: 1 }}
-                        style={styles.progressGradient}
-                      />
-                    </Animated.View>
+                      배터리 성능
+                    </Text>
+                    <Text
+                      style={[
+                        styles.sohSubLabel,
+                        convertToLineSeedFont(styles.sohSubLabel),
+                      ]}
+                    >
+                      State of Health
+                    </Text>
+                  </View>
 
-                    {/* 중앙 흰색 원 */}
-                    <View style={styles.circularProgressInner}>
-                      {/* SOH 값 표시 */}
-                      <Text
-                        style={[
-                          styles.sohPercentValue,
-                          { color: getHealthColor(report.sohPercentage) },
-                          convertToLineSeedFont(styles.sohPercentValue),
-                        ]}
-                      >
-                        {report.sohPercentage}
-                      </Text>
-                      <Text
-                        style={[
-                          styles.sohPercentUnit,
-                          convertToLineSeedFont(styles.sohPercentUnit),
-                        ]}
-                      >
-                        %
-                      </Text>
-                      <Text
-                        style={[
-                          styles.sohHealthStatus,
-                          convertToLineSeedFont(styles.sohHealthStatus),
-                        ]}
-                      >
-                        {report.sohPercentage >= 95
-                          ? '매우 우수'
-                          : report.sohPercentage >= 90
-                          ? '양호'
-                          : report.sohPercentage >= 85
-                          ? '보통'
-                          : '점검 필요'}
-                      </Text>
-                    </View>
+                  <View style={styles.sohValueContainer}>
+                    <Text
+                      style={[
+                        styles.sohValueText,
+                        { color: getHealthColor(report.sohPercentage) },
+                        convertToLineSeedFont(styles.sohValueText),
+                      ]}
+                    >
+                      {report.sohPercentage}
+                    </Text>
+                    <Text
+                      style={[
+                        styles.sohUnitText,
+                        convertToLineSeedFont(styles.sohUnitText),
+                      ]}
+                    >
+                      %
+                    </Text>
                   </View>
                 </View>
               </View>
@@ -1488,10 +1452,10 @@ const styles = StyleSheet.create({
     borderRadius: 16,
     padding: 20,
     shadowColor: "#000",
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.1,
-    shadowRadius: 8,
-    elevation: 5,
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.05,
+    shadowRadius: 6,
+    elevation: 2,
   },
   vehicleHeader: {
     flexDirection: "row",
@@ -1536,79 +1500,50 @@ const styles = StyleSheet.create({
     color: "#FFFFFF",
   },
 
-  // SOH Main Section (Circular Progress)
+  // SOH Main Section (Card Design - Matching statItem style)
   sohMainSection: {
-    marginBottom: 32,
+    marginBottom: 12,
+  },
+  sohCard: {
+    backgroundColor: "#F8FAFC",
+    borderRadius: 12,
+    padding: 20,
+    borderWidth: 1,
+    borderColor: "#E2E8F0",
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+  },
+  sohContent: {
+    flex: 1,
+    justifyContent: "center",
   },
   sohMainLabel: {
-    fontSize: 16,
-    fontWeight: "600",
-    color: "#374151",
-    marginBottom: 24,
+    fontSize: 15,
+    fontWeight: "700",
+    color: "#202632",
+    marginBottom: 4,
+    letterSpacing: -0.3,
   },
-  circularProgressContainer: {
+  sohSubLabel: {
+    fontSize: 10,
+    fontWeight: "500",
+    color: "#9CA3AF",
+    letterSpacing: 0.2,
+  },
+  sohValueContainer: {
+    flexDirection: "row",
     alignItems: "center",
-    justifyContent: "center",
-    paddingVertical: 20,
   },
-  circularProgressBackground: {
-    width: 240,
-    height: 240,
-    borderRadius: 120,
-    backgroundColor: "#F3F4F6",
-    alignItems: "center",
-    justifyContent: "center",
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 8 },
-    shadowOpacity: 0.12,
-    shadowRadius: 16,
-    elevation: 8,
+  sohValueText: {
+    fontSize: 48,
+    fontWeight: "700",
   },
-  circularProgressBar: {
-    position: "absolute",
-    width: 240,
-    height: 240,
-    borderRadius: 120,
-    borderWidth: 20,
-    borderColor: "transparent",
-    borderTopColor: "#10B981", // 임시, 실제로는 동적으로 설정됨
-  },
-  progressGradient: {
-    width: "100%",
-    height: "100%",
-    borderRadius: 120,
-  },
-  circularProgressInner: {
-    width: 200,
-    height: 200,
-    borderRadius: 100,
-    backgroundColor: "#FFFFFF",
-    alignItems: "center",
-    justifyContent: "center",
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.08,
-    shadowRadius: 12,
-    elevation: 4,
-  },
-  sohPercentValue: {
-    fontSize: 64,
-    fontWeight: "900",
-    lineHeight: 72,
-    letterSpacing: -2,
-  },
-  sohPercentUnit: {
-    fontSize: 28,
+  sohUnitText: {
+    fontSize: 24,
     fontWeight: "600",
     color: "#9CA3AF",
-    marginTop: -8,
-  },
-  sohHealthStatus: {
-    fontSize: 16,
-    fontWeight: "600",
-    color: "#6B7280",
-    marginTop: 8,
-    letterSpacing: 0.5,
+    marginLeft: 2,
   },
 
   // SOH Section
@@ -1632,42 +1567,16 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     alignItems: "center",
   },
-  backgroundCircle: {
-    position: "absolute",
-    width: 100,
-    height: 100,
-    borderRadius: 50,
-    borderWidth: 8,
-    borderColor: "#E5E7EB",
-  },
-  progressCircle: {
-    position: "absolute",
-    width: 100,
-    height: 100,
-    borderRadius: 50,
-    borderWidth: 8,
-    borderColor: "#10B981",
-  },
-  gaugeCenter: {
-    position: "absolute",
-    justifyContent: "center",
-    alignItems: "center",
-  },
-  gaugePercentage: {
-    fontSize: 20,
-    fontWeight: "700",
-  },
-
   // Section Cards
   sectionCard: {
     marginBottom: 16,
     borderRadius: 16,
     overflow: "hidden",
     shadowColor: "#000",
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.08,
-    shadowRadius: 8,
-    elevation: 3,
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.04,
+    shadowRadius: 4,
+    elevation: 2,
   },
   sectionGradient: {
     padding: 20,
@@ -1807,13 +1716,6 @@ const styles = StyleSheet.create({
   batteryOverview: {
     paddingTop: 20,
   },
-  sohContainer: {
-    alignItems: "center",
-    flexDirection: "row",
-    justifyContent: "space-between",
-    marginBottom: 24,
-    paddingHorizontal: 20,
-  },
   sohLabel: {
     fontSize: 16,
     color: "#6B7280",
@@ -1901,22 +1803,20 @@ const styles = StyleSheet.create({
     fontWeight: "500",
   },
   evaluationSection: {
-    backgroundColor: "#F0F9FF",
-    borderRadius: 12,
-    padding: 16,
-    borderWidth: 1,
-    borderColor: "#BAE6FD",
+    marginTop: 6,
   },
   evaluationTitle: {
-    fontSize: 16,
-    fontWeight: "600",
-    color: "#1E40AF",
+    fontSize: 15,
+    fontWeight: "700",
+    color: "#374151",
     marginBottom: 12,
+    letterSpacing: -0.3,
   },
   evaluationText: {
     fontSize: 14,
-    color: "#1E3A8A",
-    lineHeight: 20,
+    color: "#6B7280",
+    lineHeight: 22,
+    letterSpacing: -0.2,
   },
 
   // Detail Button
@@ -1956,11 +1856,11 @@ const styles = StyleSheet.create({
     shadowColor: "#000",
     shadowOffset: {
       width: 0,
-      height: 2,
+      height: 1,
     },
-    shadowOpacity: 0.1,
-    shadowRadius: 3.84,
-    elevation: 5,
+    shadowOpacity: 0.05,
+    shadowRadius: 2,
+    elevation: 2,
   },
   actionIconContainer: {
     marginBottom: 8,
@@ -1984,10 +1884,10 @@ const styles = StyleSheet.create({
     marginHorizontal: 4,
     marginBottom: 16,
     shadowColor: "#000",
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 8,
-    elevation: 3,
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.05,
+    shadowRadius: 4,
+    elevation: 2,
   },
 
   // Cell Grid Enhanced
@@ -2060,10 +1960,10 @@ const styles = StyleSheet.create({
     padding: 20,
     marginBottom: 16,
     shadowColor: "#000",
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 8,
-    elevation: 3,
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.05,
+    shadowRadius: 4,
+    elevation: 2,
   },
   modalSectionTitle: {
     fontSize: 18,
@@ -2281,10 +2181,10 @@ const styles = StyleSheet.create({
     borderRadius: 16,
     marginHorizontal: 8,
     shadowColor: "#000",
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.1,
-    shadowRadius: 8,
-    elevation: 5,
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.05,
+    shadowRadius: 4,
+    elevation: 2,
     overflow: "hidden",
   },
   imageCardImageWrapper: {
@@ -2480,10 +2380,10 @@ const styles = StyleSheet.create({
   },
   sectionTouchable: {
     shadowColor: "#000",
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 3,
-    elevation: 3,
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.05,
+    shadowRadius: 2,
+    elevation: 2,
   },
   sectionIconContainer: {
     width: 48,
@@ -2495,7 +2395,7 @@ const styles = StyleSheet.create({
     marginRight: 12,
     shadowColor: "#000",
     shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.1,
+    shadowOpacity: 0.05,
     shadowRadius: 2,
     elevation: 2,
   },
