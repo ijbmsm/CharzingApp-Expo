@@ -28,6 +28,7 @@ import {
 import { convertToLineSeedFont } from '../styles/fonts';
 import { getAuth } from 'firebase/auth';
 import { Ionicons } from '@expo/vector-icons';
+import sentryLogger from '../utils/sentryLogger';
 
 interface RouteParams {
   kakaoUser?: KakaoUser;
@@ -197,6 +198,12 @@ export default function SignupCompleteScreen() {
         displayName: currentUser.displayName || realName.trim(),
       }));
 
+      // Crashlytics 로그
+      sentryLogger.logSignupComplete(
+        currentUser.uid,
+        provider as 'kakao' | 'google' | 'apple'
+      );
+
       Alert.alert(
         '회원가입 완료',
         '환영합니다! 차징 서비스를 이용해보세요.',
@@ -217,6 +224,7 @@ export default function SignupCompleteScreen() {
       );
     } catch (error) {
       console.error('회원가입 완료 처리 실패:', error);
+      sentryLogger.logError(error as Error, '회원가입 완료 처리');
       Alert.alert('오류', '회원가입 완료 중 오류가 발생했습니다. 다시 시도해주세요.');
     } finally {
       setIsLoading(false);

@@ -4,6 +4,9 @@ import 'react-native-url-polyfill/auto';
 // React Native Gesture Handler (네이티브 모듈 초기화)
 import 'react-native-gesture-handler';
 
+// Sentry 초기화 (최상단)
+import * as Sentry from '@sentry/react-native';
+
 // Firebase 초기화 (새로운 시스템 사용)
 import { firebaseFacade } from './src/services/firebase/config';
 
@@ -28,6 +31,28 @@ import analyticsService from './src/services/analyticsService';
 import * as SplashScreen from 'expo-splash-screen';
 import { useFonts } from 'expo-font';
 import RNBootSplash from 'react-native-bootsplash';
+import Constants from 'expo-constants';
+
+// Sentry 초기화 (프로덕션에서만)
+if (!__DEV__) {
+  Sentry.init({
+    dsn: Constants.expoConfig?.extra?.SENTRY_DSN || '',
+    // 개발 환경에서는 비활성화
+    enabled: !__DEV__,
+    // 앱 버전 추적
+    release: Constants.expoConfig?.version,
+    dist: Constants.expoConfig?.version,
+    // 환경 설정
+    environment: __DEV__ ? 'development' : 'production',
+    // 트레이스 샘플링 레이트 (10%)
+    tracesSampleRate: 0.1,
+    // 사용자 정보 자동 수집 비활성화 (수동으로 설정)
+    enableAutoSessionTracking: true,
+    // 네이티브 크래시 수집
+    enableNative: true,
+    enableNativeCrashHandling: true,
+  });
+}
 
 // Expo 스플래시 화면을 최대한 빨리 숨기기 (촌스러운 화면 제거)
 // 우리가 만든 커스텀 로딩 화면을 대신 사용
@@ -256,4 +281,6 @@ function App() {
   );
 }
 
-export default registerRootComponent(App);
+const WrappedApp = __DEV__ ? App : Sentry.wrap(App);
+
+export default registerRootComponent(WrappedApp);

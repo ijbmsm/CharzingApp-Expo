@@ -22,6 +22,7 @@ import firebaseService from '../services/firebaseService';
 import { useLoading } from '../contexts/LoadingContext';
 import { Ionicons } from '@expo/vector-icons';
 import logger from '../services/logService';
+import sentryLogger from '../utils/sentryLogger';
 
 interface KakaoUser {
   id: string;
@@ -87,6 +88,7 @@ export default function LoginScreen() {
         };
 
         logger.auth('login_success', 'kakao', true, undefined, firebaseUser.uid);
+        sentryLogger.logLoginSuccess(firebaseUser.uid, 'kakao');
 
         if (result.needsRegistration) {
           // 신규 사용자 - 추가 정보 입력 화면으로 이동
@@ -128,6 +130,7 @@ export default function LoginScreen() {
       }
     } catch (error) {
       logger.auth('login_attempt', 'kakao', false, error);
+      sentryLogger.logLoginFailure('kakao', error as Error);
       Alert.alert('로그인 실패', '카카오 로그인 중 오류가 발생했습니다.');
     } finally {
       hideLoading();
@@ -170,6 +173,7 @@ export default function LoginScreen() {
         };
 
         logger.auth('login_success', 'google', true, undefined, firebaseUser.uid);
+        sentryLogger.logLoginSuccess(firebaseUser.uid, 'google');
 
         if (result.needsRegistration) {
           // 신규 사용자 - 추가 정보 입력 화면으로 이동
@@ -211,6 +215,7 @@ export default function LoginScreen() {
       }
     } catch (error) {
       logger.auth('login_attempt', 'google', false, error);
+      sentryLogger.logLoginFailure('google', error as Error);
       Alert.alert('로그인 실패', 'Google 로그인 중 오류가 발생했습니다.');
     } finally {
       hideLoading();
@@ -242,6 +247,7 @@ export default function LoginScreen() {
         };
 
         logger.auth('login_success', 'apple', true, undefined, firebaseUser.uid);
+        sentryLogger.logLoginSuccess(firebaseUser.uid, 'apple');
 
         if (result.needsRegistration) {
           // 신규 사용자 - 추가 정보 입력 화면으로 이동
@@ -283,8 +289,9 @@ export default function LoginScreen() {
       }
     } catch (error) {
       logger.auth('login_attempt', 'apple', false, error);
+      sentryLogger.logLoginFailure('apple', error as Error);
       Alert.alert('로그인 실패', 'Apple 로그인 중 오류가 발생했습니다.');
-    } finally {
+    } finally{
       hideLoading();
       dispatch(setLoading(false));
     }
