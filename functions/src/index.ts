@@ -3,6 +3,7 @@ import * as admin from 'firebase-admin';
 import axios from 'axios';
 import cors from 'cors';
 import { google } from 'googleapis';
+import * as Sentry from '@sentry/node';
 
 // 차량 데이터 업로드 함수 import
 export { uploadVehiclesToFirestore } from './uploadVehicles';
@@ -10,6 +11,16 @@ export { uploadVehiclesToFirestore } from './uploadVehicles';
 // Firebase Admin 초기화 (중복 초기화 방지)
 if (admin.apps.length === 0) {
   admin.initializeApp();
+}
+
+// Sentry 초기화 (프로덕션 환경에서만)
+if (process.env.SENTRY_DSN) {
+  Sentry.init({
+    dsn: process.env.SENTRY_DSN,
+    environment: process.env.NODE_ENV || 'production',
+    tracesSampleRate: 0.1,
+  });
+  console.log('✅ Sentry initialized in Firebase Functions');
 }
 
 // CORS 설정 (프로덕션에서는 특정 도메인만 허용)
@@ -32,6 +43,7 @@ export const kakaoLoginHttp = functions
   .runWith({
     memory: '512MB',
     timeoutSeconds: 60,
+    minInstances: 1, // Cold start 제거
   })
   .https.onRequest(async (req, res) => {
     try {
@@ -54,32 +66,45 @@ export const kakaoLoginHttp = functions
 
       console.log('🟡 Kakao Login HTTP 요청 받음');
       console.log('🔍 Request body:', req.body);
-      
-      const { kakaoAccessToken, userInfo } = req.body;
 
-      if (!kakaoAccessToken || !userInfo) {
+      const { kakaoAccessToken } = req.body;
+
+      if (!kakaoAccessToken) {
         res.status(400).json({
           success: false,
-          error: '카카오 액세스 토큰과 사용자 정보가 필요합니다.'
+          error: '카카오 액세스 토큰이 필요합니다.'
         });
         return;
       }
 
-      // 카카오 액세스 토큰 검증 (선택적)
+      // 🔒 보안 개선: 서버에서 직접 카카오 API로 사용자 정보 조회
+      let userInfo;
       try {
-        // 카카오 API를 통한 토큰 검증
-        const response = await axios.get('https://kapi.kakao.com/v1/user/access_token_info', {
+        // 카카오 API를 통한 사용자 정보 조회 (/v2/user/me)
+        const response = await axios.get('https://kapi.kakao.com/v2/user/me', {
           headers: {
             Authorization: `Bearer ${kakaoAccessToken}`,
+            'Content-Type': 'application/x-www-form-urlencoded;charset=utf-8'
           },
         });
-        
-        console.log('✅ 카카오 액세스 토큰 검증 완료:', response.data);
-      } catch (error) {
-        console.error('❌ 카카오 액세스 토큰 검증 실패:', error);
+
+        console.log('✅ 카카오 사용자 정보 조회 완료:', response.data);
+
+        // 사용자 정보 추출
+        const kakaoData = response.data;
+        userInfo = {
+          id: kakaoData.id.toString(),
+          email: kakaoData.kakao_account?.email || null,
+          nickname: kakaoData.kakao_account?.profile?.nickname || null,
+          profileImageUrl: kakaoData.kakao_account?.profile?.profile_image_url || null
+        };
+
+        console.log('📋 추출된 사용자 정보:', userInfo);
+      } catch (error: any) {
+        console.error('❌ 카카오 사용자 정보 조회 실패:', error.response?.data || error.message);
         res.status(400).json({
           success: false,
-          error: '카카오 액세스 토큰이 유효하지 않습니다.'
+          error: '카카오 액세스 토큰이 유효하지 않거나 사용자 정보를 가져올 수 없습니다.'
         });
         return;
       }
@@ -195,7 +220,22 @@ export const kakaoLoginHttp = functions
 
     } catch (error: any) {
       console.error('❌ Kakao Login 실패:', error);
-      
+
+      // Sentry에 에러 로그 전송
+      if (process.env.SENTRY_DSN) {
+        Sentry.captureException(error, {
+          tags: {
+            function: 'kakaoLoginHttp',
+            provider: 'kakao'
+          },
+          extra: {
+            errorMessage: error.message,
+            errorCode: error.code,
+            requestBody: req.body
+          }
+        });
+      }
+
       res.status(500).json({
         success: false,
         error: '카카오 로그인 처리 중 오류가 발생했습니다.'

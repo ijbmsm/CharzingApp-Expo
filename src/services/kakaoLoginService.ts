@@ -196,12 +196,12 @@ class KakaoLoginService implements ILoginService {
       const kakaoToken = await login();
       devLog.log('✅ 카카오 SDK 로그인 성공:', kakaoToken);
 
-      // 2. 카카오 사용자 프로필 조회
+      // 2. 카카오 사용자 프로필 조회 (클라이언트 표시용)
       const kakaoProfile = await getProfile();
       devLog.log('✅ 카카오 프로필 조회 성공:', kakaoProfile);
 
-      // 3. Firebase 커스텀 토큰 생성 및 로그인
-      const firebaseResult = await this.loginWithFirebase(kakaoProfile, kakaoToken.accessToken);
+      // 3. Firebase 커스텀 토큰 생성 및 로그인 (서버가 직접 사용자 정보 조회)
+      const firebaseResult = await this.loginWithFirebase(kakaoToken.accessToken);
 
       if (firebaseResult.success && firebaseResult.user) {
         // 4. 사용자 정보 로깅
@@ -239,10 +239,10 @@ class KakaoLoginService implements ILoginService {
   /**
    * Firebase 커스텀 토큰으로 로그인
    */
-  private async loginWithFirebase(kakaoProfile: KakaoProfile, kakaoAccessToken: string): Promise<LoginResult> {
+  private async loginWithFirebase(kakaoAccessToken: string): Promise<LoginResult> {
     try {
       // Firebase Functions를 통해 커스텀 토큰 생성
-      const customToken = await this.getFirebaseCustomToken(kakaoProfile, kakaoAccessToken);
+      const customToken = await this.getFirebaseCustomToken(kakaoAccessToken);
       
       // Firebase Auth로 로그인
       const auth = getAuth();
@@ -266,17 +266,14 @@ class KakaoLoginService implements ILoginService {
 
   /**
    * Firebase Functions를 통해 커스텀 토큰 생성 (구글/애플과 동일한 패턴)
+   * 🔒 보안 개선: userInfo를 서버에서 직접 조회하도록 변경
    */
-  private async getFirebaseCustomToken(kakaoProfile: KakaoProfile, kakaoAccessToken: string): Promise<string> {
+  private async getFirebaseCustomToken(kakaoAccessToken: string): Promise<string> {
     // 새로운 kakaoLoginHttp 함수 호출 (인증 없이)
+    // 서버에서 kakaoAccessToken으로 /v2/user/me를 직접 호출하여 사용자 정보 조회
     const response = await firebaseService.callCloudFunctionWithoutAuth('kakaoLoginHttp', {
-      kakaoAccessToken: kakaoAccessToken,
-      userInfo: {
-        id: kakaoProfile.id,
-        email: kakaoProfile.email,
-        nickname: kakaoProfile.nickname || '카카오 사용자',
-        profileImageUrl: kakaoProfile.profileImageUrl
-      }
+      kakaoAccessToken: kakaoAccessToken
+      // userInfo 제거 - 서버에서 직접 조회
     });
 
     if (!response.success || !response.customToken) {

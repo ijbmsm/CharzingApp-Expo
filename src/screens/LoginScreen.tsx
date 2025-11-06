@@ -23,6 +23,7 @@ import { useLoading } from '../contexts/LoadingContext';
 import { Ionicons } from '@expo/vector-icons';
 import logger from '../services/logService';
 import sentryLogger from '../utils/sentryLogger';
+import * as Sentry from '@sentry/react-native';
 
 interface KakaoUser {
   id: string;
@@ -45,6 +46,15 @@ export default function LoginScreen() {
 
   const showBackButton = route.params?.showBackButton ?? false;
   const message = route.params?.message;
+
+  // 🧪 Sentry 연결 테스트 (개발 중에만)
+  React.useEffect(() => {
+    if (__DEV__) {
+      console.log('🧪 Sentry 테스트 메시지 전송...');
+      Sentry.captureMessage('Sentry 테스트 메시지 - LoginScreen 로드됨');
+      Sentry.captureException(new Error('Sentry 테스트 에러 - 정상 작동 확인'));
+    }
+  }, []);
 
   // 카카오 로그인 초기화는 App.tsx에서 이미 처리됨
 
