@@ -58,11 +58,15 @@ const VehicleDiagnosisReportScreen: React.FC<Props> = ({
     "cells" | "images" | "additional" | "pdf" | "uploads" | null
   >(null);
   const [imageViewerVisible, setImageViewerVisible] = useState(false);
-  const [selectedImageUrl, setSelectedImageUrl] = useState<string>("");
-  const [selectedImageTitle, setSelectedImageTitle] = useState<string>("");
+  const [selectedImageData, setSelectedImageData] =
+    useState<InspectionImageItem | null>(null);
   const [imageLoadErrors, setImageLoadErrors] = useState<Set<string>>(
     new Set()
   );
+  const [containerWidth, setContainerWidth] = useState(
+    Dimensions.get("window").width
+  );
+
   const [currentImageIndex, setCurrentImageIndex] = useState(0);
   const animatedValue = new Animated.Value(0);
   const isMountedRef = useRef(true);
@@ -80,9 +84,8 @@ const VehicleDiagnosisReportScreen: React.FC<Props> = ({
 
     try {
       setIsLoading(true);
-      const reportData = await firebaseService.getVehicleDiagnosisReport(
-        reportId
-      );
+      const reportData =
+        await firebaseService.getVehicleDiagnosisReport(reportId);
 
       if (!reportData) {
         Alert.alert("오류", "리포트를 찾을 수 없습니다.");
@@ -127,7 +130,12 @@ const VehicleDiagnosisReportScreen: React.FC<Props> = ({
     try {
       let date: Date;
 
-      if (typeof timestamp === "object" && timestamp !== null && "toDate" in timestamp && typeof (timestamp as { toDate: () => Date }).toDate === "function") {
+      if (
+        typeof timestamp === "object" &&
+        timestamp !== null &&
+        "toDate" in timestamp &&
+        typeof (timestamp as { toDate: () => Date }).toDate === "function"
+      ) {
         date = (timestamp as { toDate: () => Date }).toDate();
       } else if (timestamp instanceof Date) {
         date = timestamp;
@@ -158,7 +166,9 @@ const VehicleDiagnosisReportScreen: React.FC<Props> = ({
     setExpandedSections(newExpanded);
   };
 
-  const openModal = (content: "cells" | "images" | "additional" | "pdf" | "uploads") => {
+  const openModal = (
+    content: "cells" | "images" | "additional" | "pdf" | "uploads"
+  ) => {
     setModalContent(content);
     setModalVisible(true);
   };
@@ -168,16 +178,16 @@ const VehicleDiagnosisReportScreen: React.FC<Props> = ({
     setModalContent(null);
   };
 
-  const openImageViewer = (imageUrl: string, title?: string) => {
-    setSelectedImageUrl(imageUrl);
-    setSelectedImageTitle(title || "검사 이미지");
+  const openImageViewer = (imageData: InspectionImageItem) => {
+    console.log("🖼️ 이미지 뷰어 열기:", imageData);
+    setSelectedImageData(imageData);
     setImageViewerVisible(true);
   };
 
   const closeImageViewer = () => {
+    console.log("🔒 이미지 뷰어 닫기");
     setImageViewerVisible(false);
-    setSelectedImageUrl("");
-    setSelectedImageTitle("");
+    setSelectedImageData(null);
   };
 
   const handleImageError = (imageUrl: string) => {
@@ -192,8 +202,10 @@ const VehicleDiagnosisReportScreen: React.FC<Props> = ({
     return url.toLowerCase().includes(".svg");
   };
 
-  const handleScroll = (event: { nativeEvent: { contentOffset: { x: number } } }) => {
-    const slideSize = Dimensions.get("window").width - 80;
+  const handleScroll = (event: {
+    nativeEvent: { contentOffset: { x: number } };
+  }) => {
+    const slideSize = containerWidth;
     const currentIndex = Math.round(
       event.nativeEvent.contentOffset.x / slideSize
     );
@@ -352,7 +364,6 @@ const VehicleDiagnosisReportScreen: React.FC<Props> = ({
 
               {/* 배터리 상태 요약 */}
               <View style={styles.batteryOverview}>
-
                 <View style={styles.quickStats}>
                   <View style={styles.statItem}>
                     <Text
@@ -458,8 +469,22 @@ const VehicleDiagnosisReportScreen: React.FC<Props> = ({
                 </View>
 
                 {/* 최근 오류 코드 (선택적 필드) */}
-                {(report as VehicleDiagnosisReport & { recentErrorCodes?: Array<{ code: string; description: string }> }).recentErrorCodes &&
-                  (report as VehicleDiagnosisReport & { recentErrorCodes?: Array<{ code: string; description: string }> }).recentErrorCodes!.length > 0 && (
+                {(
+                  report as VehicleDiagnosisReport & {
+                    recentErrorCodes?: Array<{
+                      code: string;
+                      description: string;
+                    }>;
+                  }
+                ).recentErrorCodes &&
+                  (
+                    report as VehicleDiagnosisReport & {
+                      recentErrorCodes?: Array<{
+                        code: string;
+                        description: string;
+                      }>;
+                    }
+                  ).recentErrorCodes!.length > 0 && (
                     <View style={styles.errorSection}>
                       <Text
                         style={[
@@ -470,20 +495,32 @@ const VehicleDiagnosisReportScreen: React.FC<Props> = ({
                         최근 오류 코드
                       </Text>
                       <View style={styles.errorCodes}>
-                        {(report as VehicleDiagnosisReport & { recentErrorCodes?: Array<{ code: string; description: string }> }).recentErrorCodes!
-                          .slice(0, 3)
-                          .map((error: { code: string; description: string }, index: number) => (
-                            <View key={index} style={styles.errorCode}>
-                              <Text
-                                style={[
-                                  styles.errorCodeText,
-                                  convertToLineSeedFont(styles.errorCodeText),
-                                ]}
-                              >
-                                {error.code}: {error.description}
-                              </Text>
-                            </View>
-                          ))}
+                        {(
+                          report as VehicleDiagnosisReport & {
+                            recentErrorCodes?: Array<{
+                              code: string;
+                              description: string;
+                            }>;
+                          }
+                        )
+                          .recentErrorCodes!.slice(0, 3)
+                          .map(
+                            (
+                              error: { code: string; description: string },
+                              index: number
+                            ) => (
+                              <View key={index} style={styles.errorCode}>
+                                <Text
+                                  style={[
+                                    styles.errorCodeText,
+                                    convertToLineSeedFont(styles.errorCodeText),
+                                  ]}
+                                >
+                                  {error.code}: {error.description}
+                                </Text>
+                              </View>
+                            )
+                          )}
                       </View>
                     </View>
                   )}
@@ -507,10 +544,10 @@ const VehicleDiagnosisReportScreen: React.FC<Props> = ({
                     {report.sohPercentage >= 95
                       ? "배터리 상태가 매우 우수합니다. 현재와 같은 충전 패턴을 유지하시기 바랍니다."
                       : report.sohPercentage >= 90
-                      ? "배터리 상태가 양호합니다. 급속 충전 빈도를 줄이면 더 오래 사용할 수 있습니다."
-                      : report.sohPercentage >= 85
-                      ? "배터리 성능이 저하되고 있습니다. 충전 패턴 개선과 정기 점검을 권장합니다."
-                      : "배터리 교체를 검토해야 할 시점입니다. 전문가 상담을 받으시기 바랍니다."}
+                        ? "배터리 상태가 양호합니다. 급속 충전 빈도를 줄이면 더 오래 사용할 수 있습니다."
+                        : report.sohPercentage >= 85
+                          ? "배터리 성능이 저하되고 있습니다. 충전 패턴 개선과 정기 점검을 권장합니다."
+                          : "배터리 교체를 검토해야 할 시점입니다. 전문가 상담을 받으시기 바랍니다."}
                   </Text>
                 </View>
               </View>
@@ -642,8 +679,8 @@ const VehicleDiagnosisReportScreen: React.FC<Props> = ({
                 </TouchableOpacity>
               )}
 
-            {/* 사고이력 */}
-            {report.uploadedFiles && report.uploadedFiles.length > 0 && (
+            {/* 사고이력 - 숨김 처리 */}
+            {/* {report.uploadedFiles && report.uploadedFiles.length > 0 && (
               <TouchableOpacity
                 style={styles.actionItem}
                 onPress={() => openModal("uploads")}
@@ -669,9 +706,8 @@ const VehicleDiagnosisReportScreen: React.FC<Props> = ({
                   {report.uploadedFiles.length}개 파일
                 </Text>
               </TouchableOpacity>
-            )}
+            )} */}
           </Animatable.View>
-
         </ScrollView>
 
         {/* 모달 */}
@@ -680,7 +716,7 @@ const VehicleDiagnosisReportScreen: React.FC<Props> = ({
           transparent={false}
           visible={modalVisible}
           onRequestClose={closeModal}
-          presentationStyle="pageSheet"
+          presentationStyle="fullScreen"
         >
           <SafeAreaView style={styles.modalContainer}>
             <View style={styles.modalContent}>
@@ -935,45 +971,45 @@ const VehicleDiagnosisReportScreen: React.FC<Props> = ({
 
                 {modalContent === "images" &&
                   report?.comprehensiveInspection?.inspectionImages && (
-                    <View style={styles.modalSection}>
-                      <Text
-                        style={[
-                          styles.modalSectionTitle,
-                          convertToLineSeedFont(styles.modalSectionTitle),
-                        ]}
-                      >
-                        검사 이미지 (
-                        {report.comprehensiveInspection.inspectionImages.length}
-                        개)
-                      </Text>
+                    <View
+                      style={{ flex: 1 }}
+                      onLayout={(e) => {
+                        setContainerWidth(e.nativeEvent.layout.width);
+                      }}
+                    >
                       <FlatList
                         data={report.comprehensiveInspection.inspectionImages}
                         horizontal
+                        pagingEnabled
                         showsHorizontalScrollIndicator={false}
-                        snapToInterval={Dimensions.get("window").width - 64}
-                        decelerationRate="fast"
-                        contentContainerStyle={styles.imageCarouselContainer}
                         keyExtractor={(item) => item.id}
-                        pagingEnabled={false}
                         onScroll={handleScroll}
                         scrollEventThrottle={16}
+                        getItemLayout={(data, index) => ({
+                          length: containerWidth,
+                          offset: containerWidth * index,
+                          index,
+                        })}
                         renderItem={({ item: imageItem, index }) => (
-                          <View style={styles.imageCard}>
+                          <View
+                            style={[
+                              styles.imageCardWrapper,
+                              { width: containerWidth },
+                            ]}
+                          >
                             <TouchableOpacity
-                              style={styles.imageCardImageWrapper}
-                              onPress={() =>
-                                openImageViewer(
-                                  imageItem.imageUrl,
-                                  imageItem.title
-                                )
-                              }
+                              style={styles.imageCard}
+                              onPress={() => {
+                                openImageViewer(imageItem);
+                              }}
                               activeOpacity={0.8}
+                              delayPressIn={0}
                             >
                               {isSVGFile(imageItem.imageUrl) ||
                               isImageLoadError(imageItem.imageUrl) ? (
                                 <View
                                   style={[
-                                    styles.imageCardImage,
+                                    styles.imageCardImageFull,
                                     styles.imageCardPlaceholder,
                                   ]}
                                 >
@@ -993,100 +1029,57 @@ const VehicleDiagnosisReportScreen: React.FC<Props> = ({
                                   </Text>
                                 </View>
                               ) : (
-                                <Image
-                                  source={{ uri: imageItem.imageUrl }}
-                                  style={styles.imageCardImage}
-                                  resizeMode="cover"
-                                  onError={() =>
-                                    handleImageError(imageItem.imageUrl)
-                                  }
-                                />
+                                <View
+                                  style={styles.imageCardImageFull}
+                                  pointerEvents="none"
+                                >
+                                  <Image
+                                    source={{ uri: imageItem.imageUrl }}
+                                    style={{ width: "100%", height: "100%" }}
+                                    resizeMode="cover"
+                                    onError={() =>
+                                      handleImageError(imageItem.imageUrl)
+                                    }
+                                  />
+                                </View>
                               )}
-                              <View style={styles.imageCardOverlay}>
+
+                              {/* 확대 아이콘 */}
+                              <View
+                                style={styles.imageCardOverlay}
+                                pointerEvents="none"
+                              >
                                 <Ionicons
                                   name="expand"
-                                  size={20}
+                                  size={24}
                                   color="#FFFFFF"
                                 />
                               </View>
                             </TouchableOpacity>
 
-                            <View style={styles.imageCardContent}>
-                              <View style={styles.imageCardHeader}>
-                                <Text
-                                  style={[
-                                    styles.imageCardTitle,
-                                    convertToLineSeedFont(
-                                      styles.imageCardTitle
-                                    ),
-                                  ]}
-                                >
-                                  {imageItem.title ||
-                                    `검사 이미지 ${index + 1}`}
-                                </Text>
-                                <View
-                                  style={[
-                                    styles.imageCardBadge,
-                                    {
-                                      backgroundColor:
-                                        imageItem.severity === "normal"
-                                          ? "#E0F7FA"
-                                          : "#F8F9FA",
-                                    },
-                                  ]}
-                                >
-                                  <Text
-                                    style={[
-                                      styles.imageCardBadgeText,
-                                      {
-                                        color:
-                                          imageItem.severity === "normal"
-                                            ? "#06B6D4"
-                                            : "#202632",
-                                      },
-                                      convertToLineSeedFont(
-                                        styles.imageCardBadgeText
-                                      ),
-                                    ]}
-                                  >
-                                    {imageItem.severity === "normal"
-                                      ? "정상"
-                                      : imageItem.severity === "attention"
-                                      ? "주의"
-                                      : imageItem.severity === "warning"
-                                      ? "경고"
-                                      : imageItem.severity === "critical"
-                                      ? "위험"
-                                      : imageItem.severity}
-                                  </Text>
-                                </View>
-                              </View>
-
-                              {imageItem.description && (
-                                <Text
-                                  style={[
-                                    styles.imageCardDescription,
-                                    convertToLineSeedFont(
-                                      styles.imageCardDescription
-                                    ),
-                                  ]}
-                                >
-                                  {imageItem.description}
-                                </Text>
-                              )}
-
-                              {imageItem.location && (
-                                <Text
-                                  style={[
-                                    styles.imageCardLocation,
-                                    convertToLineSeedFont(
-                                      styles.imageCardLocation
-                                    ),
-                                  ]}
-                                >
-                                  위치: {imageItem.location}
-                                </Text>
-                              )}
+                            {/* 카테고리 및 상태 정보 */}
+                            <View style={styles.imageCardInfo}>
+                              <View style={styles.imageCardDivider} />
+                              <Text
+                                style={[
+                                  styles.imageCardCategoryText,
+                                  convertToLineSeedFont(
+                                    styles.imageCardCategoryText
+                                  ),
+                                ]}
+                              >
+                                {imageItem.category}
+                              </Text>
+                              <Text
+                                style={[
+                                  styles.imageCardSeverityText,
+                                  convertToLineSeedFont(
+                                    styles.imageCardSeverityText
+                                  ),
+                                ]}
+                              >
+                                {imageItem.severity}
+                              </Text>
                             </View>
                           </View>
                         )}
@@ -1145,40 +1138,16 @@ const VehicleDiagnosisReportScreen: React.FC<Props> = ({
                               >
                                 {info.title}
                               </Text>
-                              <View
-                                style={[
-                                  styles.inspectionBadge,
-                                  {
-                                    backgroundColor:
-                                      info.severity === "normal"
-                                        ? "#E0F7FA"
-                                        : "#F8F9FA",
-                                  },
-                                ]}
-                              >
+                              <View style={styles.inspectionBadge}>
                                 <Text
                                   style={[
                                     styles.inspectionBadgeText,
-                                    {
-                                      color:
-                                        info.severity === "normal"
-                                          ? "#06B6D4"
-                                          : "#202632",
-                                    },
                                     convertToLineSeedFont(
                                       styles.inspectionBadgeText
                                     ),
                                   ]}
                                 >
-                                  {info.severity === "normal"
-                                    ? "정상"
-                                    : info.severity === "attention"
-                                    ? "주의"
-                                    : info.severity === "warning"
-                                    ? "경고"
-                                    : info.severity === "critical"
-                                    ? "위험"
-                                    : info.severity}
+                                  {info.severity}
                                 </Text>
                               </View>
                             </View>
@@ -1274,19 +1243,27 @@ const VehicleDiagnosisReportScreen: React.FC<Props> = ({
                       <View key={index} style={styles.pdfPreviewContainer}>
                         <TouchableOpacity
                           style={styles.modalInspectionItem}
-                          onPress={() => openPDFFile(file.fileUrl, file.fileName)}
+                          onPress={() =>
+                            openPDFFile(file.fileUrl, file.fileName)
+                          }
                           activeOpacity={0.7}
                         >
                           <View style={styles.inspectionRow}>
                             <Text
                               style={[
                                 styles.inspectionLocation,
-                                convertToLineSeedFont(styles.inspectionLocation),
+                                convertToLineSeedFont(
+                                  styles.inspectionLocation
+                                ),
                               ]}
                             >
                               {file.fileName}
                             </Text>
-                            <Ionicons name="download" size={20} color="#06B6D4" />
+                            <Ionicons
+                              name="download"
+                              size={20}
+                              color="#06B6D4"
+                            />
                           </View>
                           <Text
                             style={[
@@ -1297,7 +1274,7 @@ const VehicleDiagnosisReportScreen: React.FC<Props> = ({
                             크기: {(file.fileSize / 1024 / 1024).toFixed(1)}MB
                           </Text>
                         </TouchableOpacity>
-                        
+
                         {/* PDF 미리보기 */}
                         <View style={styles.pdfPreviewWrapper}>
                           <Pdf
@@ -1309,7 +1286,9 @@ const VehicleDiagnosisReportScreen: React.FC<Props> = ({
                             maxScale={1.5}
                             renderActivityIndicator={() => (
                               <View style={styles.pdfLoadingContainer}>
-                                <Text style={styles.pdfLoadingText}>PDF 로딩 중...</Text>
+                                <Text style={styles.pdfLoadingText}>
+                                  PDF 로딩 중...
+                                </Text>
                               </View>
                             )}
                             onError={(error) => {
@@ -1320,12 +1299,16 @@ const VehicleDiagnosisReportScreen: React.FC<Props> = ({
                           />
                           <TouchableOpacity
                             style={styles.pdfOverlay}
-                            onPress={() => openPDFFile(file.fileUrl, file.fileName)}
+                            onPress={() =>
+                              openPDFFile(file.fileUrl, file.fileName)
+                            }
                             activeOpacity={0.8}
                           >
                             <View style={styles.pdfOverlayContent}>
                               <Ionicons name="eye" size={24} color="#FFFFFF" />
-                              <Text style={styles.pdfOverlayText}>전체보기</Text>
+                              <Text style={styles.pdfOverlayText}>
+                                전체보기
+                              </Text>
                             </View>
                           </TouchableOpacity>
                         </View>
@@ -1335,84 +1318,31 @@ const VehicleDiagnosisReportScreen: React.FC<Props> = ({
                 )}
               </ScrollView>
             </View>
-          </SafeAreaView>
-        </Modal>
 
-        {/* 전체화면 이미지 뷰어 */}
-        <Modal
-          animationType="fade"
-          transparent={true}
-          visible={imageViewerVisible}
-          onRequestClose={closeImageViewer}
-        >
-          <View style={styles.imageViewerOverlay}>
-            <SafeAreaView style={styles.imageViewerContainer}>
-              <View style={styles.imageViewerHeader}>
-                <Text
-                  style={[
-                    styles.imageViewerTitle,
-                    convertToLineSeedFont(styles.imageViewerTitle),
-                  ]}
-                >
-                  {selectedImageTitle}
-                </Text>
-                <TouchableOpacity
-                  style={styles.imageViewerCloseButton}
-                  onPress={closeImageViewer}
-                >
-                  <Ionicons name="close" size={24} color="#FFFFFF" />
-                </TouchableOpacity>
-              </View>
-
-              <View style={styles.imageViewerContent}>
-                {selectedImageUrl ? (
-                  isSVGFile(selectedImageUrl) ||
-                  isImageLoadError(selectedImageUrl) ? (
-                    <View
-                      style={[
-                        styles.fullScreenImage,
-                        styles.fullScreenPlaceholder,
-                      ]}
+            {/* 전체화면 이미지 뷰어 - 모달 내부 오버레이 */}
+            {imageViewerVisible && selectedImageData && (
+              <View style={styles.fullScreenImageViewerOverlay}>
+                <SafeAreaView style={styles.fullScreenImageViewerContainer}>
+                  <View style={styles.fullScreenImageViewerHeader}>
+                    <TouchableOpacity
+                      style={styles.fullScreenImageViewerCloseButton}
+                      onPress={closeImageViewer}
                     >
-                      <Ionicons
-                        name={
-                          isSVGFile(selectedImageUrl)
-                            ? "document-text"
-                            : "image"
-                        }
-                        size={80}
-                        color="#06B6D4"
-                      />
-                      <Text style={styles.fullScreenPlaceholderText}>
-                        {isSVGFile(selectedImageUrl)
-                          ? "SVG 파일입니다"
-                          : "이미지를 불러올 수 없습니다"}
-                      </Text>
-                      {isSVGFile(selectedImageUrl) && (
-                        <TouchableOpacity
-                          style={styles.viewFileButton}
-                          onPress={() =>
-                            openPDFFile(selectedImageUrl, selectedImageTitle)
-                          }
-                        >
-                          <Text style={styles.viewFileButtonText}>
-                            파일 보기
-                          </Text>
-                        </TouchableOpacity>
-                      )}
-                    </View>
-                  ) : (
+                      <Ionicons name="close" size={32} color="#FFFFFF" />
+                    </TouchableOpacity>
+                  </View>
+
+                  <View style={styles.fullScreenImageViewerContent}>
                     <Image
-                      source={{ uri: selectedImageUrl }}
-                      style={styles.fullScreenImage}
+                      source={{ uri: selectedImageData.imageUrl }}
+                      style={styles.fullScreenImageViewerImage}
                       resizeMode="contain"
-                      onError={() => handleImageError(selectedImageUrl)}
                     />
-                  )
-                ) : null}
+                  </View>
+                </SafeAreaView>
               </View>
-            </SafeAreaView>
-          </View>
+            )}
+          </SafeAreaView>
         </Modal>
       </SafeAreaView>
     </LinearGradient>
@@ -1673,10 +1603,12 @@ const styles = StyleSheet.create({
     paddingHorizontal: 8,
     paddingVertical: 4,
     borderRadius: 12,
+    backgroundColor: "#F8F9FA",
   },
   inspectionBadgeText: {
     fontSize: 12,
     fontWeight: "600",
+    color: "#6B7280",
   },
 
   // PDF Files
@@ -2172,32 +2104,35 @@ const styles = StyleSheet.create({
   },
 
   // Image Carousel Styles
-  imageCarouselContainer: {
-    paddingHorizontal: 16,
+  imageCardWrapper: {
+    paddingHorizontal: 0,
   },
+
   imageCard: {
-    width: Dimensions.get("window").width - 80,
-    backgroundColor: "#FFFFFF",
-    borderRadius: 16,
-    marginHorizontal: 8,
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.05,
-    shadowRadius: 4,
-    elevation: 2,
+    width: "100%",
+    aspectRatio: 1,
     overflow: "hidden",
+    position: "relative",
+    flex: 1,
+    justifyContent: "center",
+    alignItems: "center",
+    backgroundColor: "#000000",
   },
   imageCardImageWrapper: {
     position: "relative",
   },
   imageCardImage: {
     width: "100%",
-    height: 200,
+    height: "auto",
+  },
+  imageCardImageFull: {
+    width: "100%",
+    height: "100%",
   },
   imageCardPlaceholder: {
-    backgroundColor: "#F8FAFC",
-    borderWidth: 2,
-    borderColor: "#E2E8F0",
+    backgroundColor: "#000000",
+    borderWidth: 1,
+    borderColor: "#000000",
     borderStyle: "dashed",
     alignItems: "center",
     justifyContent: "center",
@@ -2207,6 +2142,28 @@ const styles = StyleSheet.create({
     color: "#06B6D4",
     fontWeight: "500",
     marginTop: 8,
+  },
+  imageCardInfo: {
+    paddingTop: 20,
+    paddingHorizontal: 0,
+  },
+  imageCardDivider: {
+    height: 1,
+    backgroundColor: "#E5E7EB",
+    marginBottom: 16,
+  },
+  imageCardCategoryText: {
+    fontSize: 18,
+    fontWeight: "600",
+    color: "#202632",
+    marginBottom: 6,
+    letterSpacing: -0.3,
+  },
+  imageCardSeverityText: {
+    fontSize: 14,
+    fontWeight: "400",
+    color: "#6B7280",
+    lineHeight: 20,
   },
   imageCardOverlay: {
     position: "absolute",
@@ -2220,7 +2177,7 @@ const styles = StyleSheet.create({
     justifyContent: "center",
   },
   imageCardContent: {
-    padding:0,
+    padding: 0,
   },
   imageCardHeader: {
     marginBottom: 12,
@@ -2251,6 +2208,76 @@ const styles = StyleSheet.create({
     fontSize: 12,
     color: "#9CA3AF",
     fontStyle: "italic",
+  },
+
+  // Full Screen Image Viewer (Independent Overlay)
+  fullScreenImageViewerOverlay: {
+    position: "absolute",
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    backgroundColor: "rgba(0, 0, 0, 0.98)",
+    zIndex: 999999,
+    elevation: 999999,
+  },
+  fullScreenImageViewerContainer: {
+    flex: 1,
+  },
+  fullScreenImageViewerHeader: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    paddingHorizontal: 20,
+    paddingVertical: 16,
+  },
+  fullScreenImageViewerInfo: {
+    flex: 1,
+  },
+  fullScreenImageViewerBadges: {
+    flexDirection: "row",
+    gap: 8,
+  },
+  fullScreenCategoryBadge: {
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 8,
+    backgroundColor: "rgba(6, 182, 212, 0.9)",
+  },
+  fullScreenCategoryBadgeText: {
+    fontSize: 14,
+    fontWeight: "600",
+    color: "#FFFFFF",
+  },
+  fullScreenSeverityBadge: {
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 8,
+    backgroundColor: "rgba(107, 114, 128, 0.9)",
+  },
+  fullScreenSeverityBadgeText: {
+    fontSize: 14,
+    fontWeight: "600",
+    color: "#FFFFFF",
+  },
+  fullScreenImageViewerCloseButton: {
+    width: 48,
+    height: 48,
+    borderRadius: 24,
+    backgroundColor: "rgba(255, 255, 255, 0.1)",
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  fullScreenImageViewerContent: {
+    flex: 1,
+    justifyContent: "center",
+    alignItems: "center",
+    paddingHorizontal: 20,
+    paddingBottom: 100,
+  },
+  fullScreenImageViewerImage: {
+    width: "100%",
+    height: "80%",
   },
 
   // Technical Data Section

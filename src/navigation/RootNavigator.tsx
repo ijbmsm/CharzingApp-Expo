@@ -139,22 +139,23 @@ function MainTabs() {
         tabBarInactiveTintColor: '#6B7280',
         tabBarStyle: {
           backgroundColor: '#FFFFFF',
-          borderTopWidth: 1,
-          borderTopColor: '#E5E7EB',
+          borderTopWidth: 0,
           paddingBottom: Platform.OS === 'android'
-            ? Math.max(insets.bottom, 16) // Android는 최소 16px
+            ? Math.max(insets.bottom, 16) + 8 // Android는 최소 16px + 추가 8px
             : Math.max(insets.bottom, 8),  // iOS는 최소 8px
           paddingTop: 8,
           height: Platform.OS === 'android'
-            ? 68 + insets.bottom // Android는 탭바 높이 + insets
-            : 68 + insets.bottom, // iOS도 동일하게 명시적 높이 지정
-          elevation: 10,
-          shadowOpacity: 0.1,
+            ? 53 + insets.bottom // Android는 탭바 높이 + insets
+            : 45 + insets.bottom, // iOS도 동일하게 명시적 높이 지정
+          elevation: 15,
+          shadowOpacity: 0.15,
           shadowColor: '#000',
-          shadowOffset: { width: 0, height: -2 },
-          shadowRadius: 4,
+          shadowOffset: { width: 0, height: -4 },
+          shadowRadius: 8,
           borderTopLeftRadius: 30,
           borderTopRightRadius: 30,
+          overflow: 'hidden',
+          position: 'absolute',
         },
         tabBarLabelStyle: {
           fontSize: 12,

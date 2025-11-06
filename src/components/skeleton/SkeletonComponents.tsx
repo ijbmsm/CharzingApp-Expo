@@ -174,31 +174,43 @@ export const SkeletonVehicleCard: React.FC<SkeletonVehicleCardProps> = ({ style 
       </View>
 
       {/* 차량 정보 */}
-      <View style={{ marginBottom: 16 }}>
-        {/* 차량 이름과 편집 버튼 */}
+      <View style={{ flex: 1, paddingBottom: 0 }}>
+        {/* 차량 이름 */}
         <View style={{
           flexDirection: 'row',
           justifyContent: 'space-between',
           alignItems: 'flex-start',
-          marginBottom: 12,
         }}>
           <View style={{ flex: 1 }}>
             <SkeletonText width="85%" height={20} style={{ marginBottom: 6 }} />
             <SkeletonText width="65%" height={16} />
           </View>
-          <SkeletonImage width={28} height={28} borderRadius={14} />
         </View>
-      </View>
-      
-      {/* 확장 버튼 */}
-      <View style={{ 
-        alignItems: 'center',
-        marginTop: 8,
-        paddingTop: 12,
-        borderTopWidth: 1,
-        borderTopColor: '#F3F4F6',
-      }}>
-        <SkeletonButton width={120} height={36} />
+
+        {/* 배터리 및 성능 정보 (영수증 스타일) */}
+        <View style={{ marginTop: 8 }}>
+          {/* 배터리 제조사 */}
+          <View style={{
+            flexDirection: 'row',
+            justifyContent: 'space-between',
+            alignItems: 'center',
+            paddingVertical: 6,
+          }}>
+            <SkeletonText width="40%" height={14} />
+            <SkeletonText width="30%" height={14} />
+          </View>
+
+          {/* 완충 시 주행거리 */}
+          <View style={{
+            flexDirection: 'row',
+            justifyContent: 'space-between',
+            alignItems: 'center',
+            paddingVertical: 6,
+          }}>
+            <SkeletonText width="45%" height={14} />
+            <SkeletonText width="25%" height={14} />
+          </View>
+        </View>
       </View>
     </View>
   );

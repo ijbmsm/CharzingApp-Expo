@@ -42,8 +42,6 @@ import { convertToLineSeedFont } from "../styles/fonts";
 import * as Animatable from "react-native-animatable";
 import {
   SkeletonVehicleCard,
-  SkeletonText,
-  SkeletonCard,
   SkeletonImage,
 } from "../components/skeleton";
 
@@ -101,13 +99,6 @@ const VehicleCard: React.FC<VehicleCardProps> = ({ vehicle, onEdit }) => {
     }
   };
 
-  // 배터리 용량에서 숫자만 추출
-  const getBatteryCapacity = (capacity?: string): string => {
-    if (!capacity) return "알 수 없음";
-    const match = capacity.match(/(\d+(?:\.\d+)?)/);
-    return match ? `${match[1]}kWh` : capacity;
-  };
-
   // Firebase에서 차량 상세 정보 가져오기
   React.useEffect(() => {
     const fetchVehicleDetails = async () => {
@@ -149,60 +140,33 @@ const VehicleCard: React.FC<VehicleCardProps> = ({ vehicle, onEdit }) => {
     fetchVehicleDetails();
   }, [vehicle.id, vehicle.make, vehicle.model, vehicle.year, vehicle.trim]);
 
+  // 로딩 중이면 스켈레톤 카드 표시
+  if (loading) {
+    return <SkeletonVehicleCard />;
+  }
+
   return (
-    <Animatable.View
-      animation={loading ? undefined : "zoomIn"}
-      duration={300}
-      style={styles.vehicleCard}
-    >
+    <View style={styles.vehicleCard}>
       {/* 차량 이미지 */}
       <View style={styles.vehicleImageContainer}>
-        {(() => {
-          // vehicleDetails가 로드된 후에만 이미지 표시 (vehicle.imageUrl은 이전 차량 URL일 수 있음)
-          const imageUrl = vehicleDetails?.imageUrl
-            ? normalizeImageUrl(vehicleDetails.imageUrl)
-            : "";
-          return imageUrl && !imageError && !loading ? (
-            <Image
-              source={{ uri: imageUrl }}
-              style={[styles.vehicleImage, { opacity: imageLoaded ? 1 : 0 }]}
-              onLoad={() => {
-                console.log("✅ [VehicleCard] 이미지 로드 성공:", imageUrl);
-                setImageLoaded(true);
-              }}
-              onError={(error) => {
-                console.error("❌ [VehicleCard] 이미지 로드 실패:", {
-                  url: imageUrl,
-                  error: error.nativeEvent,
-                });
-                setImageError(true);
-              }}
-            />
-          ) : null;
-        })()}
-
-        {/* 이미지 로딩 중이거나 없을 때 */}
-        {(() => {
-          const hasImageUrl = !!vehicleDetails?.imageUrl;
-          if (loading || (!imageLoaded && !imageError && hasImageUrl)) {
-            return (
-              <SkeletonImage
-                width="100%"
-                height="100%"
-                borderRadius={12}
-                style={styles.vehicleImagePlaceholder}
-              />
-            );
-          }
-          if (!hasImageUrl || imageError) {
-            return (
-              <View style={styles.vehicleImagePlaceholder}>
-                <Ionicons name="car-outline" size={40} color="#9CA3AF" />
-              </View>
-            );
-          }
-          return null;
-        })()}
+        {vehicleDetails?.imageUrl && !imageError ? (
+          <Image
+            source={{ uri: normalizeImageUrl(vehicleDetails.imageUrl) }}
+            style={styles.vehicleImage}
+            onLoad={() => {
+              console.log("✅ [VehicleCard] 이미지 로드 성공");
+              setImageLoaded(true);
+            }}
+            onError={(error) => {
+              console.error("❌ [VehicleCard] 이미지 로드 실패:", error.nativeEvent);
+              setImageError(true);
+            }}
+          />
+        ) : (
+          <View style={styles.vehicleImagePlaceholder}>
+            <Ionicons name="car-outline" size={40} color="#9CA3AF" />
+          </View>
+        )}
       </View>
 
       {/* 차량 정보 */}
@@ -226,9 +190,7 @@ const VehicleCard: React.FC<VehicleCardProps> = ({ vehicle, onEdit }) => {
               <View style={styles.vehicleCardReceiptRow}>
                 <Text style={styles.vehicleCardDetails}>배터리 제조사</Text>
                 <Text style={styles.vehicleCardDetails}>
-                  {loading
-                    ? "로딩중..."
-                    : vehicleDetails?.battery.manufacturer || "알 수 없음"}
+                  {vehicleDetails?.battery.manufacturer || "알 수 없음"}
                 </Text>
               </View>
 
@@ -236,9 +198,7 @@ const VehicleCard: React.FC<VehicleCardProps> = ({ vehicle, onEdit }) => {
               <View style={styles.vehicleCardReceiptRow}>
                 <Text style={styles.vehicleCardDetails}>완충 시 주행거리</Text>
                 <Text style={styles.vehicleCardDetails}>
-                  {loading
-                    ? "로딩중..."
-                    : vehicleDetails?.performance.range
+                  {vehicleDetails?.performance.range
                     ? `${vehicleDetails.performance.range}km`
                     : "알 수 없음"}
                 </Text>
@@ -329,7 +289,7 @@ const VehicleCard: React.FC<VehicleCardProps> = ({ vehicle, onEdit }) => {
               </View> */}
         </View>
       </View>
-    </Animatable.View>
+    </View>
   );
 };
 
@@ -1298,31 +1258,33 @@ export default function HomeScreen() {
         >
           <View style={styles.statusHeader}>
             <Text style={styles.statusTitle}>내 차량</Text>
-            <TouchableOpacity
-              style={styles.usageHistoryButton}
-              onPress={() => {
-                const hasVehicle = userVehicles.length > 0;
-                if (hasVehicle && userVehicles[0]) {
-                  // 차량이 있으면 편집 모드로
-                  setSelectedVehicle(userVehicles[0]);
-                  setVehicleModalEditMode(true);
-                  setShowVehicleModal(true);
-                } else {
-                  // 차량이 없으면 추가 모드로
-                  handleAddVehicleCard();
-                }
-              }}
-              activeOpacity={0.8}
-            >
-              <Ionicons
-                name={userVehicles.length > 0 ? "pencil" : "add"}
-                size={16}
-                color="#06B6D4"
-              />
-              <Text style={styles.addVehicleHeaderText}>
-                {userVehicles.length > 0 ? "변경" : "차량 추가"}
-              </Text>
-            </TouchableOpacity>
+            {isAuthenticated && (
+              <TouchableOpacity
+                style={styles.usageHistoryButton}
+                onPress={() => {
+                  const hasVehicle = userVehicles.length > 0;
+                  if (hasVehicle && userVehicles[0]) {
+                    // 차량이 있으면 편집 모드로
+                    setSelectedVehicle(userVehicles[0]);
+                    setVehicleModalEditMode(true);
+                    setShowVehicleModal(true);
+                  } else {
+                    // 차량이 없으면 추가 모드로
+                    handleAddVehicleCard();
+                  }
+                }}
+                activeOpacity={0.8}
+              >
+                <Ionicons
+                  name={userVehicles.length > 0 ? "pencil" : "add"}
+                  size={16}
+                  color="#06B6D4"
+                />
+                <Text style={styles.addVehicleHeaderText}>
+                  {userVehicles.length > 0 ? "변경" : "차량 추가"}
+                </Text>
+              </TouchableOpacity>
+            )}
           </View>
 
           <View style={styles.statusContent}>

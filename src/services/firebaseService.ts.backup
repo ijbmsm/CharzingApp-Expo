@@ -1,24 +1,7 @@
-// Firebase 웹 SDK (Expo 호환)
-import { 
-  getFirestore, 
-  collection, 
-  doc, 
-  setDoc, 
-  getDoc, 
-  updateDoc, 
-  deleteDoc, 
-  query, 
-  where, 
-  limit, 
-  getDocs,
-  runTransaction,
-  serverTimestamp,
-  Timestamp,
-  FieldValue,
-  orderBy
-} from 'firebase/firestore';
-import { getAuth, signOut, signInWithCustomToken } from 'firebase/auth';
-import { getStorage, ref, uploadBytes, getDownloadURL } from 'firebase/storage';
+// Firebase Native SDK (@react-native-firebase)
+import firestore, { FirebaseFirestoreTypes } from '@react-native-firebase/firestore';
+import auth from '@react-native-firebase/auth';
+import storage from '@react-native-firebase/storage';
 // import { getFunctions, httpsCallable } from 'firebase/functions'; // Not supported in React Native
 import axios from 'axios';
 import Constants from 'expo-constants';
@@ -26,6 +9,9 @@ import { getDb, getAuthInstance, getStorageInstance } from '../firebase/config';
 import logger from './logService';
 import devLog from '../utils/devLog';
 import { handleFirebaseError, handleNetworkError, handleError } from './errorHandler';
+
+// Type alias for FieldValue
+type FieldValue = FirebaseFirestoreTypes.FieldValue;
 
 // 차량 이미지 URL 생성 유틸리티
 // Firebase Storage에 실제 존재하는 차량 이미지 구조 (실제 데이터 기반)
@@ -419,9 +405,9 @@ export interface ModelData {
 export interface InspectionImageItem {
   id: string; // 고유 ID
   imageUrl: string; // Firebase Storage 이미지 URL
-  category: string; // 검사 카테고리 (자유 입력: 정면, 우측, 후면, 좌측 등)
-  severity: string; // 심각도 (자유 입력: 정상, 주의, 경고 등)
-
+  category: 'paint' | 'tire' | 'component' | 'battery' | 'other'; // 검사 카테고리
+  severity: 'normal' | 'attention' | 'warning' | 'critical'; // 심각도
+  
   // 선택적 메타데이터
   title?: string; // 이미지 제목
   description?: string; // 이미지 설명
@@ -570,25 +556,25 @@ class FirebaseService {
     return getStorageInstance();
   }
 
-  // 컬렉션 참조들도 getter로 변경
+  // 컬렉션 참조들도 getter로 변경 (Native SDK)
   private get usersCollectionRef() {
-    return collection(this.db, 'users');
+    return this.db.collection('users');
   }
 
   private get diagnosisReservationsRef() {
-    return collection(this.db, 'diagnosisReservations');
+    return this.db.collection('diagnosisReservations');
   }
 
   private get diagnosisReportsRef() {
-    return collection(this.db, 'diagnosisReports');
+    return this.db.collection('diagnosisReports');
   }
 
   private get vehicleDiagnosisReportsRef() {
-    return collection(this.db, 'vehicleDiagnosisReports');
+    return this.db.collection('vehicleDiagnosisReports');
   }
 
   private get settingsRef() {
-    return collection(this.db, 'settings');
+    return this.db.collection('settings');
   }
 
   constructor() {
@@ -731,14 +717,14 @@ class FirebaseService {
   
   async saveUserProfile(userProfile: Omit<UserProfile, 'createdAt' | 'updatedAt'>): Promise<void> {
     try {
-      const now = serverTimestamp();
-      const userDocRef = doc(this.db, 'users', userProfile.uid);
-      
+      const now = firestore.FieldValue.serverTimestamp();
+      const userDocRef = this.db.collection('users').doc(userProfile.uid);
+
       // undefined 값을 제거한 깨끗한 객체 생성
       const cleanProfile: Partial<UserProfile> & { updatedAt: FieldValue } = {
         updatedAt: now,
       };
-      
+
       // undefined가 아닌 값들만 추가
       if (userProfile.uid !== undefined) cleanProfile.uid = userProfile.uid;
       if (userProfile.email !== undefined) cleanProfile.email = userProfile.email;
@@ -752,10 +738,10 @@ class FirebaseService {
       if (userProfile.phoneNumber !== undefined) cleanProfile.phoneNumber = userProfile.phoneNumber;
       if (userProfile.address !== undefined) cleanProfile.address = userProfile.address;
       if (userProfile.isRegistrationComplete !== undefined) cleanProfile.isRegistrationComplete = userProfile.isRegistrationComplete;
-      
+
       // merge: true 옵션을 사용해서 기존 데이터와 병합
-      await setDoc(userDocRef, cleanProfile, { merge: true });
-      
+      await userDocRef.set(cleanProfile, { merge: true });
+
       logger.firebaseOperation('save_user_profile', 'users', true, undefined, userProfile.uid);
     } catch (error) {
       logger.firebaseOperation('save_user_profile', 'users', false, error, userProfile.uid);
@@ -768,13 +754,13 @@ class FirebaseService {
    */
   async saveKakaoUserProfile(uid: string, kakaoProfile: any): Promise<{ isNewUser: boolean; user: UserProfile }> {
     try {
-      const userDocRef = doc(this.db, 'users', uid);
-      
-      return await runTransaction(this.db, async (transaction) => {
+      const userDocRef = this.db.collection('users').doc(uid);
+
+      return await this.db.runTransaction(async (transaction) => {
         const userDoc = await transaction.get(userDocRef);
-        const now = serverTimestamp();
-        
-        if (userDoc.exists()) {
+        const now = firestore.FieldValue.serverTimestamp();
+
+        if (userDoc.exists) {
           // 기존 사용자 - 로그인 시간만 업데이트
           const existingData = userDoc.data() as UserProfile;
           const updateData: Partial<UserProfile> = {
@@ -782,23 +768,23 @@ class FirebaseService {
             // 카카오 프로필 정보가 변경되었을 수 있으므로 업데이트
             displayName: kakaoProfile.nickname || existingData.displayName,
           };
-          
+
           // 프로필 이미지가 있는 경우에만 업데이트
           if (kakaoProfile.profileImageUrl) {
             updateData.photoURL = kakaoProfile.profileImageUrl;
           }
-          
+
           transaction.update(userDocRef, updateData);
-          
+
           logger.auth('login', 'kakao', true, undefined, uid);
-          return { 
-            isNewUser: false, 
-            user: { 
-              ...existingData, 
+          return {
+            isNewUser: false,
+            user: {
+              ...existingData,
               updatedAt: new Date(),
               displayName: kakaoProfile.nickname || existingData.displayName,
               photoURL: kakaoProfile.profileImageUrl || existingData.photoURL,
-            } 
+            }
           };
         } else {
           // 신규 사용자 - 기본 프로필 생성 (회원가입 미완료 상태)
@@ -812,7 +798,7 @@ class FirebaseService {
             createdAt: new Date(),
             updatedAt: new Date(),
           };
-          
+
           // 선택적으로 이메일과 프로필 이미지 추가 (undefined가 아닌 경우에만)
           if (kakaoProfile.email) {
             newUserProfile.email = kakaoProfile.email;
@@ -820,7 +806,7 @@ class FirebaseService {
           if (kakaoProfile.profileImageUrl) {
             newUserProfile.photoURL = kakaoProfile.profileImageUrl;
           }
-          
+
           transaction.set(userDocRef, newUserProfile);
           logger.auth('signup', 'kakao', true, undefined, uid);
           return { isNewUser: true, user: newUserProfile };
@@ -839,10 +825,10 @@ class FirebaseService {
     try {
       // Firebase 초기화 완료 대기
       await this.waitForFirebaseReady();
-      
-      const userDocRef = doc(this.db, 'users', uid);
-      const userDoc = await getDoc(userDocRef);
-      return userDoc.exists();
+
+      const userDocRef = this.db.collection('users').doc(uid);
+      const userDoc = await userDocRef.get();
+      return userDoc.exists;
     } catch (error) {
       logger.firebaseOperation('check_user_document_exists', 'users', false, error, uid);
       return false;
@@ -864,9 +850,9 @@ class FirebaseService {
     try {
       // Firebase 초기화 완료 대기
       await this.waitForFirebaseReady();
-      
-      const userDocRef = doc(this.db, 'users', uid);
-      
+
+      const userDocRef = this.db.collection('users').doc(uid);
+
       const userData = {
         uid,
         email: userInfo.email,
@@ -877,11 +863,11 @@ class FirebaseService {
         ...(userInfo.googleId && { googleId: userInfo.googleId }),
         ...(userInfo.kakaoId && { kakaoId: userInfo.kakaoId }),
         isRegistrationComplete: false, // 추가 정보 입력 필요
-        createdAt: serverTimestamp(),
-        updatedAt: serverTimestamp(),
+        createdAt: firestore.FieldValue.serverTimestamp(),
+        updatedAt: firestore.FieldValue.serverTimestamp(),
       };
 
-      await setDoc(userDocRef, userData);
+      await userDocRef.set(userData);
       logger.firebaseOperation('create_user_document', 'users', true, undefined, uid);
     } catch (error) {
       logger.firebaseOperation('create_user_document', 'users', false, error, uid);
@@ -904,24 +890,24 @@ class FirebaseService {
     try {
       // Firebase 초기화 완료 대기
       await this.waitForFirebaseReady();
-      
+
       const exists = await this.checkUserDocumentExists(uid);
-      
+
       if (!exists) {
         await this.createUserDocument(uid, userInfo);
       } else {
         // 기존 문서가 있으면 기본 정보만 업데이트
         // undefined 값들을 제거하여 Firebase 에러 방지
         const updateData: any = {
-          updatedAt: serverTimestamp(),
+          updatedAt: firestore.FieldValue.serverTimestamp(),
         };
-        
+
         if (userInfo.email !== undefined) updateData.email = userInfo.email;
         if (userInfo.displayName !== undefined) updateData.displayName = userInfo.displayName;
         if (userInfo.photoURL !== undefined) updateData.photoURL = userInfo.photoURL;
-        
-        const userDocRef = doc(this.db, 'users', uid);
-        await updateDoc(userDocRef, updateData);
+
+        const userDocRef = this.db.collection('users').doc(uid);
+        await userDocRef.update(updateData);
         devLog.log('✅ 기존 사용자 문서 업데이트 완료:', uid);
       }
     } catch (error) {
@@ -951,7 +937,7 @@ class FirebaseService {
     }
   ): Promise<void> {
     try {
-      const userDocRef = doc(this.db, 'users', uid);
+      const userDocRef = this.db.collection('users').doc(uid);
 
       // 새 사용자 문서 생성 (setDoc 사용) + 기본 알림 설정
       const userData: any = {
@@ -974,9 +960,9 @@ class FirebaseService {
           announcement: true,
           marketing: false,
         },
-        createdAt: serverTimestamp(),
-        updatedAt: serverTimestamp(),
-        lastLoginAt: serverTimestamp(),
+        createdAt: firestore.FieldValue.serverTimestamp(),
+        updatedAt: firestore.FieldValue.serverTimestamp(),
+        lastLoginAt: firestore.FieldValue.serverTimestamp(),
       };
 
       // undefined가 아닌 경우에만 ID 필드 추가 (Firestore는 undefined 허용 안 함)
@@ -990,7 +976,7 @@ class FirebaseService {
         userData.appleId = registrationData.appleId;
       }
 
-      await setDoc(userDocRef, userData);
+      await userDocRef.set(userData);
 
       devLog.log('✅ 회원가입 완료 - 사용자 문서 + 기본 알림 설정 생성:', uid);
     } catch (error) {
@@ -1006,11 +992,11 @@ class FirebaseService {
     try {
       // Firebase 초기화 완료 대기
       await this.waitForFirebaseReady();
-      
-      const userDocRef = doc(this.db, 'users', uid);
-      const userDoc = await getDoc(userDocRef);
-      
-      if (userDoc.exists()) {
+
+      const userDocRef = this.db.collection('users').doc(uid);
+      const userDoc = await userDocRef.get();
+
+      if (userDoc.exists) {
         const data = userDoc.data();
         return {
           uid,
@@ -1029,7 +1015,7 @@ class FirebaseService {
           updatedAt: data?.updatedAt?.toDate(),
         } as UserProfile;
       }
-      
+
       return null;
     } catch (error) {
       devLog.error('사용자 프로필 조회 실패:', error);
@@ -1042,10 +1028,10 @@ class FirebaseService {
    */
   async updateUserLastLogin(uid: string): Promise<void> {
     try {
-      const userDocRef = doc(this.db, 'users', uid);
-      await updateDoc(userDocRef, {
-        lastLoginAt: serverTimestamp(),
-        updatedAt: serverTimestamp(),
+      const userDocRef = this.db.collection('users').doc(uid);
+      await userDocRef.update({
+        lastLoginAt: firestore.FieldValue.serverTimestamp(),
+        updatedAt: firestore.FieldValue.serverTimestamp(),
       });
       devLog.log('✅ 마지막 로그인 시간 업데이트:', uid);
     } catch (error) {
@@ -1058,13 +1044,11 @@ class FirebaseService {
    */
   async getUserByKakaoId(kakaoId: string): Promise<UserProfile | null> {
     try {
-      const q = query(
-        this.usersCollectionRef, 
-        where('kakaoId', '==', kakaoId), 
-        limit(1)
-      );
-      const snapshot = await getDocs(q);
-      
+      const snapshot = await this.usersCollectionRef
+        .where('kakaoId', '==', kakaoId)
+        .limit(1)
+        .get();
+
       if (!snapshot.empty) {
         const doc = snapshot.docs[0];
         if (!doc) return null;
@@ -1076,19 +1060,19 @@ class FirebaseService {
           photoURL: data.photoURL,
           provider: data.provider,
           kakaoId: data.kakaoId,
-          createdAt: data.createdAt && typeof data.createdAt === 'object' && 'toDate' in data.createdAt 
-            ? (data.createdAt as any).toDate() 
-            : data.createdAt instanceof Date 
-              ? data.createdAt 
+          createdAt: data.createdAt && typeof data.createdAt === 'object' && 'toDate' in data.createdAt
+            ? (data.createdAt as any).toDate()
+            : data.createdAt instanceof Date
+              ? data.createdAt
               : new Date(),
-          updatedAt: data.updatedAt && typeof data.updatedAt === 'object' && 'toDate' in data.updatedAt 
-            ? (data.updatedAt as any).toDate() 
-            : data.updatedAt instanceof Date 
-              ? data.updatedAt 
+          updatedAt: data.updatedAt && typeof data.updatedAt === 'object' && 'toDate' in data.updatedAt
+            ? (data.updatedAt as any).toDate()
+            : data.updatedAt instanceof Date
+              ? data.updatedAt
               : new Date(),
         } as UserProfile;
       }
-      
+
       return null;
     } catch (error) {
       devLog.error('카카오 ID로 사용자 검색 실패:', error);
