@@ -138,6 +138,12 @@ export default {
         }
       ],
       [
+        "@react-native-seoul/kakao-login",
+        {
+          kakaoAppKey: process.env.EXPO_PUBLIC_KAKAO_NATIVE_APP_KEY
+        }
+      ],
+      [
         "expo-build-properties",
         {
           android: {

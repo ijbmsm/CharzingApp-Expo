@@ -235,8 +235,45 @@ class KakaoLoginService implements ILoginService {
 
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : '알 수 없는 오류';
+
+      // 상세 에러 로깅 (Key Hash 정보 포함 가능)
+      console.error('❌❌❌ 카카오 로그인 전체 에러 객체:', JSON.stringify(error, null, 2));
+      console.error('❌❌❌ 에러 타입:', typeof error);
+      console.error('❌❌❌ 에러 메시지:', errorMessage);
+
+      if (error && typeof error === 'object') {
+        console.error('❌❌❌ 에러 객체 키들:', Object.keys(error));
+        console.error('❌❌❌ 에러 name:', (error as any).name);
+        console.error('❌❌❌ 에러 code:', (error as any).code);
+        console.error('❌❌❌ 에러 nativeStackAndroid:', (error as any).nativeStackAndroid);
+      }
+
       devLog.error('❌ 카카오 네이티브 SDK 로그인 실패:', error);
       logger.auth('login_attempt', 'kakao', false, error);
+
+      // Sentry에 Key Hash 에러 전송
+      if (errorMessage.toLowerCase().includes('keyhash') ||
+          errorMessage.toLowerCase().includes('key hash')) {
+        const Sentry = require('@sentry/react-native');
+        Sentry.captureException(error, {
+          tags: {
+            feature: 'kakao-login',
+            error_type: 'keyhash_validation',
+            platform: Platform.OS,
+          },
+          contexts: {
+            kakao: {
+              error_message: errorMessage,
+              error_full: JSON.stringify(error),
+              platform: Platform.OS,
+            }
+          },
+          level: 'error',
+        });
+
+        console.error('🔴🔴🔴 KEY HASH 에러 발생! Sentry에 전송됨');
+        console.error('🔴 해결 방법: 카카오 개발자 콘솔(developers.kakao.com)에 올바른 Key Hash 등록 필요');
+      }
 
       return {
         success: false,
