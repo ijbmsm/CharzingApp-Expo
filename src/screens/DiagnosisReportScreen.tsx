@@ -4,7 +4,6 @@ import {
   Text,
   ScrollView,
   StyleSheet,
-  Dimensions,
   SafeAreaView,
   TouchableOpacity,
   Linking,
@@ -13,14 +12,13 @@ import {
 import {NativeStackScreenProps} from '@react-navigation/native-stack';
 import {RootStackParamList} from '../navigation/RootNavigator';
 import { MaterialCommunityIcons, Ionicons } from '@expo/vector-icons';
+import { moderateScale, verticalScale, scale } from 'react-native-size-matters';
 import Header from '../components/Header';
 import LoadingSpinner from '../components/LoadingSpinner';
 import firebaseService, { DiagnosisReport } from '../services/firebaseService';
 import devLog from '../utils/devLog';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'DiagnosisReport'>;
-
-const {width} = Dimensions.get('window');
 
 const DiagnosisReportScreen: React.FC<Props> = ({navigation, route}) => {
   const {reportId} = route.params || {};
@@ -233,24 +231,24 @@ const styles = StyleSheet.create({
   },
   content: {
     flex: 1,
-    padding: 16,
+    padding: scale(16),
   },
   errorContainer: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    padding: 20,
+    padding: scale(20),
   },
   errorText: {
-    fontSize: 16,
+    fontSize: moderateScale(14, 1),
     color: '#6B7280',
     textAlign: 'center',
   },
   headerSection: {
     backgroundColor: '#FFFFFF',
     borderRadius: 12,
-    padding: 20,
-    marginBottom: 16,
+    padding: scale(16),
+    marginBottom: verticalScale(12),
     shadowColor: '#000',
     shadowOffset: {
       width: 0,
@@ -264,40 +262,40 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'flex-start',
-    marginBottom: 8,
+    marginBottom: verticalScale(6),
   },
   reportTitle: {
     flex: 1,
-    fontSize: 20,
+    fontSize: moderateScale(17, 1),
     fontWeight: '700',
     color: '#1F2937',
-    marginRight: 12,
+    marginRight: scale(10),
   },
   statusBadge: {
-    paddingHorizontal: 12,
-    paddingVertical: 4,
+    paddingHorizontal: scale(10),
+    paddingVertical: verticalScale(4),
     borderRadius: 16,
   },
   statusText: {
-    fontSize: 12,
+    fontSize: moderateScale(11, 1),
     fontWeight: '600',
     color: '#FFFFFF',
   },
   reportDescription: {
-    fontSize: 14,
+    fontSize: moderateScale(12, 1),
     color: '#6B7280',
-    lineHeight: 20,
-    marginBottom: 8,
+    lineHeight: 18,
+    marginBottom: verticalScale(6),
   },
   dateText: {
-    fontSize: 12,
+    fontSize: moderateScale(11, 1),
     color: '#9CA3AF',
   },
   section: {
     backgroundColor: '#FFFFFF',
     borderRadius: 12,
-    padding: 16,
-    marginBottom: 16,
+    padding: scale(14),
+    marginBottom: verticalScale(12),
     shadowColor: '#000',
     shadowOffset: {
       width: 0,
@@ -308,10 +306,10 @@ const styles = StyleSheet.create({
     elevation: 5,
   },
   sectionTitle: {
-    fontSize: 18,
+    fontSize: moderateScale(15, 1),
     fontWeight: '600',
     color: '#1F2937',
-    marginBottom: 16,
+    marginBottom: verticalScale(12),
   },
   fileItem: {
     flexDirection: 'row',
@@ -319,8 +317,8 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     backgroundColor: '#F8FAFC',
     borderRadius: 8,
-    padding: 12,
-    marginBottom: 8,
+    padding: scale(10),
+    marginBottom: verticalScale(6),
   },
   fileInfo: {
     flex: 1,
@@ -329,34 +327,34 @@ const styles = StyleSheet.create({
   },
   fileDetails: {
     flex: 1,
-    marginLeft: 12,
+    marginLeft: scale(10),
   },
   fileName: {
-    fontSize: 14,
+    fontSize: moderateScale(12, 1),
     fontWeight: '500',
     color: '#1F2937',
-    marginBottom: 2,
+    marginBottom: verticalScale(2),
   },
   fileType: {
-    fontSize: 12,
+    fontSize: moderateScale(11, 1),
     color: '#6B7280',
   },
   infoGrid: {
     flexDirection: 'row',
     flexWrap: 'wrap',
-    gap: 16,
+    gap: scale(12),
   },
   infoItem: {
     flex: 1,
     minWidth: '45%',
   },
   infoLabel: {
-    fontSize: 12,
+    fontSize: moderateScale(11, 1),
     color: '#6B7280',
-    marginBottom: 4,
+    marginBottom: verticalScale(3),
   },
   infoValue: {
-    fontSize: 14,
+    fontSize: moderateScale(12, 1),
     fontWeight: '500',
     color: '#1F2937',
   },

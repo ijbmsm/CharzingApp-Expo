@@ -1,6 +1,7 @@
 import React from 'react';
 import { View, ViewStyle, DimensionValue } from 'react-native';
 import ShimmerView from './ShimmerView';
+import { verticalScale, moderateScale } from 'react-native-size-matters';
 
 interface SkeletonTextProps {
   width?: DimensionValue;
@@ -151,10 +152,10 @@ export const SkeletonVehicleCard: React.FC<SkeletonVehicleCardProps> = ({ style 
       {/* 차량 이미지 컨테이너 */}
       <View style={{
         width: '100%',
-        height: 160,
+        height: verticalScale(120),
         borderRadius: 12,
         overflow: 'hidden',
-        marginBottom: 16,
+        marginBottom: verticalScale(8),
         backgroundColor: '#F9FAFB',
         position: 'relative',
       }}>
@@ -169,7 +170,7 @@ export const SkeletonVehicleCard: React.FC<SkeletonVehicleCardProps> = ({ style 
           paddingVertical: 4,
           borderRadius: 12,
         }}>
-          <SkeletonText width={40} height={12} />
+          <SkeletonText width={40} height={10} />
         </View>
       </View>
 
@@ -182,22 +183,22 @@ export const SkeletonVehicleCard: React.FC<SkeletonVehicleCardProps> = ({ style 
           alignItems: 'flex-start',
         }}>
           <View style={{ flex: 1 }}>
-            <SkeletonText width="85%" height={20} style={{ marginBottom: 6 }} />
-            <SkeletonText width="65%" height={16} />
+            <SkeletonText width="85%" height={moderateScale(13, 1)} style={{ marginBottom: 4 }} />
+            <SkeletonText width="65%" height={moderateScale(12, 1)} />
           </View>
         </View>
 
         {/* 배터리 및 성능 정보 (영수증 스타일) */}
-        <View style={{ marginTop: 8 }}>
+        <View style={{ marginTop: verticalScale(6) }}>
           {/* 배터리 제조사 */}
           <View style={{
             flexDirection: 'row',
             justifyContent: 'space-between',
             alignItems: 'center',
-            paddingVertical: 6,
+            paddingVertical: verticalScale(4),
           }}>
-            <SkeletonText width="40%" height={14} />
-            <SkeletonText width="30%" height={14} />
+            <SkeletonText width="40%" height={moderateScale(11, 1)} />
+            <SkeletonText width="30%" height={moderateScale(11, 1)} />
           </View>
 
           {/* 완충 시 주행거리 */}
@@ -205,10 +206,10 @@ export const SkeletonVehicleCard: React.FC<SkeletonVehicleCardProps> = ({ style 
             flexDirection: 'row',
             justifyContent: 'space-between',
             alignItems: 'center',
-            paddingVertical: 6,
+            paddingVertical: verticalScale(4),
           }}>
-            <SkeletonText width="45%" height={14} />
-            <SkeletonText width="25%" height={14} />
+            <SkeletonText width="45%" height={moderateScale(11, 1)} />
+            <SkeletonText width="25%" height={moderateScale(11, 1)} />
           </View>
         </View>
       </View>

@@ -1,6 +1,8 @@
-const { getDefaultConfig } = require('expo/metro-config');
+const {
+  getSentryExpoConfig
+} = require("@sentry/react-native/metro");
 
-const config = getDefaultConfig(__dirname);
+const config = getSentryExpoConfig(__dirname);
 
 // Firebase Functions 디렉토리 제외
 config.resolver.blockList = [

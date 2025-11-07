@@ -165,21 +165,25 @@ class KakaoLoginService implements ILoginService {
    */
   async login(): Promise<LoginResult> {
     try {
+      console.log('🔐 [1/7] 카카오 네이티브 SDK 로그인 시작');
       devLog.log('🔐 카카오 네이티브 SDK 로그인 시작');
       logger.auth('login_attempt', 'kakao');
 
       // 초기화 확인
       if (!this.isInitialized) {
+        console.log('🔐 [2/7] 카카오 서비스 초기화 중...');
         await this.initialize();
       }
 
+      console.log('🔐 [3/7] 카카오 SDK 가용성 확인 중...');
       if (!(await this.isAvailable())) {
         throw new Error('카카오 네이티브 SDK를 사용할 수 없습니다. RNKakaoLogins 네이티브 모듈이 연결되지 않았습니다.');
       }
 
       // 1. 카카오 네이티브 SDK 로그인 (안전한 호출)
+      console.log('🔐 [4/7] 카카오 SDK login() 함수 호출 시작 (카카오톡 앱으로 이동)');
       devLog.log('🔐 카카오 SDK login 함수 호출 시작');
-      
+
       // 호출 직전 네이티브 모듈 상태 재확인
       const currentNativeModule = NativeModules.RNCKakaoSDK || NativeModules.KakaoLogin || NativeModules.RNKakaoLogins;
       devLog.log('🔍 로그인 호출 직전 네이티브 모듈 상태:', {
@@ -187,20 +191,25 @@ class KakaoLoginService implements ILoginService {
         'login 함수': login,
         'typeof login': typeof login
       });
-      
+
       // 호출 직전 한 번 더 안전성 체크
       if (!login || typeof login !== 'function') {
         throw new Error('카카오 login 함수가 사용할 수 없는 상태입니다');
       }
 
+      console.log('🔐 [5/7] 카카오 SDK login() Promise 대기 중... (Deep Link 복귀 후 resolve 예상)');
       const kakaoToken = await login();
+      console.log('✅ [6/7] 카카오 SDK 로그인 성공! accessToken 받음:', kakaoToken?.accessToken ? '있음' : '없음');
       devLog.log('✅ 카카오 SDK 로그인 성공:', kakaoToken);
 
       // 2. 카카오 사용자 프로필 조회 (클라이언트 표시용)
+      console.log('🔐 [7/7] 카카오 프로필 조회 중...');
       const kakaoProfile = await getProfile();
+      console.log('✅ 카카오 프로필 조회 성공:', kakaoProfile?.nickname || '이름없음');
       devLog.log('✅ 카카오 프로필 조회 성공:', kakaoProfile);
 
       // 3. Firebase 커스텀 토큰 생성 및 로그인 (서버가 직접 사용자 정보 조회)
+      console.log('🔥 Firebase Functions 호출 시작 (kakaoLoginHttp)');
       const firebaseResult = await this.loginWithFirebase(kakaoToken.accessToken);
 
       if (firebaseResult.success && firebaseResult.user) {
@@ -241,15 +250,20 @@ class KakaoLoginService implements ILoginService {
    */
   private async loginWithFirebase(kakaoAccessToken: string): Promise<LoginResult> {
     try {
+      console.log('🔥 [Firebase 1/3] Functions를 통해 커스텀 토큰 생성 시작');
       // Firebase Functions를 통해 커스텀 토큰 생성
       const customToken = await this.getFirebaseCustomToken(kakaoAccessToken);
-      
+      console.log('✅ [Firebase 2/3] 커스텀 토큰 받음:', customToken ? '있음' : '없음');
+
       // Firebase Auth로 로그인
+      console.log('🔥 [Firebase 3/3] Firebase Auth로 로그인 중...');
       const auth = getAuth();
       const userCredential = await signInWithCustomToken(auth, customToken);
+      console.log('✅ Firebase Auth 로그인 성공:', userCredential.user.uid);
 
       // 신규 사용자 여부 확인
       const isNewUser = await this.checkIfNewUser(userCredential.user.uid);
+      console.log('✅ 신규 사용자 여부:', isNewUser ? '신규' : '기존');
 
       return {
         success: true,
@@ -257,6 +271,7 @@ class KakaoLoginService implements ILoginService {
         needsRegistration: isNewUser
       };
     } catch (error) {
+      console.error('❌ Firebase 로그인 실패:', error);
       return {
         success: false,
         error: error instanceof Error ? error.message : 'Firebase 로그인 실패'
@@ -269,6 +284,9 @@ class KakaoLoginService implements ILoginService {
    * 🔒 보안 개선: userInfo를 서버에서 직접 조회하도록 변경
    */
   private async getFirebaseCustomToken(kakaoAccessToken: string): Promise<string> {
+    console.log('🔥 Firebase Functions 호출: kakaoLoginHttp');
+    console.log('🔥 전송 데이터:', { kakaoAccessToken: kakaoAccessToken ? '있음 (길이: ' + kakaoAccessToken.length + ')' : '없음' });
+
     // 새로운 kakaoLoginHttp 함수 호출 (인증 없이)
     // 서버에서 kakaoAccessToken으로 /v2/user/me를 직접 호출하여 사용자 정보 조회
     const response = await firebaseService.callCloudFunctionWithoutAuth('kakaoLoginHttp', {
@@ -276,8 +294,11 @@ class KakaoLoginService implements ILoginService {
       // userInfo 제거 - 서버에서 직접 조회
     });
 
+    console.log('✅ Firebase Functions 응답:', response);
+
     if (!response.success || !response.customToken) {
-      throw new Error('카카오 로그인 처리 중 오류가 발생했습니다.');
+      console.error('❌ Firebase Functions 오류:', response.error || '알 수 없는 오류');
+      throw new Error(response.error || '카카오 로그인 처리 중 오류가 발생했습니다.');
     }
 
     return response.customToken;

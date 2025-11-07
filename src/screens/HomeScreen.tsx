@@ -14,7 +14,7 @@ import {
   Image,
   FlatList,
 } from "react-native";
-import { SafeAreaView } from "react-native-safe-area-context";
+import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context";
 import { useNavigation, useFocusEffect } from "@react-navigation/native";
 import { NativeStackNavigationProp } from "@react-navigation/native-stack";
 import { RootStackParamList } from "../navigation/RootNavigator";
@@ -44,6 +44,7 @@ import {
   SkeletonVehicleCard,
   SkeletonImage,
 } from "../components/skeleton";
+import { scale, verticalScale, moderateScale } from 'react-native-size-matters';
 
 // 차량 카드 컴포넌트
 interface VehicleCardProps {
@@ -310,6 +311,9 @@ export default function HomeScreen() {
   const { user, isAuthenticated, autoLoginEnabled } = useSelector(
     (state: RootState) => state.auth
   );
+
+  // SafeArea insets 측정 (정확한 기기별 여백 계산)
+  const insets = useSafeAreaInsets();
 
   // 메모리 누수 방지를 위한 마운트 상태 추적 (컴포넌트 레벨)
   const isMountedRef = useRef(true);
@@ -1233,13 +1237,13 @@ export default function HomeScreen() {
   };
 
   return (
-    <SafeAreaView style={styles.container} edges={["top"]}>
+    <SafeAreaView style={styles.container} edges={[]}>
       <Header showLogo={true} showNotification={true} />
 
       <ScrollView
         style={styles.content}
         showsVerticalScrollIndicator={false}
-        contentContainerStyle={{ flexGrow: 1, paddingBottom: 16 }}
+        contentContainerStyle={{ flexGrow: 1, paddingBottom: verticalScale(12) + insets.bottom }}
         refreshControl={
           <RefreshControl
             refreshing={refreshing}
@@ -1514,17 +1518,17 @@ const styles = StyleSheet.create({
     alignItems: "center",
   },
   welcomeTitle: convertToLineSeedFont({
-    fontSize: 24,
+    fontSize: moderateScale(18, 1),
     fontWeight: "bold",
     color: "#1F2937",
     textAlign: "center",
-    marginBottom: 16,
+    marginBottom: verticalScale(8),
   }),
   welcomeSubtitle: convertToLineSeedFont({
-    fontSize: 16,
+    fontSize: moderateScale(13, 1),
     color: "#6B7280",
     textAlign: "center",
-    lineHeight: 24,
+    lineHeight: 20,
     paddingHorizontal: 8,
   }),
   vehicleSection: {
@@ -1577,7 +1581,7 @@ const styles = StyleSheet.create({
     paddingBottom: 0,
   },
   vehicleName: convertToLineSeedFont({
-    fontSize: 16,
+    fontSize: moderateScale(13, 1),
     fontWeight: "600",
     color: "#1F2937",
     marginBottom: 4,
@@ -1946,9 +1950,9 @@ const styles = StyleSheet.create({
   mainStatusSection: {
     backgroundColor: "#FFFFFF",
     borderRadius: 16,
-    marginHorizontal: 16,
-    marginTop: 16,
-    padding: 20,
+    marginHorizontal: scale(16),
+    marginTop: verticalScale(12),
+    padding: moderateScale(13),
     shadowColor: "#000",
     shadowOffset: {
       width: 0,
@@ -1962,36 +1966,37 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "center",
+    paddingBottom:scale(4),
   },
   statusTitle: convertToLineSeedFont({
-    fontSize: 18,
+    fontSize: moderateScale(12, 1),
     fontWeight: "bold",
     color: "#1F2937",
   }),
   usageHistoryButton: {
     flexDirection: "row",
     alignItems: "center",
-    gap: 4,
+    gap: scale(4),
   },
   usageHistoryText: convertToLineSeedFont({
-    fontSize: 14,
+    fontSize: moderateScale(14),
     color: "#6B7280",
   }),
   statusContent: {
     alignItems: "center",
-    paddingTop: 24,
-    paddingBottom: 0,
-    minHeight: 250, // 모든 상태(차량 있음/없음/로딩)에서 동일한 높이 유지
+    paddingTop: verticalScale(4),
+    paddingBottom: scale(0),
+    minHeight: verticalScale(170), // 차량 이미지(120) + 차량 정보(~70) + 여유 공간 고려
     justifyContent: "center", // 내용을 수직 중앙 정렬
   },
   statusMessage: convertToLineSeedFont({
-    fontSize: 16,
+    fontSize: moderateScale(13, 1),
     color: "#6B7280",
     textAlign: "center",
   }),
   mainActionButton: {
-    marginTop: 16,
-    marginHorizontal: 16,
+    marginTop: verticalScale(12),
+    marginHorizontal: scale(16),
   },
   diagnosisButton: {
     backgroundColor: "#06B6D4",
@@ -2008,7 +2013,7 @@ const styles = StyleSheet.create({
     elevation: 6,
   },
   diagnosisButtonText: convertToLineSeedFont({
-    fontSize: 18,
+    fontSize: moderateScale(14, 1),
     fontWeight: "bold",
     color: "#FFFFFF",
   }),
@@ -2054,17 +2059,17 @@ const styles = StyleSheet.create({
   actionGrid: {
     flexDirection: "row",
     justifyContent: "flex-start",
-    marginTop: 16,
-    marginHorizontal: 16,
-    marginBottom: 20,
+    marginTop: verticalScale(12),
+    marginHorizontal: scale(16),
+    marginBottom: verticalScale(12),
   },
   actionItem: {
     alignItems: "center",
     backgroundColor: "#FFFFFF",
     borderRadius: 12,
-    paddingVertical: 20,
-    paddingHorizontal: 12,
-    marginRight: 12,
+    paddingVertical: verticalScale(12),
+    paddingHorizontal: scale(6),
+    marginRight: scale(6),
     shadowColor: "#000",
     shadowOffset: {
       width: 0,
@@ -2073,20 +2078,20 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.1,
     shadowRadius: 4,
     elevation: 3,
-    width: (Dimensions.get("window").width - 44) / 3, // 화면 너비의 1/3 (패딩 16*2 + 마진 12 고려)
+    width: (Dimensions.get("window").width - scale(48)) / 3, // 반응형 계산
   },
   actionIconContainer: {
-    marginBottom: 8,
+    marginBottom: verticalScale(4),
   },
   actionTitle: convertToLineSeedFont({
-    fontSize: 14,
+    fontSize: moderateScale(12, 1),
     fontWeight: "bold",
     color: "#1F2937",
-    marginBottom: 2,
+    marginBottom: verticalScale(2),
     textAlign: "center",
   }),
   actionSubtitle: convertToLineSeedFont({
-    fontSize: 11,
+    fontSize: moderateScale(9, 1),
     color: "#6B7280",
     textAlign: "center",
   }),
@@ -2257,7 +2262,7 @@ const styles = StyleSheet.create({
     color: "#06B6D4",
   }),
   addVehicleHeaderText: convertToLineSeedFont({
-    fontSize: 14,
+    fontSize: moderateScale(13, 1),
     fontWeight: "600",
     color: "#06B6D4",
   }),
@@ -2269,10 +2274,10 @@ const styles = StyleSheet.create({
   },
   vehicleImageContainer: {
     width: "100%",
-    height: 160,
+    height: verticalScale(120),
     borderRadius: 12,
     overflow: "hidden",
-    marginBottom: 16,
+    marginBottom: verticalScale(8),
     backgroundColor: "#F9FAFB",
     position: "relative",
   },
@@ -2306,7 +2311,7 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "flex-start",
-    marginBottom: 12,
+    marginBottom: verticalScale(8),
   },
   vehicleCardNameContainer: {
     flex: 1,
@@ -2323,20 +2328,20 @@ const styles = StyleSheet.create({
     borderColor: "#E0F2FE",
   },
   vehicleCardName: convertToLineSeedFont({
-    fontSize: 18,
+    fontSize: moderateScale(14, 1),
     fontWeight: "bold",
     color: "#1F2937",
     marginBottom: 4,
   }),
   vehicleCardDetails: convertToLineSeedFont({
-    fontSize: 14,
+    fontSize: moderateScale(12, 1),
     color: "#6B7280",
-    lineHeight: 20,
+    lineHeight: 18,
   }),
   vehicleCardSpecs: {
     flexDirection: "row",
     justifyContent: "space-between",
-    gap: 16,
+    gap: 14,
   },
   vehicleCardSpecItem: {
     flex: 1,
@@ -2354,7 +2359,7 @@ const styles = StyleSheet.create({
     textAlign: "center",
   }),
   vehicleCardSpecValue: convertToLineSeedFont({
-    fontSize: 14,
+    fontSize: moderateScale(12, 1),
     fontWeight: "600",
     color: "#1F2937",
     textAlign: "center",
@@ -2380,13 +2385,13 @@ const styles = StyleSheet.create({
   },
   // 영수증 스타일 레이아웃 스타일
   vehicleCardReceiptSection: {
-    marginTop: 8,
+    marginTop: verticalScale(6),
   },
   vehicleCardReceiptRow: {
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "center",
-    paddingVertical: 2,
+    paddingVertical: verticalScale(1),
   },
   vehicleCardExpandButton: {
     flexDirection: "row",

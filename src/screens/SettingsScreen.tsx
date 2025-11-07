@@ -7,8 +7,9 @@ import {
   Alert,
   TouchableOpacity,
   Linking,
+  ScrollView,
 } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useNavigation } from '@react-navigation/native';
 import { useSelector, useDispatch } from 'react-redux';
 import { RootState } from '../store';
@@ -23,6 +24,7 @@ import devLog from '../utils/devLog';
 const SettingsScreen: React.FC = () => {
   const navigation = useNavigation();
   const dispatch = useDispatch();
+  const insets = useSafeAreaInsets();
   const { user, isAuthenticated } = useSelector((state: RootState) => state.auth);
   const [notificationSettings, setNotificationSettings] = useState<NotificationSettings>({
     enabled: true,
@@ -163,15 +165,19 @@ const SettingsScreen: React.FC = () => {
   }
 
   return (
-    <SafeAreaView style={styles.container}>
-      <Header 
-        title="설정" 
-        showLogo={false} 
-        showBackButton={true} 
+    <SafeAreaView style={styles.container} edges={[]}>
+      <Header
+        title="설정"
+        showLogo={false}
+        showBackButton={true}
         onBackPress={() => navigation.goBack()}
       />
-      
-      <View style={styles.content}>
+
+      <ScrollView
+        style={styles.scrollView}
+        contentContainerStyle={[styles.content, { paddingBottom: insets.bottom + 16 }]}
+        showsVerticalScrollIndicator={false}
+      >
         {/* 알림 설정 섹션 */}
         <View style={styles.section}>
           <View style={styles.sectionHeader}>
@@ -322,7 +328,7 @@ const SettingsScreen: React.FC = () => {
             알림 설정은 언제든지 변경할 수 있습니다. 전체 알림을 비활성화하면 예약 상태 변경, 리포트 완료 등 중요한 업데이트를 놓칠 수 있습니다.
           </Text>
         </View>
-      </View>
+      </ScrollView>
     </SafeAreaView>
   );
 };
@@ -332,8 +338,10 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: '#F9FAFB',
   },
-  content: {
+  scrollView: {
     flex: 1,
+  },
+  content: {
     padding: 16,
   },
   loadingContainer: {

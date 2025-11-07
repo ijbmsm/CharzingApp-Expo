@@ -159,6 +159,17 @@
       <false/>
       <key>NSAllowsLocalNetworking</key>
       <true/>
+      <!-- 카카오 CDN 이미지 허용 (프로필 사진용) -->
+      <key>NSExceptionDomains</key>
+      <dict>
+        <key>k.kakaocdn.net</key>
+        <dict>
+          <key>NSExceptionAllowsInsecureHTTPLoads</key>
+          <true/>
+          <key>NSIncludesSubdomains</key>
+          <true/>
+        </dict>
+      </dict>
     </dict>
 
     <!-- User Activity (Expo Linking) -->

@@ -13,6 +13,7 @@ import {RootStackParamList} from '../navigation/RootNavigator';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { useSelector } from 'react-redux';
 import { RootState } from '../store';
+import { moderateScale, verticalScale, scale } from 'react-native-size-matters';
 import Header from '../components/Header';
 import LoadingSpinner from '../components/LoadingSpinner';
 import firebaseService, { VehicleDiagnosisReport } from '../services/firebaseService';
@@ -212,13 +213,13 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   content: {
-    padding: 16,
+    padding: scale(16),
   },
   summaryCard: {
     backgroundColor: '#FFFFFF',
     borderRadius: 12,
-    padding: 20,
-    marginBottom: 24,
+    padding: scale(16),
+    marginBottom: verticalScale(20),
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.1,
@@ -228,18 +229,18 @@ const styles = StyleSheet.create({
   summaryHeader: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginBottom: 12,
+    marginBottom: verticalScale(10),
   },
   summaryTitle: {
-    fontSize: 18,
+    fontSize: moderateScale(15, 1),
     fontWeight: '700',
     color: '#1F2937',
-    marginLeft: 8,
+    marginLeft: scale(8),
   },
   summaryDescription: {
-    fontSize: 14,
+    fontSize: moderateScale(12, 1),
     color: '#6B7280',
-    marginBottom: 16,
+    marginBottom: verticalScale(12),
   },
   summaryStats: {
     flexDirection: 'row',
@@ -249,29 +250,29 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   statNumber: {
-    fontSize: 24,
+    fontSize: moderateScale(20, 1),
     fontWeight: '700',
     color: '#06B6D4',
-    marginBottom: 4,
+    marginBottom: verticalScale(4),
   },
   statLabel: {
-    fontSize: 12,
+    fontSize: moderateScale(11, 1),
     color: '#6B7280',
   },
   listSection: {
-    marginBottom: 20,
+    marginBottom: verticalScale(16),
   },
   sectionTitle: {
-    fontSize: 16,
+    fontSize: moderateScale(14, 1),
     fontWeight: '700',
     color: '#1F2937',
-    marginBottom: 16,
+    marginBottom: verticalScale(12),
   },
   reportCard: {
     backgroundColor: '#FFFFFF',
     borderRadius: 12,
-    padding: 16,
-    marginBottom: 12,
+    padding: scale(14),
+    marginBottom: verticalScale(12),
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.1,
@@ -282,36 +283,36 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'flex-start',
-    marginBottom: 12,
+    marginBottom: verticalScale(10),
   },
   vehicleInfo: {
     flex: 1,
   },
   vehicleModel: {
-    fontSize: 16,
+    fontSize: moderateScale(14, 1),
     fontWeight: '700',
     color: '#1F2937',
-    marginBottom: 4,
+    marginBottom: verticalScale(4),
   },
   reportType: {
-    fontSize: 14,
+    fontSize: moderateScale(12, 1),
     color: '#6B7280',
   },
   statusContainer: {
     alignItems: 'flex-end',
   },
   statusBadge: {
-    paddingHorizontal: 12,
-    paddingVertical: 6,
+    paddingHorizontal: scale(10),
+    paddingVertical: verticalScale(5),
     borderRadius: 16,
   },
   statusText: {
-    fontSize: 12,
+    fontSize: moderateScale(11, 1),
     fontWeight: '600',
     color: '#FFFFFF',
   },
   cardContent: {
-    marginBottom: 12,
+    marginBottom: verticalScale(10),
   },
   infoRow: {
     flexDirection: 'row',
@@ -323,13 +324,13 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   infoLabel: {
-    fontSize: 14,
+    fontSize: moderateScale(12, 1),
     color: '#6B7280',
-    marginLeft: 8,
-    marginRight: 8,
+    marginLeft: scale(6),
+    marginRight: scale(6),
   },
   infoValue: {
-    fontSize: 14,
+    fontSize: moderateScale(12, 1),
     fontWeight: '600',
     color: '#1F2937',
   },
@@ -337,12 +338,12 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    paddingTop: 12,
+    paddingTop: verticalScale(10),
     borderTopWidth: 1,
     borderTopColor: '#E5E7EB',
   },
   viewReportText: {
-    fontSize: 14,
+    fontSize: moderateScale(12, 1),
     color: '#06B6D4',
     fontWeight: '600',
   },
@@ -350,25 +351,25 @@ const styles = StyleSheet.create({
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    paddingVertical: 60,
-    paddingHorizontal: 20,
+    paddingVertical: verticalScale(50),
+    paddingHorizontal: scale(20),
   },
   emptyTitle: {
-    fontSize: 18,
+    fontSize: moderateScale(15, 1),
     fontWeight: '600',
     color: '#6B7280',
-    marginTop: 16,
-    marginBottom: 8,
+    marginTop: verticalScale(12),
+    marginBottom: verticalScale(6),
     textAlign: 'center',
   },
   emptyDescription: {
-    fontSize: 14,
+    fontSize: moderateScale(12, 1),
     color: '#9CA3AF',
     textAlign: 'center',
-    lineHeight: 20,
+    lineHeight: 18,
   },
   dateText: {
-    fontSize: 12,
+    fontSize: moderateScale(11, 1),
     color: '#6B7280',
   },
 });

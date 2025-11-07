@@ -262,7 +262,7 @@ function App() {
 
   return (
     <Provider store={store}>
-      <StatusBar barStyle="light-content" backgroundColor="#000000" />
+      <StatusBar barStyle="dark-content" backgroundColor="#F9FAFB" />
       <PersistGate loading={null} persistor={persistor}>
         <LoadingProvider>
           <SafeAreaProvider>

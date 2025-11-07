@@ -51,6 +51,19 @@ public class AppDelegate: ExpoAppDelegate {
     open url: URL,
     options: [UIApplication.OpenURLOptionsKey: Any] = [:]
   ) -> Bool {
+    // 🔑 카카오 로그인 Deep Link 처리 (카카오 SDK로 전달)
+    if AuthApi.isKakaoTalkLoginUrl(url) {
+      print("🔗 카카오 Deep Link 감지, SDK로 전달: \(url.absoluteString)")
+      if AuthController.handleOpenUrl(url: url) {
+        print("✅ 카카오 SDK가 URL 처리 완료")
+        return true
+      } else {
+        print("❌ 카카오 SDK URL 처리 실패")
+        return false
+      }
+    }
+
+    // 다른 Deep Link는 React Native Linking으로 전달
     return super.application(app, open: url, options: options) || RCTLinkingManager.application(app, open: url, options: options)
   }
 

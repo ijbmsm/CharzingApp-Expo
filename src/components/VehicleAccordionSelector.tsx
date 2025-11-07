@@ -6,18 +6,15 @@ import {
   TouchableOpacity,
   Modal,
   ScrollView,
-  ActivityIndicator,
   Alert,
-  Image,
-  Dimensions,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import * as Animatable from 'react-native-animatable';
 import { LinearGradient } from 'expo-linear-gradient';
 import { convertToLineSeedFont } from '../styles/fonts';
 import firebaseService from '../services/firebaseService';
-import { handleFirebaseError, showUserError } from '../services/errorHandler';
-import { SkeletonText, SkeletonImage } from './skeleton';
+import { handleFirebaseError } from '../services/errorHandler';
+import { SkeletonText } from './skeleton';
 import ShimmerView from './skeleton/ShimmerView';
 
 interface VehicleAccordionSelectorProps {
@@ -80,7 +77,6 @@ const VehicleAccordionSelector: React.FC<VehicleAccordionSelectorProps> = ({
   const [models, setModels] = useState<Model[]>([]);
   const [trims, setTrims] = useState<Trim[]>([]);
   const [loading, setLoading] = useState(false);
-  const [loadingStep, setLoadingStep] = useState<string>('');
   
   // 중복 호출 방지 및 안정성 상태
   const [isCompleting, setIsCompleting] = useState(false);
@@ -120,28 +116,34 @@ const VehicleAccordionSelector: React.FC<VehicleAccordionSelectorProps> = ({
 
   // Load brands on mount
   useEffect(() => {
-    if (visible && !hasError) {
-      try {
-        setHasError(false);
-        loadBrands();
-      } catch (error) {
-        console.error('❌ VehicleAccordionSelector 초기화 오류:', error);
-        setHasError(true);
-      }
+    if (visible) {
+      // 상태 리셋
+      setSelectedBrand(null);
+      setSelectedModel(null);
+      setSelectedTrim(null);
+      setSelectedYear(null);
+      setModels([]);
+      setTrims([]);
+      setActiveTab('brand');
+      setIsCompleting(false);
+      setHasError(false);
+
+      // 브랜드 로딩 시작
+      setLoading(true);
+      loadBrands();
     }
-  }, [visible, hasError]);
+  }, [visible]);
 
   const loadBrands = async () => {
     if (!isMountedRef.current) return;
-    
+
     try {
       setLoading(true);
-      setLoadingStep('브랜드 목록 로딩 중...');
       // console.log('🔄 브랜드 목록 로딩 시작');
-      
+
       const brandsData = await firebaseService.getBrands();
       // console.log('✅ 브랜드 목록 로딩 완료:', brandsData.length);
-      
+
       if (isMountedRef.current) {
         setBrands(brandsData);
       }
@@ -157,22 +159,20 @@ const VehicleAccordionSelector: React.FC<VehicleAccordionSelectorProps> = ({
     } finally {
       if (isMountedRef.current) {
         setLoading(false);
-        setLoadingStep('');
       }
     }
   };
 
   const loadModels = async (brand: Brand) => {
     if (!isMountedRef.current) return;
-    
+
     try {
       setLoading(true);
-      setLoadingStep(`${brand.name} 모델 로딩 중...`);
       // console.log(`🔄 모델 목록 로딩 시작: ${brand.name} (${brand.id})`);
-      
+
       const modelsData = await firebaseService.getModels(brand.id);
       // console.log(`✅ 모델 목록 로딩 완료: ${modelsData.length}개`);
-      
+
       if (isMountedRef.current) {
         setModels(modelsData);
       }
@@ -188,22 +188,20 @@ const VehicleAccordionSelector: React.FC<VehicleAccordionSelectorProps> = ({
     } finally {
       if (isMountedRef.current) {
         setLoading(false);
-        setLoadingStep('');
       }
     }
   };
 
   const loadTrims = async (brand: Brand, model: Model) => {
     if (!isMountedRef.current) return;
-    
+
     try {
       setLoading(true);
-      setLoadingStep(`${model.name} 트림 로딩 중...`);
       // console.log(`🔄 트림 목록 로딩 시작: ${brand.name} ${model.name}`);
-      
+
       const trimsData = await firebaseService.getVehicleTrims(brand.id, model.id);
       // console.log(`✅ 트림 목록 로딩 완료: ${trimsData.length}개`);
-      
+
       if (isMountedRef.current) {
         setTrims(trimsData);
       }
@@ -219,7 +217,6 @@ const VehicleAccordionSelector: React.FC<VehicleAccordionSelectorProps> = ({
     } finally {
       if (isMountedRef.current) {
         setLoading(false);
-        setLoadingStep('');
       }
     }
   };
@@ -303,29 +300,6 @@ const VehicleAccordionSelector: React.FC<VehicleAccordionSelectorProps> = ({
     }
   };
 
-  const handleReset = () => {
-    // console.log('🔄 VehicleAccordionSelector 상태 리셋');
-    setSelectedBrand(null);
-    setSelectedModel(null);
-    setSelectedTrim(null);
-    setSelectedYear(null);
-    setModels([]);
-    setTrims([]);
-    setActiveTab('brand');
-    setLoading(false);
-    setLoadingStep('');
-    setIsCompleting(false);
-    setHasError(false);
-  };
-
-  useEffect(() => {
-    if (visible) {
-      // console.log('👁️ VehicleAccordionSelector visible 변경: true - 상태 리셋');
-      handleReset();
-    } else {
-      // console.log('👁️ VehicleAccordionSelector visible 변경: false');
-    }
-  }, [visible]);
 
   // Navigation system
   const getNavigationSteps = () => {
@@ -465,11 +439,12 @@ const VehicleAccordionSelector: React.FC<VehicleAccordionSelectorProps> = ({
       <Text style={[styles.errorMessage, convertToLineSeedFont(styles.errorMessage)]}>
         차량 정보를 불러오는 중 오류가 발생했습니다.
       </Text>
-      <TouchableOpacity 
+      <TouchableOpacity
         style={styles.retryButton}
         onPress={() => {
           setHasError(false);
-          handleReset();
+          setLoading(true);
+          loadBrands();
         }}
         activeOpacity={0.7}
       >
@@ -490,8 +465,10 @@ const VehicleAccordionSelector: React.FC<VehicleAccordionSelectorProps> = ({
           key={index}
           style={styles.listItem}
         >
-          <SkeletonText width="100%" height={16} />
-          <SkeletonImage width={16} height={16} borderRadius={8} />
+          <View style={{ flex: 1 }}>
+            <SkeletonText width="60%" height={16} />
+          </View>
+          <ShimmerView width={16} height={16} borderRadius={8} />
         </View>
       ))}
     </View>
@@ -622,7 +599,7 @@ const VehicleAccordionSelector: React.FC<VehicleAccordionSelectorProps> = ({
     return (
       <View style={styles.yearContainer}>
         <View style={styles.yearGrid}>
-          {sortedYears.map((year, index) => {
+          {sortedYears.map((year) => {
             const yearNumber = typeof year === 'string' ? parseInt(year) : year;
             
             return (
@@ -673,8 +650,6 @@ const VehicleAccordionSelector: React.FC<VehicleAccordionSelectorProps> = ({
       </View>
     );
   };
-
-  const isCompleteReady = selectedBrand && selectedModel && selectedTrim && selectedYear;
 
   // Navigation helpers
   const getNextStep = () => {

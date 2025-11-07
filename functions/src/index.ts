@@ -109,21 +109,21 @@ export const kakaoLoginHttp = functions
         return;
       }
 
-      // 기존 사용자인지 kakaoId로 확인
-      const existingUserQuery = await db.collection('users')
-        .where('kakaoId', '==', userInfo.id)
-        .limit(1)
-        .get();
+      // 🚀 성능 최적화: kakaoId와 email 쿼리를 병렬로 실행
+      const [kakaoQuery, emailQuery] = await Promise.all([
+        db.collection('users').where('kakaoId', '==', userInfo.id).limit(1).get(),
+        userInfo.email ? db.collection('users').where('email', '==', userInfo.email).limit(1).get() : Promise.resolve({ empty: true, docs: [] })
+      ]);
 
       let firebaseUID;
       let isNewUser;
 
-      if (!existingUserQuery.empty) {
-        // 기존 사용자
-        firebaseUID = existingUserQuery.docs[0].id;
+      if (!kakaoQuery.empty) {
+        // 기존 카카오 사용자 발견
+        firebaseUID = kakaoQuery.docs[0].id;
         isNewUser = false;
         console.log('✅ 기존 카카오 사용자 발견:', firebaseUID);
-        
+
         // 기존 사용자 정보 업데이트
         await db.collection('users').doc(firebaseUID).update({
           email: userInfo.email,
@@ -133,8 +133,29 @@ export const kakaoLoginHttp = functions
           updatedAt: admin.firestore.FieldValue.serverTimestamp(),
         });
         console.log('✅ 기존 카카오 사용자 정보 업데이트:', firebaseUID);
+      } else if (!emailQuery.empty) {
+        // 🚀 최적화: email로 기존 사용자 발견 (getUserByEmail 대신 Firestore 쿼리)
+        firebaseUID = emailQuery.docs[0].id;
+        isNewUser = false;
+        console.log('✅ 기존 이메일 사용자 발견 (Firestore 쿼리):', firebaseUID);
+
+        // 기존 사용자에 카카오 정보 추가
+        await db.collection('users').doc(firebaseUID).update({
+          kakaoId: userInfo.id,
+          photoURL: userInfo.profileImageUrl,
+          displayName: userInfo.nickname || emailQuery.docs[0].data().displayName,
+          lastLoginAt: admin.firestore.FieldValue.serverTimestamp(),
+          updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+          'providers.kakao': {
+            id: userInfo.id,
+            nickname: userInfo.nickname,
+            profileImageUrl: userInfo.profileImageUrl,
+            linkedAt: admin.firestore.FieldValue.serverTimestamp()
+          }
+        });
+        console.log('✅ 기존 사용자에 카카오 정보 추가 완료 (Firestore 쿼리 사용)');
       } else {
-        // 신규 사용자 생성 시도
+        // 완전히 새로운 사용자 - Firebase Auth 생성
         try {
           const userRecord = await admin.auth().createUser({
             email: userInfo.email,
@@ -148,40 +169,12 @@ export const kakaoLoginHttp = functions
           console.log('🔄 클라이언트에서 SignupComplete 화면으로 이동 필요');
         } catch (createError: any) {
           if (createError.code === 'auth/email-already-exists') {
-            console.log('🔄 이메일이 이미 존재함. 기존 사용자에 카카오 연동 추가:', userInfo.email);
-            
-            // 기존 이메일로 사용자 찾기
+            // Firebase Auth에는 있는데 Firestore에는 없는 경우 (드물지만 가능)
+            console.log('⚠️ Firebase Auth에만 존재하는 사용자, getUserByEmail로 찾기:', userInfo.email);
             const existingUserRecord = await admin.auth().getUserByEmail(userInfo.email);
             firebaseUID = existingUserRecord.uid;
-            
-            console.log('📧 기존 이메일 사용자 UID:', firebaseUID);
-            
-            // 기존 사용자에 카카오 정보 추가/업데이트
-            const userDoc = await db.collection('users').doc(firebaseUID).get();
-
-            if (userDoc.exists) {
-              // 기존 Firestore 문서 업데이트 (카카오 정보 추가)
-              isNewUser = false;
-              await db.collection('users').doc(firebaseUID).update({
-                kakaoId: userInfo.id,
-                photoURL: userInfo.profileImageUrl || existingUserRecord.photoURL,
-                displayName: userInfo.nickname || existingUserRecord.displayName,
-                lastLoginAt: admin.firestore.FieldValue.serverTimestamp(),
-                updatedAt: admin.firestore.FieldValue.serverTimestamp(),
-                'providers.kakao': {
-                  id: userInfo.id,
-                  nickname: userInfo.nickname,
-                  profileImageUrl: userInfo.profileImageUrl,
-                  linkedAt: admin.firestore.FieldValue.serverTimestamp()
-                }
-              });
-              console.log('✅ 기존 사용자에 카카오 정보 추가 완료');
-            } else {
-              // Firestore 문서가 없음 → 신규 사용자로 처리
-              isNewUser = true;
-              console.log('🆕 Firebase Auth는 있지만 Firestore 문서 없음 → 신규 사용자로 처리');
-              console.log('🔄 클라이언트에서 SignupComplete 화면으로 이동 필요');
-            }
+            isNewUser = true; // Firestore 문서가 없으므로 신규로 처리
+            console.log('📧 Firebase Auth 사용자 UID:', firebaseUID);
           } else {
             throw createError;
           }
