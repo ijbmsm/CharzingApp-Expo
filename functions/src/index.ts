@@ -94,9 +94,9 @@ export const kakaoLoginHttp = functions
         const kakaoData = response.data;
         userInfo = {
           id: kakaoData.id.toString(),
-          email: kakaoData.kakao_account?.email || null,
-          nickname: kakaoData.kakao_account?.profile?.nickname || null,
-          profileImageUrl: kakaoData.kakao_account?.profile?.profile_image_url || null
+          email: kakaoData.kakao_account?.email || undefined,
+          nickname: kakaoData.kakao_account?.profile?.nickname || undefined,
+          profileImageUrl: kakaoData.kakao_account?.profile?.profile_image_url || undefined
         };
 
         console.log('📋 추출된 사용자 정보:', userInfo);
@@ -124,14 +124,22 @@ export const kakaoLoginHttp = functions
         isNewUser = false;
         console.log('✅ 기존 카카오 사용자 발견:', firebaseUID);
 
-        // 기존 사용자 정보 업데이트
-        await db.collection('users').doc(firebaseUID).update({
-          email: userInfo.email,
+        // 기존 사용자 정보 업데이트 (undefined 필드는 자동 제외됨)
+        const updatePayload: Record<string, any> = {
           displayName: userInfo.nickname || userInfo.email?.split('@')[0] || '카카오 사용자',
-          photoURL: userInfo.profileImageUrl,
           lastLoginAt: admin.firestore.FieldValue.serverTimestamp(),
           updatedAt: admin.firestore.FieldValue.serverTimestamp(),
-        });
+        };
+
+        if (userInfo.email) {
+          updatePayload.email = userInfo.email;
+        }
+
+        if (userInfo.profileImageUrl) {
+          updatePayload.photoURL = userInfo.profileImageUrl;
+        }
+
+        await db.collection('users').doc(firebaseUID).update(updatePayload);
         console.log('✅ 기존 카카오 사용자 정보 업데이트:', firebaseUID);
       } else if (!emailQuery.empty) {
         // 🚀 최적화: email로 기존 사용자 발견 (getUserByEmail 대신 Firestore 쿼리)
@@ -140,35 +148,53 @@ export const kakaoLoginHttp = functions
         console.log('✅ 기존 이메일 사용자 발견 (Firestore 쿼리):', firebaseUID);
 
         // 기존 사용자에 카카오 정보 추가
-        await db.collection('users').doc(firebaseUID).update({
+        const updatePayload: Record<string, any> = {
           kakaoId: userInfo.id,
-          photoURL: userInfo.profileImageUrl,
           displayName: userInfo.nickname || emailQuery.docs[0].data().displayName,
           lastLoginAt: admin.firestore.FieldValue.serverTimestamp(),
           updatedAt: admin.firestore.FieldValue.serverTimestamp(),
           'providers.kakao': {
             id: userInfo.id,
             nickname: userInfo.nickname,
-            profileImageUrl: userInfo.profileImageUrl,
+            profileImageUrl: userInfo.profileImageUrl || null, // providers 내부는 null 허용
             linkedAt: admin.firestore.FieldValue.serverTimestamp()
           }
-        });
+        };
+
+        if (userInfo.profileImageUrl) {
+          updatePayload.photoURL = userInfo.profileImageUrl;
+        }
+
+        await db.collection('users').doc(firebaseUID).update(updatePayload);
         console.log('✅ 기존 사용자에 카카오 정보 추가 완료 (Firestore 쿼리 사용)');
       } else {
         // 완전히 새로운 사용자 - Firebase Auth 생성
         try {
-          const userRecord = await admin.auth().createUser({
-            email: userInfo.email,
+          // photoURL과 email이 undefined이면 필드 제외
+          const createUserPayload: {
+            email?: string;
+            displayName: string;
+            photoURL?: string;
+          } = {
             displayName: userInfo.nickname || userInfo.email?.split('@')[0] || '카카오 사용자',
-            photoURL: userInfo.profileImageUrl,
-          });
+          };
+
+          if (userInfo.email) {
+            createUserPayload.email = userInfo.email;
+          }
+
+          if (userInfo.profileImageUrl) {
+            createUserPayload.photoURL = userInfo.profileImageUrl;
+          }
+
+          const userRecord = await admin.auth().createUser(createUserPayload);
           firebaseUID = userRecord.uid;
           isNewUser = true;
 
           console.log('✅ 신규 카카오 사용자 생성 (Firebase Auth만, Firestore 문서는 SignupComplete에서 생성):', firebaseUID);
           console.log('🔄 클라이언트에서 SignupComplete 화면으로 이동 필요');
         } catch (createError: any) {
-          if (createError.code === 'auth/email-already-exists') {
+          if (createError.code === 'auth/email-already-exists' && userInfo.email) {
             // Firebase Auth에는 있는데 Firestore에는 없는 경우 (드물지만 가능)
             console.log('⚠️ Firebase Auth에만 존재하는 사용자, getUserByEmail로 찾기:', userInfo.email);
             const existingUserRecord = await admin.auth().getUserByEmail(userInfo.email);

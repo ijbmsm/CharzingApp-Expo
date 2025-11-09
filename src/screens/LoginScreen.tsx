@@ -109,7 +109,21 @@ export default function LoginScreen() {
           logger.userAction('login_complete', firebaseUser.uid, { provider: 'kakao', isExistingUser: true });
 
           try {
+            // Firestore 프로필 조회
             const userProfile = await firebaseService.getUserProfile(firebaseUser.uid);
+
+            // 카카오로 로그인했으므로 provider를 'kakao'로 업데이트
+            console.log('🔄 카카오 로그인 - Firestore provider 업데이트:', firebaseUser.uid);
+            await firebaseService.saveUserProfile({
+              uid: firebaseUser.uid,
+              provider: 'kakao',
+              kakaoId: kakaoUser.kakaoId,
+              email: firebaseUser.email || undefined,
+              displayName: userProfile?.displayName || firebaseUser.displayName || undefined,
+              photoURL: firebaseUser.photoURL || userProfile?.photoURL || undefined,
+              isRegistrationComplete: true,
+            });
+
             const completeUserData = {
               ...kakaoUser,
               realName: userProfile?.realName || kakaoUser.displayName,
@@ -194,7 +208,21 @@ export default function LoginScreen() {
           logger.userAction('login_complete', firebaseUser.uid, { provider: 'google', isExistingUser: true });
 
           try {
+            // Firestore 프로필 조회
             const userProfile = await firebaseService.getUserProfile(firebaseUser.uid);
+
+            // Google로 로그인했으므로 provider를 'google'로 업데이트
+            console.log('🔄 Google 로그인 - Firestore provider 업데이트:', firebaseUser.uid);
+            await firebaseService.saveUserProfile({
+              uid: firebaseUser.uid,
+              provider: 'google',
+              googleId: googleUser.googleId,
+              email: firebaseUser.email || undefined,
+              displayName: userProfile?.displayName || firebaseUser.displayName || undefined,
+              photoURL: firebaseUser.photoURL || userProfile?.photoURL || undefined,
+              isRegistrationComplete: true,
+            });
+
             const completeUserData = {
               ...googleUser,
               realName: userProfile?.realName || googleUser.displayName,
@@ -268,7 +296,21 @@ export default function LoginScreen() {
           logger.userAction('login_complete', firebaseUser.uid, { provider: 'apple', isExistingUser: true });
 
           try {
+            // Firestore 프로필 조회
             const userProfile = await firebaseService.getUserProfile(firebaseUser.uid);
+
+            // Apple로 로그인했으므로 provider를 'apple'로 업데이트
+            console.log('🔄 Apple 로그인 - Firestore provider 업데이트:', firebaseUser.uid);
+            await firebaseService.saveUserProfile({
+              uid: firebaseUser.uid,
+              provider: 'apple',
+              appleId: firebaseUser.uid,
+              email: firebaseUser.email || undefined,
+              displayName: userProfile?.displayName || firebaseUser.displayName || undefined,
+              photoURL: firebaseUser.photoURL || userProfile?.photoURL || undefined,
+              isRegistrationComplete: true,
+            });
+
             const completeUserData = {
               ...appleUser,
               realName: userProfile?.realName || appleUser.displayName,
