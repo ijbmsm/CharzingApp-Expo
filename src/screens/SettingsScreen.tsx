@@ -297,7 +297,7 @@ const SettingsScreen: React.FC = () => {
           {/* 고객지원 */}
           <TouchableOpacity
             style={styles.linkItem}
-            onPress={() => openLink('https://charzing.kr/support', '고객지원')}
+            onPress={() => openLink('http://pf.kakao.com/_amsHn', '고객지원')}
           >
             <View style={styles.linkInfo}>
               <Text style={styles.linkTitle}>고객지원</Text>

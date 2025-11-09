@@ -47,6 +47,13 @@ export const kakaoLoginHttp = functions
   })
   .https.onRequest(async (req, res) => {
     try {
+      // Sentry: 함수 시작 추적
+      Sentry.addBreadcrumb({
+        category: 'auth',
+        message: 'Kakao login request started',
+        level: 'info',
+      });
+
       // CORS 헤더 설정
       res.set('Access-Control-Allow-Origin', '*');
       res.set('Access-Control-Allow-Methods', 'POST');
@@ -223,6 +230,22 @@ export const kakaoLoginHttp = functions
       
       const customToken = await admin.auth().createCustomToken(firebaseUID, customClaims);
       console.log('✅ Kakao Custom Token 생성 완료 (강화된 claims 포함)');
+
+      // Sentry: 성공 로깅
+      Sentry.captureMessage('Kakao login successful', {
+        level: 'info',
+        tags: {
+          function: 'kakaoLoginHttp',
+          provider: 'kakao',
+          userType: isNewUser ? 'new' : 'existing'
+        },
+        contexts: {
+          user: {
+            id: firebaseUID,
+            email: userInfo.email || 'no-email',
+          }
+        }
+      });
 
       // 응답
       res.status(200).json({
@@ -460,8 +483,15 @@ export const googleLogin = functions
   })
   .https.onCall(async (data, context) => {
     try {
+      // Sentry: 함수 시작 추적
+      Sentry.addBreadcrumb({
+        category: 'auth',
+        message: 'Google login request started',
+        level: 'info',
+      });
+
       console.log('🔍 Google Login 요청 받음');
-      
+
       const { idToken, userInfo } = data;
 
       if (!idToken || !userInfo) {
@@ -542,6 +572,22 @@ export const googleLogin = functions
       const customToken = await admin.auth().createCustomToken(firebaseUID, customClaims);
       console.log('✅ Google Custom Token 생성 완료 (강화된 claims 포함)');
 
+      // Sentry: 성공 로깅
+      Sentry.captureMessage('Google login successful', {
+        level: 'info',
+        tags: {
+          function: 'googleLogin',
+          provider: 'google',
+          userType: isNewUser ? 'new' : 'existing'
+        },
+        contexts: {
+          user: {
+            id: firebaseUID,
+            email: userInfo.email || 'no-email',
+          }
+        }
+      });
+
       // 응답
       return {
         success: true,
@@ -557,7 +603,19 @@ export const googleLogin = functions
 
     } catch (error: any) {
       console.error('❌ Google Login 실패:', error);
-      
+
+      // Sentry: 에러 로깅
+      Sentry.captureException(error, {
+        tags: {
+          function: 'googleLogin',
+          provider: 'google'
+        },
+        extra: {
+          errorMessage: error.message,
+          errorCode: error.code,
+        }
+      });
+
       throw new functions.https.HttpsError(
         'internal',
         'Google 로그인 처리 중 오류가 발생했습니다.'
@@ -577,8 +635,15 @@ export const createCustomTokenFromApple = functions
   .https.onRequest(async (req, res) => {
     return corsHandler(req, res, async () => {
       try {
+        // Sentry: 함수 시작 추적
+        Sentry.addBreadcrumb({
+          category: 'auth',
+          message: 'Apple login request started',
+          level: 'info',
+        });
+
         console.log('🍎 Apple Custom Token 생성 요청 받음');
-        
+
         if (req.method !== 'POST') {
           res.status(405).json({ success: false, error: 'Method not allowed' });
           return;
@@ -648,6 +713,22 @@ export const createCustomTokenFromApple = functions
         const customToken = await admin.auth().createCustomToken(firebaseUID, customClaims);
         console.log('✅ Apple Custom Token 생성 완료 (강화된 claims 포함)');
 
+        // Sentry: 성공 로깅
+        Sentry.captureMessage('Apple login successful', {
+          level: 'info',
+          tags: {
+            function: 'createCustomTokenFromApple',
+            provider: 'apple',
+            userType: isNewUser ? 'new' : 'existing'
+          },
+          contexts: {
+            user: {
+              id: firebaseUID,
+              email: userInfo.email || 'no-email',
+            }
+          }
+        });
+
         // 응답
         res.status(200).json({
           success: true,
@@ -658,7 +739,18 @@ export const createCustomTokenFromApple = functions
 
       } catch (error: any) {
         console.error('❌ Apple Custom Token 생성 실패:', error);
-        
+
+        // Sentry: 에러 로깅
+        Sentry.captureException(error, {
+          tags: {
+            function: 'createCustomTokenFromApple',
+            provider: 'apple'
+          },
+          extra: {
+            errorMessage: error.message,
+          }
+        });
+
         res.status(500).json({
           success: false,
           error: '서버 오류가 발생했습니다.',
@@ -774,8 +866,15 @@ export const createDiagnosisReservation = functions
   .https.onRequest(async (req, res) => {
     return corsHandler(req, res, async () => {
       try {
+        // Sentry: 함수 시작 추적
+        Sentry.addBreadcrumb({
+          category: 'reservation',
+          message: 'Create diagnosis reservation request started',
+          level: 'info',
+        });
+
         console.log('🔍 진단 예약 생성 요청 받음 (HTTP)');
-        
+
         if (req.method !== 'POST') {
           res.status(405).json({ success: false, error: 'Method not allowed' });
           return;
@@ -876,8 +975,26 @@ export const createDiagnosisReservation = functions
 
         // Firestore에 저장
         const reservationRef = await db.collection('diagnosisReservations').add(reservationData);
-        
+
         console.log('✅ 진단 예약 생성 완료:', reservationRef.id);
+
+        // Sentry: 성공 로깅
+        Sentry.captureMessage('Diagnosis reservation created successfully', {
+          level: 'info',
+          tags: {
+            function: 'createDiagnosisReservation',
+            category: 'reservation'
+          },
+          contexts: {
+            reservation: {
+              id: reservationRef.id,
+              userId: uid,
+              vehicleBrand,
+              vehicleModel,
+              serviceType,
+            }
+          }
+        });
 
         res.status(200).json({
           success: true,
@@ -887,6 +1004,18 @@ export const createDiagnosisReservation = functions
 
       } catch (error: any) {
         console.error('❌ 진단 예약 생성 실패:', error);
+
+        // Sentry: 에러 로깅
+        Sentry.captureException(error, {
+          tags: {
+            function: 'createDiagnosisReservation',
+            category: 'reservation'
+          },
+          extra: {
+            errorMessage: error.message,
+          }
+        });
+
         res.status(500).json({
           success: false,
           error: '서버 오류가 발생했습니다.'
@@ -1315,11 +1444,18 @@ export const sendReservationStatusNotification = functions
     try {
       const beforeData = change.before.data();
       const afterData = change.after.data();
-      
+
       // 상태가 변경된 경우에만 알림 전송
       if (beforeData.status === afterData.status) {
         return;
       }
+
+      // Sentry: 함수 시작 추적
+      Sentry.addBreadcrumb({
+        category: 'notification',
+        message: `Reservation status changed: ${beforeData.status} → ${afterData.status}`,
+        level: 'info',
+      });
 
       console.log(`예약 상태 변경: ${beforeData.status} → ${afterData.status}`);
       
@@ -1444,12 +1580,40 @@ export const sendReservationStatusNotification = functions
         await db.collection('users').doc(userId).collection('inAppNotifications').add(inAppNotification);
         console.log(`사용자 ${userId}에게 자동 인앱 알림 저장 완료 (예약 상태 변경)`);
 
+        // Sentry: 성공 로깅
+        Sentry.captureMessage('Reservation status notification sent successfully', {
+          level: 'info',
+          tags: {
+            function: 'sendReservationStatusNotification',
+            category: 'notification',
+            statusChange: `${beforeData.status} → ${afterData.status}`
+          },
+          contexts: {
+            reservation: {
+              id: reservationId,
+              userId,
+              newStatus: afterData.status,
+            }
+          }
+        });
+
       } catch (inAppError) {
         console.error(`사용자 ${userId} 자동 인앱 알림 저장 실패:`, inAppError);
       }
 
     } catch (error) {
       console.error('자동 푸시 알림 전송 실패:', error);
+
+      // Sentry: 에러 로깅
+      Sentry.captureException(error, {
+        tags: {
+          function: 'sendReservationStatusNotification',
+          category: 'notification'
+        },
+        extra: {
+          errorMessage: error instanceof Error ? error.message : 'Unknown error',
+        }
+      });
     }
   });
 
