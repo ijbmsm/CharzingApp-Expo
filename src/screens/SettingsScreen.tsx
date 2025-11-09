@@ -150,11 +150,11 @@ const SettingsScreen: React.FC = () => {
 
   if (isLoading) {
     return (
-      <SafeAreaView style={styles.container}>
-        <Header 
-          title="설정" 
-          showLogo={false} 
-          showBackButton={true} 
+      <SafeAreaView style={styles.container} edges={['top', 'bottom']}>
+        <Header
+          title="설정"
+          showLogo={false}
+          showBackButton={true}
           onBackPress={() => navigation.goBack()}
         />
         <View style={styles.loadingContainer}>
@@ -165,7 +165,7 @@ const SettingsScreen: React.FC = () => {
   }
 
   return (
-    <SafeAreaView style={styles.container} edges={[]}>
+    <SafeAreaView style={styles.container} edges={['top', 'bottom']}>
       <Header
         title="설정"
         showLogo={false}

@@ -4,7 +4,6 @@ import {
   Text,
   StyleSheet,
   ScrollView,
-  SafeAreaView,
   TouchableOpacity,
   TouchableWithoutFeedback,
   ActivityIndicator,
@@ -12,6 +11,7 @@ import {
   RefreshControl,
   Image,
 } from "react-native";
+import { SafeAreaView } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
 import * as Animatable from "react-native-animatable";
 import { useFocusEffect } from "@react-navigation/native";
@@ -401,7 +401,7 @@ export default function BatteryInfoScreen() {
   );
 
   return (
-    <SafeAreaView style={styles.container}>
+    <SafeAreaView style={styles.container} edges={['top']}>
       <View style={styles.headerContainer}>
         <Header title="배터리 정보" showLogo={false} />
         {batteryInfo && (

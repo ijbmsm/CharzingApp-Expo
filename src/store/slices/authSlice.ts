@@ -11,6 +11,7 @@ interface User {
   googleId?: string; // Google 로그인용 (선택사항)
   appleId?: string; // Apple 로그인용 (선택사항)
   provider?: 'kakao' | 'google' | 'apple'; // 로그인 제공자 정보
+  role?: 'user' | 'admin' | 'mechanic'; // 사용자 권한 (기본값: user)
 }
 
 interface AuthState {

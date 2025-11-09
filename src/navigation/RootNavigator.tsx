@@ -1,8 +1,8 @@
 import React, { useState, useEffect } from 'react';
-import { View, Linking, Easing, Platform } from 'react-native';
+import { View, Linking, Easing, TouchableOpacity, Text } from 'react-native';
 import { NavigationContainer } from '@react-navigation/native';
 import { createStackNavigator, StackScreenProps } from '@react-navigation/stack';
-import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
+import { createBottomTabNavigator, BottomTabBarProps } from '@react-navigation/bottom-tabs';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 // 카카오 로그인 서비스 제거됨
@@ -27,6 +27,9 @@ import BatteryInfoScreen from '../screens/BatteryInfoScreen';
 // 새로운 예약 플로우 화면들
 import ReservationScreen from '../screens/ReservationScreen';
 import DiagnosticTabScreen from '../screens/DiagnosticTabScreen';
+import VehicleInspectionScreen from '../screens/VehicleInspectionScreen';
+import ReservationApprovalScreen from '../screens/ReservationApprovalScreen';
+import ReservationsManagementScreen from '../screens/ReservationsManagementScreen';
 
 // Types
 export type RootStackParamList = {
@@ -102,6 +105,11 @@ export type RootStackParamList = {
       updatedAt: string | Date | any;
     };
   };
+  // Admin 전용 화면들
+  ReservationApproval: undefined;
+  ReservationsManagement: undefined;
+  VehicleInspection: undefined;
+  AdminReservationList: undefined;
 };
 
 export type MainTabParamList = {
@@ -128,58 +136,97 @@ const MyPageIcon = ({ color, size }: { color: string; size: number }) => (
 
 // 모든 화면이 기능별로 보호됨
 
-function MainTabs() {
+// Custom TabBar Component
+function CustomTabBar({ state, descriptors, navigation }: BottomTabBarProps) {
   const insets = useSafeAreaInsets();
 
   return (
-    <Tab.Navigator
+    <View
+      style={{
+        flexDirection: 'row',
+        backgroundColor: '#FFFFFF',
+        borderTopLeftRadius: 30,
+        borderTopRightRadius: 30,
+        paddingBottom: insets.bottom,
+        paddingTop: 8,
+        height: 53 + insets.bottom,
+        elevation: 15,
+        shadowOpacity: 0.15,
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: -4 },
+        shadowRadius: 8,
+      }}
+    >
+      {state.routes.map((route, index) => {
+        const descriptor = descriptors[route.key];
+        if (!descriptor) return null;
+
+        const { options } = descriptor;
+        const label = typeof options.tabBarLabel === 'string'
+          ? options.tabBarLabel
+          : route.name;
+        const isFocused = state.index === index;
+        const color = isFocused ? '#202632' : '#6B7280';
+
+        const onPress = () => {
+          const event = navigation.emit({
+            type: 'tabPress',
+            target: route.key,
+            canPreventDefault: true,
+          });
+
+          if (!isFocused && !event.defaultPrevented) {
+            navigation.navigate(route.name);
+          }
+        };
+
+        const TabIcon = options.tabBarIcon;
+
+        return (
+          <TouchableOpacity
+            key={route.key}
+            accessibilityRole="button"
+            accessibilityState={isFocused ? { selected: true } : {}}
+            onPress={onPress}
+            style={{ flex: 1, alignItems: 'center', justifyContent: 'center' }}
+          >
+            {TabIcon && TabIcon({ focused: isFocused, color, size: 24 })}
+            <Text style={{ color, fontSize: 12, fontWeight: '600', marginTop: 4 }}>
+              {label}
+            </Text>
+          </TouchableOpacity>
+        );
+      })}
+    </View>
+  );
+}
+
+function MainTabs() {
+  return (
+    <View style={{ flex: 1 }}>
+      <Tab.Navigator
+      tabBar={(props) => <CustomTabBar {...props} />}
       screenOptions={{
         headerShown: false,
-        tabBarActiveTintColor: '#202632',
-        tabBarInactiveTintColor: '#6B7280',
-        tabBarStyle: {
-          backgroundColor: '#FFFFFF',
-          borderTopWidth: 0,
-          paddingBottom: Platform.OS === 'android'
-            ? Math.max(insets.bottom, 16) + 8 // Android는 최소 16px + 추가 8px
-            : Math.max(insets.bottom, 8),  // iOS는 최소 8px
-          paddingTop: 8,
-          height: Platform.OS === 'android'
-            ? 53 + insets.bottom // Android는 탭바 높이 + insets
-            : 45 + insets.bottom, // iOS도 동일하게 명시적 높이 지정
-          elevation: 15,
-          shadowOpacity: 0.15,
-          shadowColor: '#000',
-          shadowOffset: { width: 0, height: -4 },
-          shadowRadius: 8,
-          borderTopLeftRadius: 30,
-          borderTopRightRadius: 30,
-          overflow: 'hidden',
-          position: 'absolute',
-        },
-        tabBarLabelStyle: {
-          fontSize: 12,
-          fontWeight: '600',
-        },
       }}>
-      <Tab.Screen 
-        name="Home" 
+      <Tab.Screen
+        name="Home"
         component={HomeScreen}
         options={{
           tabBarLabel: '홈',
           tabBarIcon: HomeIcon,
         }}
       />
-      <Tab.Screen 
-        name="BatteryInfo" 
+      <Tab.Screen
+        name="BatteryInfo"
         component={BatteryInfoScreen}
         options={{
           tabBarLabel: '배터리 정보',
           tabBarIcon: BatteryInfoIcon,
         }}
       />
-      <Tab.Screen 
-        name="MyPage" 
+      <Tab.Screen
+        name="MyPage"
         component={MyPageScreen}
         options={{
           tabBarLabel: '마이페이지',
@@ -187,6 +234,7 @@ function MainTabs() {
         }}
       />
     </Tab.Navigator>
+    </View>
   );
 }
 
@@ -373,9 +421,23 @@ export default function RootNavigator() {
         />
         
         {/* 상세 예약 플로우 화면들 */}
-        <Stack.Screen 
-          name="Reservation" 
+        <Stack.Screen
+          name="Reservation"
           component={ReservationScreen}
+        />
+
+        {/* Admin 전용 화면들 */}
+        <Stack.Screen
+          name="ReservationApproval"
+          component={ReservationApprovalScreen}
+        />
+        <Stack.Screen
+          name="ReservationsManagement"
+          component={ReservationsManagementScreen}
+        />
+        <Stack.Screen
+          name="VehicleInspection"
+          component={VehicleInspectionScreen}
         />
       </Stack.Navigator>
     </NavigationContainer>

@@ -4,7 +4,6 @@ import {
   Text,
   Image,
   StyleSheet,
-  SafeAreaView,
   TouchableOpacity,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
@@ -55,14 +54,14 @@ const Header: React.FC<HeaderProps> = ({
   };
 
   return (
-    <SafeAreaView style={styles.container}>
+    <View style={styles.container}>
       <View style={styles.header}>
         {showBackButton && (
           <TouchableOpacity onPress={onBackPress} style={styles.backButton}>
-            <Ionicons name="chevron-back" size={24} color="#1F2937" />
+            <Ionicons name="arrow-back" size={24} color="#1F2937" />
           </TouchableOpacity>
         )}
-        
+
         {showLogo ? (
           <TouchableOpacity onPress={onLogoPress} style={styles.logoContainer}>
             <Image
@@ -96,7 +95,7 @@ const Header: React.FC<HeaderProps> = ({
         visible={isNotificationModalVisible}
         onClose={() => setIsNotificationModalVisible(false)}
       />
-    </SafeAreaView>
+    </View>
   );
 };
 
@@ -127,12 +126,8 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   backButton: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    backgroundColor: '#F3F4F6',
-    alignItems: 'center',
-    justifyContent: 'center',
+    paddingVertical: 8,
+    paddingHorizontal: 4,
     marginRight: 12,
   },
   notificationButton: {

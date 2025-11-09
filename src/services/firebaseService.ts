@@ -215,6 +215,7 @@ export interface UserProfile {
   googleId?: string;
   phoneNumber?: string;
   address?: string;
+  role?: 'user' | 'admin'; // 사용자 권한 (기본값: user)
   isRegistrationComplete: boolean;
   createdAt: Date | FieldValue;
   updatedAt: Date | FieldValue;
@@ -323,6 +324,12 @@ export interface DiagnosisReservation {
   createdAt: Date | FieldValue;
   updatedAt: Date | FieldValue;
   source?: 'web' | 'app';       // 예약 출처 구분 (웹과 동일)
+
+  // 정비사 할당 정보
+  assignedTo?: string;          // 정비사 UID
+  assignedToName?: string;      // 정비사 이름 (표시용)
+  assignedAt?: Date | FieldValue; // 할당된 시간
+  confirmedBy?: string;         // 예약을 확정한 사람 UID (assignedTo와 동일할 수도 있음)
 }
 
 export interface DiagnosisReportFile {
@@ -346,8 +353,10 @@ export interface DiagnosisReport {
 // 차량 진단 리포트 세부 항목
 export interface DiagnosisDetail {
   category: string; // 구분 (SOH, 셀 불량 여부 등)
-  measuredValue: string; // 측정값
-  interpretation: string; // 해석
+  measuredValue?: string; // 측정값
+  interpretation?: string; // 해석
+  status?: string; // 상태
+  description?: string; // 설명
 }
 
 // 배터리 셀 정보
@@ -433,10 +442,10 @@ export interface InspectionImageItem {
 
 // 추가 검사 정보 (텍스트 기반)
 export interface AdditionalInspectionInfo {
-  title: string; // 검사 제목
-  content: string; // 검사 내용 설명
-  category: 'paint' | 'tire' | 'component' | 'battery' | 'other';
-  severity: 'normal' | 'attention' | 'warning' | 'critical';
+  category: string; // 자유 입력
+  title: string;
+  content: string;
+  severity: string; // 자유 입력
 }
 
 // PDF 검사 리포트
@@ -456,7 +465,7 @@ export interface UploadedFile {
   fileUrl: string;
   fileSize: number;
   fileType: string;
-  uploadDate: Date;
+  uploadDate: Date | FieldValue;
 }
 
 // 종합 차량 검사 (새로운 구조)
@@ -503,13 +512,24 @@ export interface VehicleDiagnosisReport {
   id: string;
   reservationId?: string | null; // 예약과 연결 (선택사항)
   userId: string;
-  
+
+  // 사용자 정보 (점검시 기록)
+  userName?: string; // 사용자 이름
+  userPhone?: string; // 사용자 전화번호
+
   // 차량 기본 정보
   vehicleBrand?: string; // 차량 브랜드
   vehicleName: string; // 차량명
   vehicleYear: string; // 차량 년식
   vehicleVIN?: string; // 차대번호 (선택사항)
   diagnosisDate: Date | FieldValue; // 진단 날짜
+
+  // 차량 상태 정보
+  mileage?: number; // 주행거리 (km)
+  dashboardCondition?: string; // 계기판 상태
+  isVinVerified?: boolean; // 차대번호 동일성 확인
+  hasNoIllegalModification?: boolean; // 불법 구조변경 없음
+  hasNoFloodDamage?: boolean; // 침수 이력 없음
   
   // 배터리 진단 정보
   cellCount: number; // 셀 개수
@@ -525,8 +545,8 @@ export interface VehicleDiagnosisReport {
   minVoltage?: number; // 최소 전압
   
   // 셀 정보
-  cellsData: BatteryCell[]; // 개별 셀 상태 데이터
-  
+  cellsData?: BatteryCell[]; // 개별 셀 상태 데이터
+
   // 진단 세부 결과
   diagnosisDetails: DiagnosisDetail[];
   
@@ -1024,6 +1044,7 @@ class FirebaseService {
           googleId: data?.googleId,
           phoneNumber: data?.phoneNumber,
           address: data?.address,
+          role: data?.role || 'user', // role이 없으면 기본값 'user'
           isRegistrationComplete: data?.isRegistrationComplete ?? false,
           createdAt: data?.createdAt?.toDate(),
           updatedAt: data?.updatedAt?.toDate(),
@@ -1385,12 +1406,292 @@ class FirebaseService {
   async cancelDiagnosisReservation(reservationId: string, reason?: string): Promise<void> {
     try {
       devLog.log('진단 예약 취소:', reservationId);
-      
+
       await this.updateDiagnosisReservationStatus(reservationId, 'cancelled', reason);
-      
+
       devLog.log('✅ 진단 예약 취소 완료:', reservationId);
     } catch (error) {
       devLog.error('❌ 진단 예약 취소 실패:', error);
+      throw error;
+    }
+  }
+
+  // ============================================================================
+  // 🔒 시간 충돌 검증 헬퍼 (SOLID - Single Responsibility Principle)
+  // ============================================================================
+
+  /**
+   * 예약에서 시간대 추출
+   * @param reservation 진단 예약
+   * @param durationHours 예약 소요 시간 (기본 2시간)
+   * @returns 시간대 객체
+   * @description SRP - 예약 데이터에서 시간대 정보만 추출하는 단일 책임
+   */
+  private getReservationTimeSlot(
+    reservation: DiagnosisReservation,
+    durationHours: number = 2
+  ): { startTime: Date; endTime: Date } {
+    // requestedDate를 Date로 변환
+    const startTime = reservation.requestedDate instanceof Timestamp
+      ? reservation.requestedDate.toDate()
+      : reservation.requestedDate as Date;
+
+    // 종료 시간 계산 (시작 시간 + 소요 시간)
+    const endTime = new Date(startTime.getTime() + durationHours * 60 * 60 * 1000);
+
+    return { startTime, endTime };
+  }
+
+  /**
+   * 두 시간대의 겹침 여부 확인
+   * @param slot1 첫 번째 시간대
+   * @param slot2 두 번째 시간대
+   * @returns 겹침 여부
+   * @description SRP - 시간대 겹침 검증만 담당
+   *
+   * 겹침 조건: slot1.start < slot2.end AND slot2.start < slot1.end
+   * 예시:
+   *   slot1: 09:00 ~ 11:00
+   *   slot2: 10:00 ~ 12:00
+   *   → 겹침 (09:00 < 12:00 AND 10:00 < 11:00)
+   */
+  private hasTimeOverlap(
+    slot1: { startTime: Date; endTime: Date },
+    slot2: { startTime: Date; endTime: Date }
+  ): boolean {
+    return slot1.startTime < slot2.endTime && slot2.startTime < slot1.endTime;
+  }
+
+  /**
+   * 정비사의 시간 충돌 예약 확인
+   * @param mechanicUid 정비사 UID
+   * @param newReservationTime 새 예약 시간대
+   * @returns 충돌하는 예약 (없으면 null)
+   * @description SRP - 특정 정비사의 시간 충돌만 검증
+   */
+  private async findConflictingReservation(
+    mechanicUid: string,
+    newReservationTime: { startTime: Date; endTime: Date }
+  ): Promise<DiagnosisReservation | null> {
+    try {
+      // 해당 정비사의 활성 예약 조회 (confirmed, in_progress)
+      const reservationsRef = collection(this.db, 'diagnosisReservations');
+      const q = query(
+        reservationsRef,
+        where('assignedTo', '==', mechanicUid),
+        where('status', 'in', ['confirmed', 'in_progress'])
+      );
+
+      const querySnapshot = await getDocs(q);
+
+      // 각 예약과 시간 충돌 확인
+      for (const docSnapshot of querySnapshot.docs) {
+        const existingReservation = docSnapshot.data() as DiagnosisReservation;
+        const existingTimeSlot = this.getReservationTimeSlot(existingReservation);
+
+        if (this.hasTimeOverlap(existingTimeSlot, newReservationTime)) {
+          return existingReservation;
+        }
+      }
+
+      return null;
+    } catch (error) {
+      devLog.error('❌ 시간 충돌 확인 실패:', error);
+      throw error;
+    }
+  }
+
+  // ============================================================================
+  // 🔧 정비사 할당 메인 로직
+  // ============================================================================
+
+  /**
+   * 예약을 정비사에게 할당 (Transaction 사용으로 동시성 제어)
+   * @param reservationId 예약 ID
+   * @param mechanicUid 정비사 UID
+   * @param mechanicName 정비사 이름
+   * @returns 할당 성공 여부
+   * @throws 이미 할당된 예약인 경우 에러
+   * @throws 시간 충돌이 있는 경우 에러
+   *
+   * @description
+   * - Transaction 내에서 할당 중복 방지 (동시성 제어)
+   * - 시간 충돌 검증으로 동일 정비사의 중복 예약 방지
+   * - SOLID 원칙 준수: 검증 로직은 별도 헬퍼 함수로 분리
+   */
+  async assignReservationToMechanic(
+    reservationId: string,
+    mechanicUid: string,
+    mechanicName: string
+  ): Promise<void> {
+    try {
+      devLog.log('예약 할당 시도:', { reservationId, mechanicUid, mechanicName });
+
+      const reservationRef = doc(this.db, 'diagnosisReservations', reservationId);
+
+      // Transaction을 사용하여 동시성 문제 방지
+      await runTransaction(this.db, async (transaction) => {
+        const reservationDoc = await transaction.get(reservationRef);
+
+        if (!reservationDoc.exists()) {
+          throw new Error('예약을 찾을 수 없습니다.');
+        }
+
+        const reservationData = reservationDoc.data() as DiagnosisReservation;
+
+        // 1️⃣ 이미 할당된 예약인지 확인
+        if (reservationData.assignedTo) {
+          throw new Error(
+            `이미 ${reservationData.assignedToName || '다른 정비사'}에게 할당된 예약입니다.`
+          );
+        }
+
+        // 2️⃣ 예약 상태가 pending이 아닌 경우 체크
+        if (reservationData.status !== 'pending') {
+          throw new Error('대기 중인 예약만 할당할 수 있습니다.');
+        }
+
+        // 3️⃣ 시간 충돌 확인 (동일 정비사의 다른 예약과 겹치는지)
+        const newReservationTime = this.getReservationTimeSlot(reservationData);
+        const conflictingReservation = await this.findConflictingReservation(
+          mechanicUid,
+          newReservationTime
+        );
+
+        if (conflictingReservation) {
+          // 충돌하는 예약의 시간 정보 포맷팅
+          const conflictTime = conflictingReservation.requestedDate instanceof Timestamp
+            ? conflictingReservation.requestedDate.toDate()
+            : conflictingReservation.requestedDate as Date;
+
+          const timeStr = conflictTime.toLocaleString('ko-KR', {
+            month: 'long',
+            day: 'numeric',
+            hour: '2-digit',
+            minute: '2-digit',
+          });
+
+          throw new Error(
+            `이미 ${timeStr}에 다른 예약(${conflictingReservation.userName})이 있습니다. 시간이 겹치는 예약은 받을 수 없습니다.`
+          );
+        }
+
+        // 4️⃣ 모든 검증 통과 - 할당 정보 업데이트
+        transaction.update(reservationRef, {
+          assignedTo: mechanicUid,
+          assignedToName: mechanicName,
+          assignedAt: serverTimestamp(),
+          confirmedBy: mechanicUid,
+          status: 'confirmed',
+          updatedAt: serverTimestamp(),
+        } as Partial<DiagnosisReservation>);
+      });
+
+      devLog.log('✅ 예약 할당 완료:', reservationId);
+    } catch (error) {
+      devLog.error('❌ 예약 할당 실패:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * 정비사에게 할당된 예약 목록 조회
+   * @param mechanicUid 정비사 UID
+   * @param status 조회할 예약 상태 (선택사항)
+   * @returns 할당된 예약 목록
+   */
+  async getMechanicAssignedReservations(
+    mechanicUid: string,
+    status?: DiagnosisReservation['status']
+  ): Promise<DiagnosisReservation[]> {
+    try {
+      devLog.log('정비사 할당 예약 조회:', { mechanicUid, status });
+
+      const reservationsRef = collection(this.db, 'diagnosisReservations');
+
+      // 쿼리 빌더 패턴 사용 (SOLID의 단일 책임 원칙)
+      let q = query(
+        reservationsRef,
+        where('assignedTo', '==', mechanicUid),
+        orderBy('requestedDate', 'desc')
+      );
+
+      // 상태 필터가 있으면 추가
+      if (status) {
+        q = query(q, where('status', '==', status));
+      }
+
+      const snapshot = await getDocs(q);
+
+      const reservations: DiagnosisReservation[] = snapshot.docs.map((doc) => ({
+        id: doc.id,
+        ...doc.data(),
+      } as DiagnosisReservation));
+
+      devLog.log('✅ 정비사 할당 예약 조회 완료:', reservations.length);
+      return reservations;
+    } catch (error) {
+      devLog.error('❌ 정비사 할당 예약 조회 실패:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * pending 상태의 예약 목록 조회 (모든 정비사가 볼 수 있음)
+   * @returns pending 예약 목록
+   */
+  async getPendingReservations(): Promise<DiagnosisReservation[]> {
+    try {
+      devLog.log('대기 중인 예약 목록 조회');
+
+      const reservationsRef = collection(this.db, 'diagnosisReservations');
+      const q = query(
+        reservationsRef,
+        where('status', '==', 'pending'),
+        orderBy('requestedDate', 'asc')
+      );
+
+      const snapshot = await getDocs(q);
+
+      const reservations: DiagnosisReservation[] = snapshot.docs.map((doc) => ({
+        id: doc.id,
+        ...doc.data(),
+      } as DiagnosisReservation));
+
+      devLog.log('✅ 대기 중인 예약 목록 조회 완료:', reservations.length);
+      return reservations;
+    } catch (error) {
+      devLog.error('❌ 대기 중인 예약 목록 조회 실패:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * confirmed 상태의 모든 예약 조회 (할당 정보 포함)
+   * @returns confirmed 예약 목록
+   */
+  async getAllConfirmedReservations(): Promise<DiagnosisReservation[]> {
+    try {
+      devLog.log('확정된 예약 목록 조회');
+
+      const reservationsRef = collection(this.db, 'diagnosisReservations');
+      const q = query(
+        reservationsRef,
+        where('status', '==', 'confirmed'),
+        orderBy('requestedDate', 'asc')
+      );
+
+      const snapshot = await getDocs(q);
+
+      const reservations: DiagnosisReservation[] = snapshot.docs.map((doc) => ({
+        id: doc.id,
+        ...doc.data(),
+      } as DiagnosisReservation));
+
+      devLog.log('✅ 확정된 예약 목록 조회 완료:', reservations.length);
+      return reservations;
+    } catch (error) {
+      devLog.error('❌ 확정된 예약 목록 조회 실패:', error);
       throw error;
     }
   }
@@ -1923,6 +2224,64 @@ class FirebaseService {
     } catch (error) {
       devLog.error('❌ 예약별 차량 진단 리포트 조회 실패:', error);
       throw error;
+    }
+  }
+
+  /**
+   * 차량 점검 이미지 업로드
+   */
+  async uploadVehicleInspectionImage(imageUri: string, userId: string): Promise<string> {
+    try {
+      devLog.log('📸 차량 점검 이미지 업로드 시작:', imageUri);
+
+      // 이미지를 Blob으로 변환
+      const response = await fetch(imageUri);
+      const blob = await response.blob();
+
+      // Storage 경로 생성
+      const fileName = `${Date.now()}_${Math.random().toString(36).substring(7)}.jpg`;
+      const storageRef = ref(this.storage, `vehicleInspections/${userId}/${fileName}`);
+
+      // 이미지 업로드
+      await uploadBytes(storageRef, blob);
+
+      // 다운로드 URL 가져오기
+      const downloadURL = await getDownloadURL(storageRef);
+
+      devLog.log('✅ 차량 점검 이미지 업로드 완료:', downloadURL);
+      return downloadURL;
+    } catch (error) {
+      devLog.error('❌ 차량 점검 이미지 업로드 실패:', error);
+      throw new Error('이미지 업로드에 실패했습니다.');
+    }
+  }
+
+  /**
+   * 차량 진단 리포트 생성
+   */
+  async createVehicleDiagnosisReport(reportData: Omit<VehicleDiagnosisReport, 'id' | 'createdAt' | 'updatedAt'>): Promise<string> {
+    try {
+      devLog.log('📝 차량 진단 리포트 생성 시작');
+
+      // 새 리포트 ID 생성
+      const reportId = doc(collection(this.db, 'vehicleDiagnosisReports')).id;
+
+      // 현재 시각
+      const now = serverTimestamp();
+
+      // Firestore에 저장
+      await setDoc(doc(this.db, 'vehicleDiagnosisReports', reportId), {
+        ...reportData,
+        id: reportId,
+        createdAt: now,
+        updatedAt: now,
+      });
+
+      devLog.log('✅ 차량 진단 리포트 생성 완료:', reportId);
+      return reportId;
+    } catch (error) {
+      devLog.error('❌ 차량 진단 리포트 생성 실패:', error);
+      throw new Error('진단 리포트 생성에 실패했습니다.');
     }
   }
 

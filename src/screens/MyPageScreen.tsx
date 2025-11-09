@@ -16,6 +16,7 @@ import { useSelector, useDispatch } from 'react-redux';
 import { useNavigation } from '@react-navigation/native';
 import { StackNavigationProp } from '@react-navigation/stack';
 import * as Animatable from 'react-native-animatable';
+import { scale, verticalScale, moderateScale } from 'react-native-size-matters';
 import { RootState } from '../store';
 import { logout, updateUserProfile } from '../store/slices/authSlice';
 import Header from '../components/Header';
@@ -49,6 +50,10 @@ const AuthenticatedMyPage: React.FC<{
 
     try {
       const profile = await firebaseService.getUserProfile(user.uid);
+      console.log('🔍 MyPage - Firebase 프로필:', profile);
+      console.log('🔍 MyPage - Redux user:', user);
+      console.log('🔍 MyPage - user.role:', user?.role);
+      console.log('🔍 MyPage - profile.role:', profile?.role);
       setFirebaseUser(profile);
     } catch (error) {
       devLog.error('사용자 프로필 로드 실패:', error);
@@ -162,12 +167,19 @@ const AuthenticatedMyPage: React.FC<{
               <Text style={styles.userEmail}>
                 {displayUser?.email || '이메일 정보 없음'}
               </Text>
-              <View style={styles.providerBadge}>
-                <Text style={styles.providerText}>
-                  {displayUser?.provider === 'kakao' ? '카카오' :
-                   displayUser?.provider === 'google' ? '구글' :
-                   displayUser?.provider === 'apple' ? '애플' : '이메일'} 로그인
-                </Text>
+              <View style={styles.badgeContainer}>
+                <View style={styles.providerBadge}>
+                  <Text style={styles.providerText}>
+                    {displayUser?.provider === 'kakao' ? '카카오' :
+                     displayUser?.provider === 'google' ? '구글' :
+                     displayUser?.provider === 'apple' ? '애플' : '이메일'} 로그인
+                  </Text>
+                </View>
+                {displayUser?.role === 'admin' && (
+                  <View style={styles.adminBadge}>
+                    <Text style={styles.adminText}>진단사</Text>
+                  </View>
+                )}
               </View>
             </View>
           </View>
@@ -191,6 +203,50 @@ const AuthenticatedMyPage: React.FC<{
             <Text style={styles.actionTitle}>설정</Text>
             <Text style={styles.actionSubtitle}>앱 관리</Text>
           </TouchableOpacity>
+
+          {/* 고객: 내 예약 버튼 */}
+          {displayUser?.role !== 'admin' && displayUser?.role !== 'mechanic' && (
+            <TouchableOpacity
+              style={styles.actionItem}
+              onPress={() => navigation.navigate('MyReservations')}
+              activeOpacity={0.7}
+            >
+              <View style={styles.actionIconContainer}>
+                <Ionicons name="calendar-outline" size={32} color="#6366F1" />
+              </View>
+              <Text style={styles.actionTitle}>내 예약</Text>
+              <Text style={styles.actionSubtitle}>예약 내역 확인</Text>
+            </TouchableOpacity>
+          )}
+
+          {/* 정비사/관리자: 예약 관리 버튼 */}
+          {(displayUser?.role === 'admin' || displayUser?.role === 'mechanic') && (
+            <>
+              <TouchableOpacity
+                style={styles.actionItem}
+                onPress={() => navigation.navigate('ReservationsManagement')}
+                activeOpacity={0.7}
+              >
+                <View style={styles.actionIconContainer}>
+                  <Ionicons name="calendar" size={32} color="#6366F1" />
+                </View>
+                <Text style={styles.actionTitle}>예약 관리</Text>
+                <Text style={styles.actionSubtitle}>대기 중 · 내 담당</Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                style={styles.actionItem}
+                onPress={() => navigation.navigate('VehicleInspection')}
+                activeOpacity={0.7}
+              >
+                <View style={styles.actionIconContainer}>
+                  <Ionicons name="car-sport" size={32} color="#06B6D4" />
+                </View>
+                <Text style={styles.actionTitle}>차량 점검</Text>
+                <Text style={styles.actionSubtitle}>현장 점검 기록</Text>
+              </TouchableOpacity>
+            </>
+          )}
 
           <TouchableOpacity
             style={styles.actionItem}
@@ -439,33 +495,56 @@ const styles = StyleSheet.create({
     color: '#6B7280',
     marginBottom: 8,
   },
+  badgeContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
   providerBadge: {
     alignSelf: 'flex-start',
   },
   providerText: {
     fontSize: 12,
+    fontWeight: '500',
     color: '#6366F1',
     backgroundColor: '#EEF2FF',
     paddingHorizontal: 8,
     paddingVertical: 4,
     borderRadius: 12,
     overflow: 'hidden',
+    lineHeight: 16,
+  },
+  adminBadge: {
+    alignSelf: 'flex-start',
+    marginLeft: 8,
+  },
+  adminText: {
+    fontSize: 12,
+    fontWeight: '500',
+    color: '#6B7280',
+    backgroundColor: '#F3F4F6',
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 12,
+    overflow: 'hidden',
+    lineHeight: 16,
   },
 
-  // 액션 그리드 - 홈 스타일
+  // 액션 그리드 - 홈 스타일 (3열)
   actionGridContainer: {
     flexDirection: 'row',
+    flexWrap: 'wrap',
     justifyContent: 'flex-start',
-    marginBottom: 16,
+    marginBottom: verticalScale(12),
     paddingHorizontal: 0,
   },
   actionItem: {
     alignItems: 'center',
     backgroundColor: '#FFFFFF',
     borderRadius: 12,
-    paddingVertical: 20,
-    paddingHorizontal: 16,
-    marginRight: 12,
+    paddingVertical: verticalScale(12),
+    paddingHorizontal: scale(6),
+    marginRight: scale(6),
+    marginBottom: verticalScale(12),
     shadowColor: '#000',
     shadowOffset: {
       width: 0,
@@ -474,23 +553,22 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.1,
     shadowRadius: 4,
     elevation: 3,
-    width: (Dimensions.get('window').width - 48) / 3, // 화면 너비의 1/3 (패딩 16*2 + 마진 16 고려)
+    width: (Dimensions.get('window').width - scale(48)) / 3,
   },
   actionIconContainer: {
-    marginBottom: 8,
+    marginBottom: verticalScale(4),
   },
   actionTitle: {
-    fontSize: 14,
+    fontSize: moderateScale(12, 1),
     fontWeight: '700',
     color: '#1F2937',
-    marginBottom: 4,
+    marginBottom: verticalScale(2),
     textAlign: 'center',
   },
   actionSubtitle: {
-    fontSize: 11,
+    fontSize: moderateScale(9, 1),
     color: '#6B7280',
     textAlign: 'center',
-    lineHeight: 14,
   },
   disabledActionItem: {
     opacity: 0.5,

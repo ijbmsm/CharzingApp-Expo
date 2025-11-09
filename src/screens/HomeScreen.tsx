@@ -14,7 +14,7 @@ import {
   Image,
   FlatList,
 } from "react-native";
-import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context";
+import { SafeAreaView } from "react-native-safe-area-context";
 import { useNavigation, useFocusEffect } from "@react-navigation/native";
 import { NativeStackNavigationProp } from "@react-navigation/native-stack";
 import { RootStackParamList } from "../navigation/RootNavigator";
@@ -312,9 +312,6 @@ export default function HomeScreen() {
     (state: RootState) => state.auth
   );
 
-  // SafeArea insets 측정 (정확한 기기별 여백 계산)
-  const insets = useSafeAreaInsets();
-
   // 메모리 누수 방지를 위한 마운트 상태 추적 (컴포넌트 레벨)
   const isMountedRef = useRef(true);
 
@@ -557,24 +554,28 @@ export default function HomeScreen() {
     }
   };
 
-  // 화면에 포커스될 때마다 차량 목록 새로고침
+  // 화면에 포커스될 때 차량 데이터가 없으면 로딩 (캐싱)
   useFocusEffect(
     React.useCallback(() => {
       console.log(
         "👁️ HomeScreen 포커스 이벤트 - isAuthenticated:",
         isAuthenticated,
         "user:",
-        !!user
+        !!user,
+        "userVehicles.length:",
+        userVehicles.length
       );
 
-      if (isAuthenticated && user && isMountedRef.current) {
-        console.log("🔄 HomeScreen 포커스 - 차량 목록 새로고침 시작");
+      // 이미 차량 데이터가 있으면 다시 로딩하지 않음
+      if (isAuthenticated && user && isMountedRef.current && userVehicles.length === 0) {
+        console.log("🔄 HomeScreen 포커스 - 차량 목록 최초 로딩 시작");
 
-        // 차량 목록을 강제로 새로고침
         setVehiclesLoading(true);
         loadUserVehicles(isMountedRef);
+      } else if (userVehicles.length > 0) {
+        console.log("✅ 차량 데이터가 이미 있어서 로딩 스킵");
       }
-    }, [isAuthenticated, user])
+    }, [isAuthenticated, user, userVehicles.length])
   );
 
   // 차량 데이터 강제 새로고침 함수
@@ -1237,13 +1238,13 @@ export default function HomeScreen() {
   };
 
   return (
-    <SafeAreaView style={styles.container} edges={[]}>
+    <SafeAreaView style={styles.container} edges={['top']}>
       <Header showLogo={true} showNotification={true} />
 
       <ScrollView
         style={styles.content}
         showsVerticalScrollIndicator={false}
-        contentContainerStyle={{ flexGrow: 1, paddingBottom: verticalScale(12) + insets.bottom }}
+        contentContainerStyle={{ flexGrow: 1 }}
         refreshControl={
           <RefreshControl
             refreshing={refreshing}

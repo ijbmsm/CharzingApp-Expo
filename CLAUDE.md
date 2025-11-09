@@ -104,10 +104,38 @@
 - `ReservationScreen.tsx` - 상세 예약 플로우 (위치 → 날짜/시간 → 차량)
 - `MyPageScreen.tsx` - 마이페이지 (내 정보, 예약 내역)
 - `LoginScreen.tsx` - 로그인 (Google, Apple 지원)
+- `VehicleInspectionScreen.tsx` - **차량 진단 리포트 작성** (아코디언 구조, 1900+ 라인)
 
 #### **핵심 컴포넌트 (src/components/)**
+
+##### 차량 선택 및 지도
 - `VehicleAccordionSelector.tsx` - 🎯 **신규 차량 선택 모달** (브랜드 → 모델 → 트림 → 연식)
 - `KakaoMapView.tsx` - 카카오 지도 WebView 통합
+
+##### 배터리 셀 관리 (VehicleInspectionScreen 전용)
+- `BatteryCellGridModal.tsx` - **배터리 셀 그리드 모달** (셀 목록 표시, 기본 전압 설정)
+  - 하단 슬라이드 모달 형태
+  - 셀 개수만큼 그리드로 표시 (예: 100개 셀)
+  - 각 셀별 전압 표시 및 불량 셀 표시
+  - 기본 전압 설정 (모든 셀에 일괄 적용)
+  - 셀 클릭 시 상세 편집 모달 열기
+- `BatteryCellDetailModal.tsx` - **개별 셀 상세 편집 모달** (중앙 모달)
+  - 불량 셀 체크박스
+  - 개별 셀 전압 입력
+  - 깔끔한 중앙 모달 UI
+
+##### 진단 리포트 카드 (VehicleInspectionScreen 전용)
+- `DiagnosisDetailCard.tsx` - **진단 항목 카드 컴포넌트**
+  - 카테고리, 측정값, 해석 입력 필드
+  - 삭제 버튼 (2개 이상일 때만 표시)
+  - 재사용 가능한 카드 형태
+- `InspectionImageCard.tsx` - **검사 이미지 카드 컴포넌트**
+  - 이미지 미리보기
+  - 카테고리, 상태 입력 필드
+  - 이미지 삭제 버튼
+  - 그리드 레이아웃 지원 (2열)
+
+##### 공통 컴포넌트
 - `Header.tsx` - 공통 헤더 컴포넌트
 - `LoadingSpinner.tsx` - 로딩 상태 표시
 
@@ -151,6 +179,115 @@ gs://charzing-d1600.firebasestorage.app/vehicle-images/
 ├── PORSCHE/
 └── TESLA/
 ```
+
+## VehicleInspectionScreen 상세 가이드
+
+### 📋 화면 구조
+차량 진단 리포트를 작성하는 핵심 화면으로, 아코디언 형태의 5개 섹션으로 구성됩니다.
+
+#### 섹션 구조
+1. **차량 기본 정보** (`vehicleInfo`)
+   - 브랜드, 차량명, 연식, 차대번호, 진단 날짜
+   - 주행거리, 계기판 상태
+
+2. **차대번호 및 상태 확인** (`vinCheck`)
+   - 차대번호 동일성 확인 체크박스
+   - 불법 구조변경 없음 체크박스
+   - 침수 이력 없음 체크박스
+
+3. **배터리 정보** (`batteryInfo`) ⭐ **핵심 기능**
+   - SOH (%) - 필수 입력
+   - 최대/최소 전압 - **자동 계산** (읽기 전용)
+   - 셀 개수 - 필수 입력
+   - **배터리 셀 관리 버튼** (셀 개수 > 0일 때 표시)
+     - 클릭 시 `BatteryCellGridModal` 열림
+     - 각 셀별 전압 설정 가능
+     - 불량 셀 체크 가능
+   - 불량 셀 개수 - **자동 계산** (읽기 전용)
+   - 일반 충전 횟수
+   - 급속 충전 횟수
+
+4. **진단 세부사항** (`diagnosis`)
+   - 항목별 카테고리, 측정값, 해석 입력
+   - `DiagnosisDetailCard` 컴포넌트 사용
+   - 항목 추가/삭제 가능
+
+5. **검사 이미지** (`images`)
+   - 사진 촬영 / 갤러리에서 선택
+   - `InspectionImageCard` 컴포넌트 사용
+   - 이미지별 카테고리, 상태 입력
+
+### 🔄 배터리 셀 관리 플로우
+
+```
+1. 사용자가 "셀 개수" 입력 (예: 100)
+   ↓
+2. useEffect가 batteryCells 배열 자동 생성
+   - 각 셀: { id, cellNumber, isDefective: false, voltage: defaultCellVoltage }
+   ↓
+3. "배터리 셀 관리" 버튼 표시
+   ↓
+4. 버튼 클릭 → BatteryCellGridModal 열림
+   - 기본 전압 설정 가능 (모든 셀에 적용)
+   - 100개 셀 그리드로 표시
+   ↓
+5. 셀 클릭 (예: 6번 셀)
+   ↓
+6. BatteryCellDetailModal 열림
+   - 불량 셀 체크박스 ON/OFF
+   - 개별 전압 입력
+   ↓
+7. 자동 계산 (useMemo)
+   - defectiveCellCount: 불량 셀 개수 카운트
+   - maxCellVoltage: 최대 전압 계산
+   - minCellVoltage: 최소 전압 계산
+```
+
+### 💡 주요 구현 패턴
+
+#### 1. 자동 계산 값 (useMemo 사용)
+```typescript
+// ❌ 잘못된 방법 - 사용자가 직접 입력
+const [defectiveCellCount, setDefectiveCellCount] = useState(0);
+
+// ✅ 올바른 방법 - 자동 계산
+const defectiveCellCount = useMemo(() => {
+  return batteryCells.filter(cell => cell.isDefective).length;
+}, [batteryCells]);
+```
+
+#### 2. 읽기 전용 입력 필드 스타일
+```typescript
+<View style={styles.readOnlyInput}>
+  <Text style={styles.readOnlyText}>{defectiveCellCount}개</Text>
+</View>
+```
+
+#### 3. 조건부 버튼 표시
+```typescript
+{batteryCellCount > 0 && (
+  <TouchableOpacity
+    style={styles.cellManagementButton}
+    onPress={handleOpenCellModal}
+  >
+    <Text>배터리 셀 관리</Text>
+  </TouchableOpacity>
+)}
+```
+
+### 🎨 컴포넌트 분리 원칙
+
+**VehicleInspectionScreen에서 컴포넌트로 분리한 이유:**
+- 파일 크기 관리 (1900+ 라인)
+- 재사용 가능성 (다른 화면에서도 사용 가능)
+- 유지보수성 향상 (각 컴포넌트의 책임 분리)
+- 테스트 용이성
+
+**컴포넌트 분리 체크리스트:**
+- ✅ 반복되는 UI 패턴 (map으로 렌더링되는 항목)
+- ✅ 독립적인 기능 단위 (모달, 카드 등)
+- ✅ 50줄 이상의 render 로직
+- ❌ 한 번만 사용되고 10줄 미만인 간단한 UI
 
 ## 중요 개발 규칙
 
