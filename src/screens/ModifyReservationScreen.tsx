@@ -96,7 +96,7 @@ const ModifyReservationScreen: React.FC = () => {
           reservationDate = new Date(reservation.requestedDate);
         } else if (reservation.requestedDate instanceof Date) {
           reservationDate = reservation.requestedDate;
-        } else if (reservation.requestedDate.toDate && typeof reservation.requestedDate.toDate === 'function') {
+        } else if (reservation.requestedDate && typeof reservation.requestedDate === 'object' && 'toDate' in reservation.requestedDate && typeof reservation.requestedDate.toDate === 'function') {
           // Firestore Timestamp 객체인 경우
           reservationDate = reservation.requestedDate.toDate();
         }

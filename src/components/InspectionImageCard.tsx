@@ -1,14 +1,16 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { View, Image, TextInput, TouchableOpacity, StyleSheet } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { scale, verticalScale, moderateScale } from 'react-native-size-matters';
 import { InspectionImageItem } from '../../adminWeb/index';
+import FullScreenImageViewer from './FullScreenImageViewer';
 
 interface InspectionImageCardProps {
   image: InspectionImageItem;
   onRemove: (id: string) => void;
   onUpdateCategory: (id: string, text: string) => void;
   onUpdateSeverity: (id: string, text: string) => void;
+  onImageEdit?: (id: string, newImageUrl: string) => void;
 }
 
 const InspectionImageCard: React.FC<InspectionImageCardProps> = ({
@@ -16,10 +18,33 @@ const InspectionImageCard: React.FC<InspectionImageCardProps> = ({
   onRemove,
   onUpdateCategory,
   onUpdateSeverity,
+  onImageEdit,
 }) => {
+  const [imageViewerVisible, setImageViewerVisible] = useState(false);
+
+  const handleImagePress = () => {
+    setImageViewerVisible(true);
+  };
+
+  const handleCloseImageViewer = () => {
+    setImageViewerVisible(false);
+  };
+
+  const handleSaveEditedImage = (editedUri: string) => {
+    if (onImageEdit) {
+      onImageEdit(image.id, editedUri);
+    }
+  };
+
   return (
     <View style={styles.card}>
-      <Image source={{ uri: image.imageUrl }} style={styles.preview} />
+      <TouchableOpacity
+        onPress={handleImagePress}
+        activeOpacity={0.9}
+        style={styles.imageTouchable}
+      >
+        <Image source={{ uri: image.imageUrl }} style={styles.preview} />
+      </TouchableOpacity>
       <TouchableOpacity
         style={styles.removeButton}
         onPress={() => onRemove(image.id)}
@@ -44,6 +69,14 @@ const InspectionImageCard: React.FC<InspectionImageCardProps> = ({
           onChangeText={(text) => onUpdateSeverity(image.id, text)}
         />
       </View>
+
+      {/* Full Screen Image Viewer */}
+      <FullScreenImageViewer
+        visible={imageViewerVisible}
+        imageUri={image.imageUrl}
+        onClose={handleCloseImageViewer}
+        onSave={handleSaveEditedImage}
+      />
     </View>
   );
 };
@@ -59,9 +92,13 @@ const styles = StyleSheet.create({
     backgroundColor: '#FFFFFF',
     position: 'relative',
   },
-  preview: {
+  imageTouchable: {
     width: '100%',
     height: verticalScale(150),
+  },
+  preview: {
+    width: '100%',
+    height: '100%',
     resizeMode: 'cover',
   },
   removeButton: {

@@ -18,7 +18,6 @@ export default {
     name: "차징",
     slug: "CharzingApp-Expo",
     version: "1.0.1",
-    sdkVersion: "54.0.0",
     orientation: "portrait",
     icon: "./assets/images/icon.png",
     scheme: "charzingapp",

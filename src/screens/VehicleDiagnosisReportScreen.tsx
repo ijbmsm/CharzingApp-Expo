@@ -29,6 +29,8 @@ import firebaseService, {
   InspectionImageItem,
   AdditionalInspectionInfo,
   PDFInspectionReport,
+  MajorDevicesInspection,
+  MajorDeviceItem,
 } from "../services/firebaseService";
 
 import {
@@ -55,7 +57,7 @@ const VehicleDiagnosisReportScreen: React.FC<Props> = ({
   );
   const [modalVisible, setModalVisible] = useState(false);
   const [modalContent, setModalContent] = useState<
-    "cells" | "images" | "additional" | "pdf" | "uploads" | null
+    "cells" | "images" | "additional" | "pdf" | "uploads" | "majorDevices" | null
   >(null);
   const [imageViewerVisible, setImageViewerVisible] = useState(false);
   const [selectedImageData, setSelectedImageData] =
@@ -167,7 +169,7 @@ const VehicleDiagnosisReportScreen: React.FC<Props> = ({
   };
 
   const openModal = (
-    content: "cells" | "images" | "additional" | "pdf" | "uploads"
+    content: "cells" | "images" | "additional" | "pdf" | "uploads" | "majorDevices"
   ) => {
     setModalContent(content);
     setModalVisible(true);
@@ -305,16 +307,6 @@ const VehicleDiagnosisReportScreen: React.FC<Props> = ({
                     {report.vehicleYear}년 • 진단일:{" "}
                     {formatDate(report.diagnosisDate)}
                   </Text>
-                  {report.vehicleVIN && (
-                    <Text
-                      style={[
-                        styles.vehicleVin,
-                        convertToLineSeedFont(styles.vehicleVin),
-                      ]}
-                    >
-                      VIN: {report.vehicleVIN.slice(-8)}
-                    </Text>
-                  )}
                 </View>
               </View>
 
@@ -587,6 +579,40 @@ const VehicleDiagnosisReportScreen: React.FC<Props> = ({
               </Text>
             </TouchableOpacity>
 
+            {/* 주요 장치 검사 카드 */}
+            {report.majorDevicesInspection &&
+              (Object.keys(report.majorDevicesInspection.steering || {}).length > 0 ||
+                Object.keys(report.majorDevicesInspection.braking || {}).length > 0 ||
+                Object.keys(report.majorDevicesInspection.electrical || {}).length > 0) && (
+                <TouchableOpacity
+                  style={styles.actionItem}
+                  onPress={() => openModal("majorDevices")}
+                  activeOpacity={0.7}
+                >
+                  <View style={styles.actionIconContainer}>
+                    <Ionicons name="construct" size={32} color="#6B7280" />
+                  </View>
+                  <Text
+                    style={[
+                      styles.actionTitle,
+                      convertToLineSeedFont(styles.actionTitle),
+                    ]}
+                  >
+                    주요 장치 검사
+                  </Text>
+                  <Text
+                    style={[
+                      styles.actionSubtitle,
+                      convertToLineSeedFont(styles.actionSubtitle),
+                    ]}
+                  >
+                    {Object.keys(report.majorDevicesInspection.steering || {}).length +
+                      Object.keys(report.majorDevicesInspection.braking || {}).length +
+                      Object.keys(report.majorDevicesInspection.electrical || {}).length}개 항목
+                  </Text>
+                </TouchableOpacity>
+              )}
+
             {/* 검사 이미지 카드 */}
             {report.comprehensiveInspection?.inspectionImages &&
               report.comprehensiveInspection.inspectionImages.length > 0 && (
@@ -728,6 +754,7 @@ const VehicleDiagnosisReportScreen: React.FC<Props> = ({
                   ]}
                 >
                   {modalContent === "cells" && "배터리 셀 맵"}
+                  {modalContent === "majorDevices" && "주요 장치 검사"}
                   {modalContent === "images" && "검사 이미지"}
                   {modalContent === "additional" && "추가 검사 정보"}
                   {modalContent === "pdf" && "PDF 리포트"}
@@ -966,6 +993,275 @@ const VehicleDiagnosisReportScreen: React.FC<Props> = ({
                         </Text>
                       </View>
                     </View>
+                  </View>
+                )}
+
+                {/* 주요 장치 검사 모달 내용 */}
+                {modalContent === "majorDevices" && report?.majorDevicesInspection && (
+                  <View style={styles.modalSection}>
+                    {/* 조향 (Steering) */}
+                    {report.majorDevicesInspection.steering &&
+                      Object.keys(report.majorDevicesInspection.steering).length > 0 && (
+                        <View style={{ marginBottom: 24 }}>
+                          <Text
+                            style={[
+                              styles.modalSectionTitle,
+                              convertToLineSeedFont(styles.modalSectionTitle),
+                            ]}
+                          >
+                            조향
+                          </Text>
+                          {Object.entries(report.majorDevicesInspection.steering).map(
+                            ([key, item]) =>
+                              item && (
+                                <View key={key} style={styles.majorDeviceItem}>
+                                  <Text
+                                    style={[
+                                      styles.majorDeviceItemName,
+                                      convertToLineSeedFont(styles.majorDeviceItemName),
+                                    ]}
+                                  >
+                                    {item.name}
+                                  </Text>
+                                  {item.imageUri && (
+                                    <Image
+                                      source={{ uri: item.imageUri }}
+                                      style={styles.majorDeviceItemImage}
+                                      resizeMode="cover"
+                                    />
+                                  )}
+                                  <View style={styles.majorDeviceItemStatus}>
+                                    <View
+                                      style={[
+                                        styles.majorDeviceStatusBadge,
+                                        item.status === "good"
+                                          ? styles.majorDeviceStatusGood
+                                          : styles.majorDeviceStatusProblem,
+                                      ]}
+                                    >
+                                      <Ionicons
+                                        name={
+                                          item.status === "good"
+                                            ? "checkmark-circle"
+                                            : "alert-circle"
+                                        }
+                                        size={16}
+                                        color={item.status === "good" ? "#10B981" : "#EF4444"}
+                                      />
+                                      <Text
+                                        style={[
+                                          styles.majorDeviceStatusText,
+                                          item.status === "good"
+                                            ? styles.majorDeviceStatusTextGood
+                                            : styles.majorDeviceStatusTextProblem,
+                                          convertToLineSeedFont(styles.majorDeviceStatusText),
+                                        ]}
+                                      >
+                                        {item.status === "good" ? "양호" : "문제 있음"}
+                                      </Text>
+                                    </View>
+                                  </View>
+                                  {item.status === "problem" && item.issueDescription && (
+                                    <View style={styles.majorDeviceIssueContainer}>
+                                      <Text
+                                        style={[
+                                          styles.majorDeviceIssueLabel,
+                                          convertToLineSeedFont(styles.majorDeviceIssueLabel),
+                                        ]}
+                                      >
+                                        문제 내용:
+                                      </Text>
+                                      <Text
+                                        style={[
+                                          styles.majorDeviceIssueText,
+                                          convertToLineSeedFont(styles.majorDeviceIssueText),
+                                        ]}
+                                      >
+                                        {item.issueDescription}
+                                      </Text>
+                                    </View>
+                                  )}
+                                </View>
+                              )
+                          )}
+                        </View>
+                      )}
+
+                    {/* 제동 (Braking) */}
+                    {report.majorDevicesInspection.braking &&
+                      Object.keys(report.majorDevicesInspection.braking).length > 0 && (
+                        <View style={{ marginBottom: 24 }}>
+                          <Text
+                            style={[
+                              styles.modalSectionTitle,
+                              convertToLineSeedFont(styles.modalSectionTitle),
+                            ]}
+                          >
+                            제동
+                          </Text>
+                          {Object.entries(report.majorDevicesInspection.braking).map(
+                            ([key, item]) =>
+                              item && (
+                                <View key={key} style={styles.majorDeviceItem}>
+                                  <Text
+                                    style={[
+                                      styles.majorDeviceItemName,
+                                      convertToLineSeedFont(styles.majorDeviceItemName),
+                                    ]}
+                                  >
+                                    {item.name}
+                                  </Text>
+                                  {item.imageUri && (
+                                    <Image
+                                      source={{ uri: item.imageUri }}
+                                      style={styles.majorDeviceItemImage}
+                                      resizeMode="cover"
+                                    />
+                                  )}
+                                  <View style={styles.majorDeviceItemStatus}>
+                                    <View
+                                      style={[
+                                        styles.majorDeviceStatusBadge,
+                                        item.status === "good"
+                                          ? styles.majorDeviceStatusGood
+                                          : styles.majorDeviceStatusProblem,
+                                      ]}
+                                    >
+                                      <Ionicons
+                                        name={
+                                          item.status === "good"
+                                            ? "checkmark-circle"
+                                            : "alert-circle"
+                                        }
+                                        size={16}
+                                        color={item.status === "good" ? "#10B981" : "#EF4444"}
+                                      />
+                                      <Text
+                                        style={[
+                                          styles.majorDeviceStatusText,
+                                          item.status === "good"
+                                            ? styles.majorDeviceStatusTextGood
+                                            : styles.majorDeviceStatusTextProblem,
+                                          convertToLineSeedFont(styles.majorDeviceStatusText),
+                                        ]}
+                                      >
+                                        {item.status === "good" ? "양호" : "문제 있음"}
+                                      </Text>
+                                    </View>
+                                  </View>
+                                  {item.status === "problem" && item.issueDescription && (
+                                    <View style={styles.majorDeviceIssueContainer}>
+                                      <Text
+                                        style={[
+                                          styles.majorDeviceIssueLabel,
+                                          convertToLineSeedFont(styles.majorDeviceIssueLabel),
+                                        ]}
+                                      >
+                                        문제 내용:
+                                      </Text>
+                                      <Text
+                                        style={[
+                                          styles.majorDeviceIssueText,
+                                          convertToLineSeedFont(styles.majorDeviceIssueText),
+                                        ]}
+                                      >
+                                        {item.issueDescription}
+                                      </Text>
+                                    </View>
+                                  )}
+                                </View>
+                              )
+                          )}
+                        </View>
+                      )}
+
+                    {/* 전기 (Electrical) */}
+                    {report.majorDevicesInspection.electrical &&
+                      Object.keys(report.majorDevicesInspection.electrical).length > 0 && (
+                        <View style={{ marginBottom: 24 }}>
+                          <Text
+                            style={[
+                              styles.modalSectionTitle,
+                              convertToLineSeedFont(styles.modalSectionTitle),
+                            ]}
+                          >
+                            전기
+                          </Text>
+                          {Object.entries(report.majorDevicesInspection.electrical).map(
+                            ([key, item]) =>
+                              item && (
+                                <View key={key} style={styles.majorDeviceItem}>
+                                  <Text
+                                    style={[
+                                      styles.majorDeviceItemName,
+                                      convertToLineSeedFont(styles.majorDeviceItemName),
+                                    ]}
+                                  >
+                                    {item.name}
+                                  </Text>
+                                  {item.imageUri && (
+                                    <Image
+                                      source={{ uri: item.imageUri }}
+                                      style={styles.majorDeviceItemImage}
+                                      resizeMode="cover"
+                                    />
+                                  )}
+                                  <View style={styles.majorDeviceItemStatus}>
+                                    <View
+                                      style={[
+                                        styles.majorDeviceStatusBadge,
+                                        item.status === "good"
+                                          ? styles.majorDeviceStatusGood
+                                          : styles.majorDeviceStatusProblem,
+                                      ]}
+                                    >
+                                      <Ionicons
+                                        name={
+                                          item.status === "good"
+                                            ? "checkmark-circle"
+                                            : "alert-circle"
+                                        }
+                                        size={16}
+                                        color={item.status === "good" ? "#10B981" : "#EF4444"}
+                                      />
+                                      <Text
+                                        style={[
+                                          styles.majorDeviceStatusText,
+                                          item.status === "good"
+                                            ? styles.majorDeviceStatusTextGood
+                                            : styles.majorDeviceStatusTextProblem,
+                                          convertToLineSeedFont(styles.majorDeviceStatusText),
+                                        ]}
+                                      >
+                                        {item.status === "good" ? "양호" : "문제 있음"}
+                                      </Text>
+                                    </View>
+                                  </View>
+                                  {item.status === "problem" && item.issueDescription && (
+                                    <View style={styles.majorDeviceIssueContainer}>
+                                      <Text
+                                        style={[
+                                          styles.majorDeviceIssueLabel,
+                                          convertToLineSeedFont(styles.majorDeviceIssueLabel),
+                                        ]}
+                                      >
+                                        문제 내용:
+                                      </Text>
+                                      <Text
+                                        style={[
+                                          styles.majorDeviceIssueText,
+                                          convertToLineSeedFont(styles.majorDeviceIssueText),
+                                        ]}
+                                      >
+                                        {item.issueDescription}
+                                      </Text>
+                                    </View>
+                                  )}
+                                </View>
+                              )
+                          )}
+                        </View>
+                      )}
                   </View>
                 )}
 
@@ -2494,6 +2790,75 @@ const styles = StyleSheet.create({
   pdfLoadingText: {
     fontSize: 14,
     color: "#6B7280",
+  },
+
+  // Major Device Styles
+  majorDeviceItem: {
+    backgroundColor: "#F9FAFB",
+    borderRadius: 12,
+    padding: 16,
+    marginBottom: 12,
+    borderWidth: 1,
+    borderColor: "#E5E7EB",
+  },
+  majorDeviceItemName: {
+    fontSize: 16,
+    fontWeight: "600",
+    color: "#1F2937",
+    marginBottom: 12,
+  },
+  majorDeviceItemImage: {
+    width: "100%",
+    height: 200,
+    borderRadius: 8,
+    marginBottom: 12,
+  },
+  majorDeviceItemStatus: {
+    marginBottom: 8,
+  },
+  majorDeviceStatusBadge: {
+    flexDirection: "row",
+    alignItems: "center",
+    alignSelf: "flex-start",
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 20,
+    gap: 6,
+  },
+  majorDeviceStatusGood: {
+    backgroundColor: "#F0FDF4",
+  },
+  majorDeviceStatusProblem: {
+    backgroundColor: "#FEF2F2",
+  },
+  majorDeviceStatusText: {
+    fontSize: 14,
+    fontWeight: "600",
+  },
+  majorDeviceStatusTextGood: {
+    color: "#10B981",
+  },
+  majorDeviceStatusTextProblem: {
+    color: "#EF4444",
+  },
+  majorDeviceIssueContainer: {
+    marginTop: 12,
+    padding: 12,
+    backgroundColor: "#FFFFFF",
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: "#FEE2E2",
+  },
+  majorDeviceIssueLabel: {
+    fontSize: 12,
+    fontWeight: "600",
+    color: "#EF4444",
+    marginBottom: 6,
+  },
+  majorDeviceIssueText: {
+    fontSize: 14,
+    color: "#374151",
+    lineHeight: 20,
   },
 });
 

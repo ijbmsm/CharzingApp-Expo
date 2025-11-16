@@ -5,23 +5,10 @@
  * Dependency Inversion Principle (DIP): 추상화된 인터페이스에 의존
  */
 
-// 안전한 카카오 SDK import
+// Lazy loading을 위한 카카오 SDK 변수 선언 (런타임 준비 후 로드)
 let login: any, logout: any, getProfile: any, unlink: any;
+let isSDKLoaded = false;
 
-try {
-  const KakaoSDK = require("@react-native-seoul/kakao-login");
-  login = KakaoSDK.login;
-  logout = KakaoSDK.logout;
-  getProfile = KakaoSDK.getProfile;
-  unlink = KakaoSDK.unlink;
-} catch (error) {
-  console.warn('⚠️ 카카오 SDK import 실패 - Development Build 필요:', error);
-  // 네이티브 모듈이 없는 환경에서는 undefined로 설정
-  login = undefined;
-  logout = undefined;
-  getProfile = undefined;
-  unlink = undefined;
-}
 import { getAuth, signInWithCustomToken } from 'firebase/auth';
 import { Platform, NativeModules } from 'react-native';
 import firebaseService from './firebaseService';
@@ -78,12 +65,12 @@ class KakaoLoginService implements ILoginService {
 
   constructor() {
     this.userFactory = new KakaoUserFactory();
-    
-    devLog.log('🔧 카카오 네이티브 SDK 로그인 서비스 초기화');
+    // ⛔️ constructor에서는 NativeModules 접근 금지 - initialize()에서 처리
   }
 
   /**
    * 카카오 로그인 서비스 초기화
+   * 런타임이 준비된 후 네이티브 모듈을 lazy loading
    */
   async initialize(): Promise<void> {
     if (this.isInitialized) {
@@ -91,6 +78,27 @@ class KakaoLoginService implements ILoginService {
     }
 
     try {
+      // Lazy load: 네이티브 모듈 로드 (런타임 준비 후)
+      if (!isSDKLoaded) {
+        try {
+          const KakaoSDK = require("@react-native-seoul/kakao-login");
+          login = KakaoSDK.login;
+          logout = KakaoSDK.logout;
+          getProfile = KakaoSDK.getProfile;
+          unlink = KakaoSDK.unlink;
+          isSDKLoaded = true;
+          devLog.log('✅ 카카오 SDK 네이티브 모듈 로드 완료 (lazy loading)');
+        } catch (error) {
+          console.warn('⚠️ 카카오 SDK import 실패 - Development Build 필요:', error);
+          // 네이티브 모듈이 없는 환경에서는 undefined로 설정
+          login = undefined;
+          logout = undefined;
+          getProfile = undefined;
+          unlink = undefined;
+          devLog.warn('⚠️ 카카오 SDK 네이티브 모듈 로드 실패, Web fallback 사용 권장');
+        }
+      }
+
       devLog.log('✅ 카카오 네이티브 SDK 로그인 서비스 초기화 완료');
       this.isInitialized = true;
     } catch (error) {
@@ -412,6 +420,28 @@ class KakaoLoginService implements ILoginService {
   }
 }
 
-// 싱글톤 인스턴스 생성
-const kakaoLoginService = new KakaoLoginService();
-export default kakaoLoginService;
+// Lazy initialization: 요청할 때만 인스턴스 생성
+let kakaoLoginServiceInstance: KakaoLoginService | null = null;
+
+/**
+ * KakaoLoginService 싱글톤 인스턴스를 반환합니다.
+ * 첫 호출 시에만 인스턴스가 생성됩니다 (lazy initialization).
+ *
+ * @returns KakaoLoginService 인스턴스
+ *
+ * @example
+ * ```typescript
+ * import getKakaoLoginService from './services/kakaoLoginService';
+ *
+ * const result = await getKakaoLoginService().login();
+ * ```
+ */
+const getKakaoLoginService = (): KakaoLoginService => {
+  if (!kakaoLoginServiceInstance) {
+    kakaoLoginServiceInstance = new KakaoLoginService();
+  }
+  return kakaoLoginServiceInstance;
+};
+
+// Lazy initialization을 위해 함수 자체를 export
+export default getKakaoLoginService;

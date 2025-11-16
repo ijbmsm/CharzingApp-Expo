@@ -70,9 +70,9 @@ const BatteryCellDetailModal: React.FC<BatteryCellDetailModalProps> = ({
             <Text style={styles.voltageLabel}>전압 (V)</Text>
             <TextInput
               style={styles.voltageInput}
-              value={cell.voltage === 0 || cell.voltage === undefined ? '' : cell.voltage.toString()}
+              value={cell.voltage === 0 || cell.voltage === undefined || cell.voltage === '' ? '' : typeof cell.voltage === 'string' ? cell.voltage : cell.voltage.toString()}
               onChangeText={onUpdateVoltage}
-              keyboardType="decimal-pad"
+              keyboardType="default"
               placeholder="0.00"
               placeholderTextColor="#9CA3AF"
             />

@@ -1,9 +1,6 @@
 // URL polyfill for Hermes (최상단에서 먼저 실행)
 import 'react-native-url-polyfill/auto';
 
-// React Native Gesture Handler (네이티브 모듈 초기화)
-import 'react-native-gesture-handler';
-
 // Sentry 초기화 (최상단)
 import * as Sentry from '@sentry/react-native';
 
@@ -26,7 +23,7 @@ import SmartAuthProvider from './src/components/SmartAuthProvider';
 import BundlingLoadingScreen from './src/components/BundlingLoadingScreen';
 import notificationService from './src/services/notificationService';
 import googleLoginService from './src/services/googleLoginService';
-import kakaoLoginService from './src/services/kakaoLoginService';
+import getKakaoLoginService from './src/services/kakaoLoginService';
 import analyticsService from './src/services/analyticsService';
 import * as SplashScreen from 'expo-splash-screen';
 import { useFonts } from 'expo-font';
@@ -86,7 +83,7 @@ function NotificationInitializer() {
     // 카카오 로그인 서비스 초기화 (모든 플랫폼)
     console.log('📱 카카오 로그인 서비스 초기화 중...');
     setTimeout(() => {
-      kakaoLoginService.initialize().catch((error) => {
+      getKakaoLoginService().initialize().catch((error: Error) => {
         console.error('❌ 카카오 로그인 서비스 초기화 실패:', error);
       });
     }, 1000);
@@ -205,8 +202,15 @@ function App() {
         console.log('✅ Expo 스플래시 화면 숨김 완료');
 
         // 1. BootSplash 숨기기 (번들링 로딩 화면)
-        await RNBootSplash.hide({ fade: true });
-        console.log('✅ BootSplash 숨김 완료');
+        try {
+          await Promise.race([
+            RNBootSplash.hide({ fade: true }),
+            new Promise((resolve) => setTimeout(resolve, 1000)) // 1초 timeout
+          ]);
+          console.log('✅ BootSplash 숨김 완료');
+        } catch (error) {
+          console.warn('⚠️ BootSplash 숨김 실패 (무시하고 계속):', error);
+        }
 
         // 2. Firebase 초기화
         setLoadingMessage('Firebase 연결 중...');
@@ -227,7 +231,7 @@ function App() {
         // 4. 카카오 로그인 서비스 초기화
         setLoadingMessage('로그인 서비스 준비 중...');
         try {
-          await kakaoLoginService.initialize();
+          await getKakaoLoginService().initialize();
           console.log('✅ 카카오 로그인 서비스 초기화 성공');
         } catch (error) {
           console.warn('⚠️ 카카오 로그인 서비스 초기화 실패:', error);

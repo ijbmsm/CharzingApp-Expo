@@ -18,7 +18,6 @@ export default {
     name: "차징",
     slug: "CharzingApp-Expo",
     version: "1.0.1",
-    sdkVersion: "54.0.0",
     orientation: "portrait",
     icon: "./ios/app/Images.xcassets/AppIcon.appiconset/App-Icon-1024x1024@1x.png",
     scheme: "charzingapp",
@@ -127,15 +126,10 @@ export default {
           androidClientId: "91035459357-lc3tir17pmmomf793bnce1qmstns4rh7.apps.googleusercontent.com"
         }
       ],
-      [
-        "@react-native-seoul/kakao-login",
-        {
-          kakaoAppKey: process.env.EXPO_PUBLIC_KAKAO_NATIVE_APP_KEY,
-          overrideKakaoSDKVersion: "2.11.2",
-          kotlinVersion: "1.9.0"
-        }
-      ],
-      [
+      ["@react-native-seoul/kakao-login", {
+        kakaoAppKey: process.env.EXPO_PUBLIC_KAKAO_NATIVE_APP_KEY
+      }],
+            [
         "expo-build-properties",
         {
           android: {

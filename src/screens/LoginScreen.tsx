@@ -17,7 +17,7 @@ import { setUser, setLoading, setAutoLoginEnabled } from '../store/slices/authSl
 import { RootState } from '../store';
 import appleLoginService from '../services/appleLoginService';
 import googleLoginService from '../services/googleLoginService';
-import kakaoLoginService from '../services/kakaoLoginService';
+import getKakaoLoginService from '../services/kakaoLoginService';
 import firebaseService from '../services/firebaseService';
 import { useLoading } from '../contexts/LoadingContext';
 import { Ionicons } from '@expo/vector-icons';
@@ -82,8 +82,8 @@ export default function LoginScreen() {
       await clearPreviousSession();
 
       // 카카오 로그인 서비스 초기화 및 실행
-      await kakaoLoginService.initialize();
-      const result = await kakaoLoginService.login();
+      await getKakaoLoginService().initialize();
+      const result = await getKakaoLoginService().login();
       
       if (result.success && result.user) {
         const firebaseUser = result.user;

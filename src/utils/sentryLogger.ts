@@ -208,6 +208,121 @@ class SentryLogger {
   }
 
   /**
+   * 진단 리포트 업로드 시작 로그
+   */
+  logDiagnosisReportUploadStart(
+    userId: string,
+    vehicleInfo: {
+      brand?: string;
+      name: string;
+      year: string;
+    }
+  ): void {
+    if (this.isDevelopment) {
+      console.log('📝 [DEV] Sentry 진단 리포트 업로드 시작:', { userId, vehicleInfo });
+      return;
+    }
+
+    try {
+      Sentry.addBreadcrumb({
+        message: `🔄 진단 리포트 업로드 시작 - ${vehicleInfo.brand || ''} ${vehicleInfo.name} (${vehicleInfo.year})`,
+        level: 'info',
+        data: { userId, vehicleInfo },
+      });
+      if (vehicleInfo.brand) {
+        Sentry.setTag('last_report_vehicle_brand', vehicleInfo.brand);
+      }
+    } catch (error) {
+      console.warn('⚠️ Sentry 진단 리포트 업로드 시작 로그 실패:', error);
+    }
+  }
+
+  /**
+   * 진단 리포트 업로드 성공 로그
+   */
+  logDiagnosisReportUploadSuccess(
+    userId: string,
+    reportId: string,
+    vehicleInfo: {
+      brand?: string;
+      name: string;
+      year: string;
+    },
+    reportDetails: {
+      cellCount: number;
+      defectiveCellCount: number;
+      sohPercentage: number;
+      mileage?: number;
+    }
+  ): void {
+    if (this.isDevelopment) {
+      console.log('📝 [DEV] Sentry 진단 리포트 업로드 성공:', {
+        userId,
+        reportId,
+        vehicleInfo,
+        reportDetails
+      });
+      return;
+    }
+
+    try {
+      Sentry.addBreadcrumb({
+        message: `✅ 진단 리포트 업로드 완료 - ${vehicleInfo.brand || ''} ${vehicleInfo.name} (${vehicleInfo.year}) | SOH: ${reportDetails.sohPercentage}% | 셀: ${reportDetails.cellCount}개 (불량: ${reportDetails.defectiveCellCount}개)`,
+        level: 'info',
+        data: { userId, reportId, vehicleInfo, reportDetails },
+      });
+      if (vehicleInfo.brand) {
+        Sentry.setTag('last_uploaded_vehicle_brand', vehicleInfo.brand);
+      }
+      Sentry.setTag('last_report_id', reportId);
+    } catch (error) {
+      console.warn('⚠️ Sentry 진단 리포트 업로드 성공 로그 실패:', error);
+    }
+  }
+
+  /**
+   * 진단 리포트 업로드 실패 로그
+   */
+  logDiagnosisReportUploadError(
+    userId: string,
+    error: Error,
+    vehicleInfo: {
+      brand?: string;
+      name: string;
+      year: string;
+    },
+    context?: string
+  ): void {
+    if (this.isDevelopment) {
+      console.error('📝 [DEV] Sentry 진단 리포트 업로드 실패:', {
+        userId,
+        error,
+        vehicleInfo,
+        context
+      });
+      return;
+    }
+
+    try {
+      Sentry.addBreadcrumb({
+        message: `❌ 진단 리포트 업로드 실패 - ${vehicleInfo.brand || ''} ${vehicleInfo.name} (${vehicleInfo.year})${context ? ` | Context: ${context}` : ''}`,
+        level: 'error',
+        data: { userId, vehicleInfo, context, errorMessage: error.message },
+      });
+      Sentry.captureException(error, {
+        tags: {
+          vehicle_brand: vehicleInfo.brand || 'unknown',
+          vehicle_name: vehicleInfo.name,
+          vehicle_year: vehicleInfo.year,
+          context: context || 'unknown',
+        },
+      });
+    } catch (err) {
+      console.warn('⚠️ Sentry 진단 리포트 업로드 실패 로그 실패:', err);
+    }
+  }
+
+  /**
    * 커스텀 이벤트 로그
    */
   logCustomEvent(eventName: string, details?: string): void {

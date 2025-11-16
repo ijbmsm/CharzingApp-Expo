@@ -166,7 +166,7 @@ const DiagnosisReportListScreen: React.FC<Props> = ({navigation}) => {
                     </View>
                     <View style={styles.statItem}>
                       <Text style={styles.statNumber}>
-                        {vehicleReports.filter(r => r.status === 'completed').length}
+                        {vehicleReports.filter(r => r.status === 'approved' || r.status === 'published').length}
                       </Text>
                       <Text style={styles.statLabel}>완료</Text>
                     </View>

@@ -5,6 +5,7 @@ import { createStackNavigator, StackScreenProps } from '@react-navigation/stack'
 import { createBottomTabNavigator, BottomTabBarProps } from '@react-navigation/bottom-tabs';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
+import { Timestamp, FieldValue } from 'firebase/firestore';
 // 카카오 로그인 서비스 제거됨
 
 // Screens
@@ -52,9 +53,9 @@ export type RootStackParamList = {
   MyReservations: undefined;
   ReservationDetail: {
     reservation: Omit<import('../services/firebaseService').DiagnosisReservation, 'requestedDate' | 'createdAt' | 'updatedAt'> & {
-      requestedDate: string | Date | any;
-      createdAt: string | Date | any;
-      updatedAt: string | Date | any;
+      requestedDate: string | Date | Timestamp | FieldValue;
+      createdAt: string | Date | Timestamp | FieldValue;
+      updatedAt: string | Date | Timestamp | FieldValue;
     };
   };
   Settings: undefined;
@@ -93,16 +94,16 @@ export type RootStackParamList = {
   Reservation: {
     editMode?: boolean;
     existingReservation?: Omit<import('../services/firebaseService').DiagnosisReservation, 'requestedDate' | 'createdAt' | 'updatedAt'> & {
-      requestedDate: string | Date | any;
-      createdAt: string | Date | any;
-      updatedAt: string | Date | any;
+      requestedDate: string | Date | Timestamp | FieldValue;
+      createdAt: string | Date | Timestamp | FieldValue;
+      updatedAt: string | Date | Timestamp | FieldValue;
     };
   } | undefined;
   ModifyReservation: {
     reservation: Omit<import('../services/firebaseService').DiagnosisReservation, 'requestedDate' | 'createdAt' | 'updatedAt'> & {
-      requestedDate: string | Date | any;
-      createdAt: string | Date | any;
-      updatedAt: string | Date | any;
+      requestedDate: string | Date | Timestamp | FieldValue;
+      createdAt: string | Date | Timestamp | FieldValue;
+      updatedAt: string | Date | Timestamp | FieldValue;
     };
   };
   // Admin 전용 화면들
@@ -203,7 +204,7 @@ function CustomTabBar({ state, descriptors, navigation }: BottomTabBarProps) {
 
 function MainTabs() {
   return (
-    <View style={{ flex: 1 }}>
+    <View style={{ flex: 1, backgroundColor: '#FFFFFF' }}>
       <Tab.Navigator
       tabBar={(props) => <CustomTabBar {...props} />}
       screenOptions={{

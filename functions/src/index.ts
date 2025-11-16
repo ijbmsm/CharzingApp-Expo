@@ -4,6 +4,8 @@ import axios from 'axios';
 import cors from 'cors';
 import { google } from 'googleapis';
 import * as Sentry from '@sentry/node';
+import { v4 as uuidv4 } from 'uuid';
+import { FieldValue } from 'firebase-admin/firestore';
 
 // 차량 데이터 업로드 함수 import
 export { uploadVehiclesToFirestore } from './uploadVehicles';
@@ -2295,5 +2297,341 @@ export const getModels = functions
         details: errorMessage
       });
       return;
+    }
+  });
+
+import {
+  ConfirmPaymentRequest,
+  ConfirmPaymentResponse,
+  CancelPaymentRequest,
+  CancelPaymentResponse,
+} from './types/functions.types';
+import { PaymentDocument } from './types/payment.types';
+import { confirmPayment as confirmPaymentAPI, cancelPayment as cancelPaymentAPI } from './utils/toss-api';
+import { tossResponseToPaymentDocument, createCancelUpdateData } from './utils/payment-mapper';
+
+function validateConfig(): string {
+  const secretKey = process.env.TOSS_SECRET_KEY;
+
+  if (!secretKey) {
+    throw new functions.https.HttpsError(
+      'failed-precondition',
+      'Toss Secret Key가 설정되지 않았습니다. ' +
+      'functions/.env 파일에 TOSS_SECRET_KEY를 설정하거나 firebase functions:secrets:set TOSS_SECRET_KEY 명령을 실행하세요.'
+    );
+  }
+  return secretKey;
+}
+
+export const confirmPaymentFunction = functions
+  .region('asia-northeast3')
+  .runWith({
+    secrets: ['TOSS_SECRET_KEY'],
+  })
+  .https.onCall(async (data: ConfirmPaymentRequest, context): Promise<ConfirmPaymentResponse> => {
+    const secretKey = validateConfig();
+
+    if (!data.paymentKey || !data.orderId || !data.amount) {
+      throw new functions.https.HttpsError(
+        'invalid-argument',
+        '필수 파라미터가 누락되었습니다: paymentKey, orderId, amount'
+      );
+    }
+
+    if (!data.customerInfo?.name || !data.customerInfo?.phone) {
+      throw new functions.https.HttpsError(
+        'invalid-argument',
+        '고객 정보가 누락되었습니다: name, phone'
+      );
+    }
+
+    try {
+      const tossResponse = await confirmPaymentAPI(secretKey, {
+        paymentKey: data.paymentKey,
+        orderId: data.orderId,
+        amount: data.amount,
+      });
+
+      const paymentDocData = tossResponseToPaymentDocument(tossResponse, {
+        reservationId: data.reservationId || null,
+        userId: context.auth?.uid || null,
+        customerName: data.customerInfo.name,
+        customerPhone: data.customerInfo.phone,
+        customerEmail: data.customerInfo.email || '',
+      });
+
+      const paymentRef = db.collection('payments').doc();
+      await paymentRef.set({
+        ...paymentDocData,
+        createdAt: FieldValue.serverTimestamp(),
+        updatedAt: FieldValue.serverTimestamp(),
+      } as PaymentDocument);
+
+      let reservationId = data.reservationId;
+
+      if (data.reservationInfo) {
+        const reservationRef = db.collection('diagnosisReservations').doc();
+
+        console.log('📅 받은 requestedDate:', data.reservationInfo.requestedDate);
+        const requestedDateTime = new Date(data.reservationInfo.requestedDate);
+        console.log('📅 변환된 Date 객체:', requestedDateTime);
+        console.log('📅 Date 유효성:', requestedDateTime instanceof Date && !isNaN(requestedDateTime.getTime()));
+
+        // 날짜 유효성 검증
+        if (!(requestedDateTime instanceof Date) || isNaN(requestedDateTime.getTime())) {
+          throw new functions.https.HttpsError(
+            'invalid-argument',
+            `유효하지 않은 날짜 형식입니다: ${data.reservationInfo.requestedDate}`
+          );
+        }
+
+        await reservationRef.set({
+          // 기존 구조와 호환 (vehicleBrand, vehicleModel, vehicleYear)
+          vehicleBrand: data.reservationInfo.vehicle.make,
+          vehicleModel: data.reservationInfo.vehicle.model,
+          vehicleYear: String(data.reservationInfo.vehicle.year),
+
+          // 주소 정보
+          address: data.reservationInfo.address,
+          detailAddress: data.reservationInfo.detailAddress,
+          latitude: 0, // 주소 API에서 가져올 수 없는 경우 기본값
+          longitude: 0,
+
+          // 날짜/시간
+          requestedDate: admin.firestore.Timestamp.fromDate(requestedDateTime),
+
+          // 서비스 정보
+          serviceType: data.reservationInfo.serviceType,
+          servicePrice: tossResponse.totalAmount,
+          status: 'confirmed',
+
+          // 고객 정보 (기존 구조: userName, userPhone, userEmail)
+          userName: data.customerInfo.name,
+          userPhone: data.customerInfo.phone,
+          userEmail: data.customerInfo.email || '',
+
+          // 메모
+          notes: data.reservationInfo.notes || '',
+          adminNotes: '',
+
+          // 결제 정보
+          paymentId: paymentRef.id,
+          paymentStatus: 'paid',
+          paymentMethod: tossResponse.method,
+          paymentAmount: tossResponse.totalAmount,
+          paymentCompletedAt: FieldValue.serverTimestamp(),
+
+          // 사용자 및 소스
+          userId: context.auth?.uid || null,
+          source: 'web',
+
+          // 타임스탬프
+          createdAt: FieldValue.serverTimestamp(),
+          updatedAt: FieldValue.serverTimestamp(),
+        });
+
+        reservationId = reservationRef.id;
+
+        await paymentRef.update({
+          reservationId: reservationRef.id,
+        });
+
+        console.log(`예약 생성 완료: ${reservationRef.id}`);
+      } else if (data.reservationId) {
+        // 두 컬렉션 모두 확인 (reservations: 앱 예약, diagnosisReservations: 웹 예약)
+        let reservationRef = db.collection('reservations').doc(data.reservationId);
+        let reservationDoc = await reservationRef.get();
+
+        if (!reservationDoc.exists) {
+          // reservations에 없으면 diagnosisReservations 확인
+          reservationRef = db.collection('diagnosisReservations').doc(data.reservationId);
+          reservationDoc = await reservationRef.get();
+        }
+
+        if (!reservationDoc.exists) {
+          console.warn(`예약 문서를 찾을 수 없습니다: ${data.reservationId}`);
+        } else {
+          await reservationRef.update({
+            paymentId: paymentRef.id,
+            paymentStatus: 'paid',
+            paymentMethod: tossResponse.method,
+            paymentCompletedAt: FieldValue.serverTimestamp(),
+            updatedAt: FieldValue.serverTimestamp(),
+          });
+        }
+      }
+
+      return {
+        success: true,
+        paymentId: paymentRef.id,
+        receiptUrl: tossResponse.receipt?.url || null,
+      };
+
+    } catch (error) {
+      console.error('결제 승인 실패:', error);
+
+      if (error instanceof functions.https.HttpsError) {
+        throw error;
+      }
+
+      throw new functions.https.HttpsError(
+        'internal',
+        '결제 승인 중 오류가 발생했습니다.',
+        error instanceof Error ? { message: error.message } : undefined
+      );
+    }
+  });
+
+export const cancelPaymentFunction = functions
+  .region('asia-northeast3')
+  .runWith({
+    secrets: ['TOSS_SECRET_KEY'],
+  })
+  .https.onCall(async (data: CancelPaymentRequest, context): Promise<CancelPaymentResponse> => {
+    const secretKey = validateConfig();
+
+    if (!data.paymentId) {
+      throw new functions.https.HttpsError(
+        'invalid-argument',
+        'paymentId가 필요합니다.'
+      );
+    }
+
+    if (!data.cancelReason?.trim()) {
+      throw new functions.https.HttpsError(
+        'invalid-argument',
+        '취소 사유를 입력해주세요.'
+      );
+    }
+
+    try {
+      const paymentRef = db.collection('payments').doc(data.paymentId);
+      const paymentDoc = await paymentRef.get();
+
+      if (!paymentDoc.exists) {
+        throw new functions.https.HttpsError(
+          'not-found',
+          '결제 정보를 찾을 수 없습니다.'
+        );
+      }
+
+      const paymentData = paymentDoc.data() as PaymentDocument;
+
+      if (paymentData.cancelInProgress) {
+        throw new functions.https.HttpsError(
+          'failed-precondition',
+          '이미 취소 처리 중입니다. 잠시 후 다시 시도해주세요.'
+        );
+      }
+
+      if (paymentData.status === 'CANCELED') {
+        throw new functions.https.HttpsError(
+          'failed-precondition',
+          '이미 취소된 결제입니다.'
+        );
+      }
+
+      if (paymentData.balanceAmount === 0) {
+        throw new functions.https.HttpsError(
+          'failed-precondition',
+          '환불 가능한 금액이 없습니다.'
+        );
+      }
+
+      if (data.cancelAmount !== undefined) {
+        if (data.cancelAmount <= 0) {
+          throw new functions.https.HttpsError(
+            'invalid-argument',
+            '취소 금액은 0보다 커야 합니다.'
+          );
+        }
+
+        if (data.cancelAmount > paymentData.balanceAmount) {
+          throw new functions.https.HttpsError(
+            'invalid-argument',
+            `취소 금액이 환불 가능 금액(${paymentData.balanceAmount}원)을 초과합니다.`
+          );
+        }
+      }
+
+      await paymentRef.update({
+        cancelInProgress: true,
+        updatedAt: FieldValue.serverTimestamp(),
+      });
+
+      try {
+        const idempotencyKey = uuidv4();
+
+        const tossResponse = await cancelPaymentAPI(
+          secretKey,
+          paymentData.paymentKey,
+          {
+            cancelReason: data.cancelReason.trim(),
+            cancelAmount: data.cancelAmount,
+          },
+          idempotencyKey
+        );
+
+        const updateData = createCancelUpdateData(tossResponse, idempotencyKey);
+        await paymentRef.update(updateData);
+
+        if (paymentData.reservationId) {
+          // 두 컬렉션 모두 확인 (reservations: 앱 예약, diagnosisReservations: 웹 예약)
+          let reservationRef = db.collection('reservations').doc(paymentData.reservationId);
+          let reservationDoc = await reservationRef.get();
+
+          if (!reservationDoc.exists) {
+            // reservations에 없으면 diagnosisReservations 확인
+            reservationRef = db.collection('diagnosisReservations').doc(paymentData.reservationId);
+            reservationDoc = await reservationRef.get();
+          }
+
+          if (reservationDoc.exists) {
+            let paymentStatus: 'paid' | 'partial_refunded' | 'refunded' = 'paid';
+
+            if (tossResponse.status === 'CANCELED') {
+              paymentStatus = 'refunded';
+            } else if (tossResponse.status === 'PARTIAL_CANCELED') {
+              paymentStatus = 'partial_refunded';
+            }
+
+            await reservationRef.update({
+              paymentStatus,
+              updatedAt: FieldValue.serverTimestamp(),
+            });
+
+            console.log(`예약 상태 업데이트 완료: ${paymentData.reservationId} -> ${paymentStatus}`);
+          } else {
+            console.warn(`예약 문서를 찾을 수 없습니다: ${paymentData.reservationId}`);
+          }
+        }
+
+        return {
+          success: true,
+          status: tossResponse.status as 'CANCELED' | 'PARTIAL_CANCELED',
+          balanceAmount: tossResponse.balanceAmount,
+          cancelAmount: data.cancelAmount || paymentData.balanceAmount,
+        };
+
+      } catch (error) {
+        await paymentRef.update({
+          cancelInProgress: false,
+          updatedAt: FieldValue.serverTimestamp(),
+        });
+        throw error;
+      }
+
+    } catch (error) {
+      console.error('결제 취소 실패:', error);
+
+      if (error instanceof functions.https.HttpsError) {
+        throw error;
+      }
+
+      throw new functions.https.HttpsError(
+        'internal',
+        '결제 취소 중 오류가 발생했습니다.',
+        error instanceof Error ? { message: error.message } : undefined
+      );
     }
   });

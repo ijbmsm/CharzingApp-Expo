@@ -5,13 +5,12 @@ import {
   StyleSheet,
   FlatList,
   TouchableOpacity,
-  ActivityIndicator,
   Alert,
   RefreshControl,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useSelector } from 'react-redux';
-import { useNavigation, CommonActions } from '@react-navigation/native';
+import { useNavigation } from '@react-navigation/native';
 import { StackNavigationProp } from '@react-navigation/stack';
 import { Ionicons } from '@expo/vector-icons';
 import StepIndicator from 'react-native-step-indicator';
@@ -19,45 +18,35 @@ import Header from '../components/Header';
 import { RootState } from '../store';
 import firebaseService, { DiagnosisReservation } from '../services/firebaseService';
 import { RootStackParamList } from '../navigation/RootNavigator';
-import { useLoading } from '../contexts/LoadingContext';
 
 type NavigationProp = StackNavigationProp<RootStackParamList>;
 
 const MyReservationsScreen: React.FC = () => {
   const navigation = useNavigation<NavigationProp>();
   const { user, isAuthenticated } = useSelector((state: RootState) => state.auth);
-  const { showLoading, hideLoading } = useLoading();
-  
+
   const [reservations, setReservations] = useState<DiagnosisReservation[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
   const [isRefreshing, setIsRefreshing] = useState(false);
 
   useEffect(() => {
     let isMounted = true; // 마운트 상태 추적
-    
+
     if (isAuthenticated && user?.uid) {
-      loadReservations(true, isMounted);
+      loadReservations(isMounted);
     }
-    
+
     // Cleanup 함수
     return () => {
       isMounted = false;
     };
   }, [isAuthenticated, user]);
 
-  const loadReservations = async (showGlobalLoading = false, isMounted = true) => {
+  const loadReservations = async (isMounted = true) => {
     if (!user?.uid || !isMounted) return;
-    
+
     try {
-      if (showGlobalLoading && isMounted) {
-        showLoading('예약 목록을 불러오는 중...');
-      }
-      if (isMounted) {
-        setIsLoading(true);
-      }
-      
       const userReservations = await firebaseService.getUserDiagnosisReservations(user.uid);
-      
+
       if (isMounted) {
         setReservations(userReservations);
       }
@@ -66,19 +55,12 @@ const MyReservationsScreen: React.FC = () => {
         console.error('예약 목록 불러오기 실패:', error);
         Alert.alert('오류', '예약 목록을 불러올 수 없습니다.');
       }
-    } finally {
-      if (isMounted) {
-        if (showGlobalLoading) {
-          hideLoading();
-        }
-        setIsLoading(false);
-      }
     }
   };
 
   const handleRefresh = async () => {
     setIsRefreshing(true);
-    await loadReservations(false, true); // 마운트 상태를 true로 전달
+    await loadReservations(true); // 마운트 상태를 true로 전달
     setIsRefreshing(false);
   };
 
@@ -316,29 +298,22 @@ const MyReservationsScreen: React.FC = () => {
         onBackPress={() => navigation.goBack()}
       />
       
-      {isLoading ? (
-        <View style={styles.loadingContainer}>
-          <ActivityIndicator size="large" color="#06B6D4" />
-          <Text style={styles.loadingText}>예약 내역을 불러오는 중...</Text>
-        </View>
-      ) : (
-        <FlatList
-          data={reservations}
-          renderItem={renderReservationItem}
-          keyExtractor={(item) => item.id}
-          contentContainerStyle={styles.listContainer}
-          refreshControl={
-            <RefreshControl
-              refreshing={isRefreshing}
-              onRefresh={handleRefresh}
-              colors={['#06B6D4']}
-              tintColor="#06B6D4"
-            />
-          }
-          ListEmptyComponent={renderEmptyState}
-          showsVerticalScrollIndicator={false}
-        />
-      )}
+      <FlatList
+        data={reservations}
+        renderItem={renderReservationItem}
+        keyExtractor={(item) => item.id}
+        contentContainerStyle={styles.listContainer}
+        refreshControl={
+          <RefreshControl
+            refreshing={isRefreshing}
+            onRefresh={handleRefresh}
+            colors={['#06B6D4']}
+            tintColor="#06B6D4"
+          />
+        }
+        ListEmptyComponent={renderEmptyState}
+        showsVerticalScrollIndicator={false}
+      />
     </SafeAreaView>
   );
 };
@@ -347,16 +322,6 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: '#F9FAFB',
-  },
-  loadingContainer: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  loadingText: {
-    marginTop: 12,
-    fontSize: 16,
-    color: '#6B7280',
   },
   listContainer: {
     paddingHorizontal: 16,

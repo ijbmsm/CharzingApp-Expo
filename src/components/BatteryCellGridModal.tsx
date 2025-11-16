@@ -68,9 +68,9 @@ const BatteryCellGridModal: React.FC<BatteryCellGridModalProps> = ({
   const handleUpdateCellVoltage = (text: string) => {
     if (!selectedCellForEdit) return;
 
-    // 빈 문자열이면 0
+    // 빈 문자열이면 빈 문자열로 유지
     if (text === '') {
-      const updatedCell = { ...selectedCellForEdit, voltage: 0 };
+      const updatedCell = { ...selectedCellForEdit, voltage: '' };
       const updatedCells = cells.map(cell =>
         cell.id === selectedCellForEdit.id ? updatedCell : cell
       );
@@ -86,11 +86,8 @@ const BatteryCellGridModal: React.FC<BatteryCellGridModalProps> = ({
     const parts = filtered.split('.');
     const validText = parts.length > 2 ? `${parts[0]}.${parts.slice(1).join('')}` : filtered;
 
-    // 유효한 숫자로 변환
-    const numValue = parseFloat(validText);
-    const voltage = isNaN(numValue) ? 0 : numValue;
-
-    const updatedCell = { ...selectedCellForEdit, voltage };
+    // validText를 그대로 저장 (소수점 입력 중에도 유지)
+    const updatedCell = { ...selectedCellForEdit, voltage: validText };
     const updatedCells = cells.map(cell =>
       cell.id === selectedCellForEdit.id ? updatedCell : cell
     );
@@ -127,7 +124,7 @@ const BatteryCellGridModal: React.FC<BatteryCellGridModalProps> = ({
               style={styles.defaultVoltageInput}
               value={defaultVoltage === 0 ? '' : defaultVoltage.toString()}
               onChangeText={onDefaultVoltageChange}
-              keyboardType="decimal-pad"
+              keyboardType="default"
               placeholder="3.7"
               placeholderTextColor="#9CA3AF"
             />
@@ -153,7 +150,7 @@ const BatteryCellGridModal: React.FC<BatteryCellGridModalProps> = ({
                       {cell.cellNumber}
                     </Text>
                     <Text style={[styles.cellVoltage, cell.isDefective && styles.cellVoltageDefective]}>
-                      {cell.voltage ? `${cell.voltage.toFixed(2)}V` : '0.00V'}
+                      {cell.voltage ? `${typeof cell.voltage === 'number' ? cell.voltage.toFixed(2) : parseFloat(cell.voltage || '0').toFixed(2)}V` : '0.00V'}
                     </Text>
                     {cell.isDefective && (
                       <View style={styles.cellDefectiveBadge}>

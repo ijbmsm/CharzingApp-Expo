@@ -363,8 +363,38 @@ export interface DiagnosisDetail {
 export interface BatteryCell {
   id: number; // 셀 번호
   isDefective: boolean; // 불량 여부
-  voltage?: number; // 전압 (옵션)
+  voltage?: number | string; // 전압 (입력 중에는 string, 저장 시 number)
   temperature?: number; // 온도 (옵션)
+}
+
+// 주요 장치 검사 항목
+export interface MajorDeviceItem {
+  name: string; // 항목명
+  status?: 'good' | 'problem'; // 상태 (양호/문제 있음)
+  issueDescription?: string; // 문제 내용
+  imageUri?: string; // 이미지 URI
+}
+
+// 주요 장치 검사 (조향, 제동, 전기)
+export interface MajorDevicesInspection {
+  steering: {
+    powerSteeringOilLeak?: MajorDeviceItem; // 동력조향 작동 오일 누유
+    steeringGear?: MajorDeviceItem; // 스티어링 기어
+    steeringPump?: MajorDeviceItem; // 스티어링 펌프
+    tierodEndBallJoint?: MajorDeviceItem; // 타이로드엔드 및 볼 조인트
+  };
+  braking: {
+    brakeOilLevel?: MajorDeviceItem; // 브레이크 오일 유량 상태
+    brakeOilLeak?: MajorDeviceItem; // 브레이크 오일 누유
+    boosterCondition?: MajorDeviceItem; // 배력장치 상태
+  };
+  electrical: {
+    generatorOutput?: MajorDeviceItem; // 발전기 출력
+    startMotor?: MajorDeviceItem; // 시동 모터
+    wiperMotor?: MajorDeviceItem; // 와이퍼 모터 기능
+    blowerMotor?: MajorDeviceItem; // 실내송풍 모터
+    radiatorFanMotor?: MajorDeviceItem; // 라디에이터 팬 모터
+  };
 }
 
 // 새로운 차량 진단 리포트 구조
@@ -468,24 +498,53 @@ export interface UploadedFile {
   uploadDate: Date | FieldValue;
 }
 
+// 차량 사진 검사 항목 (구조화된 형태)
+export interface VehiclePhotoInspection {
+  // 전체 사진 촬영
+  overallPhotos: {
+    front?: string; // 차량 앞
+    leftSide?: string; // 차량 좌측(운전석)
+    rear?: string; // 차량 뒤
+    rightSide?: string; // 차량 우측(동승석)
+  };
+
+  // 차량 하부 - 서스펜션 암 및 링크 구조물
+  suspensionStructure: {
+    driverFrontWheel?: string; // 운전석 앞 바퀴
+    driverRearWheel?: string; // 운전석 뒤 바퀴
+    passengerRearWheel?: string; // 동승석 뒤 바퀴
+    passengerFrontWheel?: string; // 동승석 앞 바퀴
+  };
+
+  // 차량 하부 - 하부 배터리 팩 상태
+  undercarriageBattery: {
+    front?: string; // 앞
+    leftSide?: string; // 좌측(운전석)
+    rear?: string; // 뒤
+    rightSide?: string; // 우측(동승석)
+  };
+}
+
 // 종합 차량 검사 (새로운 구조)
 export interface ComprehensiveVehicleInspection {
   // 새로운 이미지 기반 검사 구조
   inspectionImages?: InspectionImageItem[]; // 검사 이미지
   additionalInfo?: AdditionalInspectionInfo[]; // 추가 검사 정보
   pdfReports?: PDFInspectionReport[]; // PDF 검사 리포트
-  
+
   // 기존 검사 구조 (하위 호환성)
   paintThickness?: PaintThicknessInspection[];
   tireTread?: TireTreadInspection[];
+  vehiclePhotos?: VehiclePhotoInspection; // 차량 사진 (전체 사진 + 차량 하부) - 구조화됨
   componentReplacement?: ComponentReplacementInspection[];
 }
 
 // 기존 검사 인터페이스들 (하위 호환성)
 export interface PaintThicknessInspection {
   location: string;
-  thickness: number;
-  isWithinRange: boolean;
+  thickness?: number;
+  status?: 'good' | 'problem';
+  imageUris?: string[];
   notes?: string;
 }
 
@@ -518,18 +577,22 @@ export interface VehicleDiagnosisReport {
   userPhone?: string; // 사용자 전화번호
 
   // 차량 기본 정보
-  vehicleBrand?: string; // 차량 브랜드
+  vehicleBrand: string; // 차량 브랜드 (필수)
   vehicleName: string; // 차량명
+  vehicleGrade?: string; // 등급/트림 (선택사항)
   vehicleYear: string; // 차량 년식
-  vehicleVIN?: string; // 차대번호 (선택사항)
+  vehicleVinImageUri?: string; // 차대번호 사진 URI (선택사항)
   diagnosisDate: Date | FieldValue; // 진단 날짜
 
   // 차량 상태 정보
   mileage?: number; // 주행거리 (km)
-  dashboardCondition?: string; // 계기판 상태
+  dashboardImageUri?: string; // 계기판 사진 URI
+  dashboardStatus?: 'good' | 'problem'; // 계기판 상태 (양호/문제있음)
+  dashboardIssueDescription?: string; // 계기판 문제 설명
   isVinVerified?: boolean; // 차대번호 동일성 확인
   hasNoIllegalModification?: boolean; // 불법 구조변경 없음
   hasNoFloodDamage?: boolean; // 침수 이력 없음
+  carKeyCount: number; // 차키 개수 (필수)
   
   // 배터리 진단 정보
   cellCount: number; // 셀 개수
@@ -555,9 +618,15 @@ export interface VehicleDiagnosisReport {
   
   // 종합 차량 검사 (새로운 구조)
   comprehensiveInspection?: ComprehensiveVehicleInspection;
-  
+
+  // 주요 장치 검사 (조향, 제동, 전기)
+  majorDevicesInspection?: MajorDevicesInspection;
+
   // 메타 정보
-  status: 'draft' | 'completed';
+  status: 'draft' | 'pending_review' | 'approved' | 'rejected' | 'published';
+  reviewComment?: string; // 검수 의견 (rejected 시 사유)
+  reviewedBy?: string; // 검수자 UID (admin)
+  reviewedAt?: Date | FieldValue; // 검수 일시
   createdAt: Date | FieldValue;
   updatedAt: Date | FieldValue;
 }
@@ -1705,10 +1774,10 @@ class FirebaseService {
     reason?: string;
   } {
     const now = new Date();
-    const reservationDate = reservation.requestedDate instanceof Date 
-      ? reservation.requestedDate 
+    const reservationDate = reservation.requestedDate instanceof Date
+      ? reservation.requestedDate
       : reservation.requestedDate && typeof reservation.requestedDate === 'object' && 'toDate' in reservation.requestedDate
-        ? (reservation.requestedDate as any).toDate()
+        ? (reservation.requestedDate as Timestamp).toDate()
         : new Date();
     
     // 예약 시간 2시간 전 계산
@@ -2257,14 +2326,49 @@ class FirebaseService {
   }
 
   /**
-   * 차량 진단 리포트 생성
+   * 리포트 전용 이미지 업로드 (reportId 기반 경로)
    */
-  async createVehicleDiagnosisReport(reportData: Omit<VehicleDiagnosisReport, 'id' | 'createdAt' | 'updatedAt'>): Promise<string> {
+  async uploadReportImage(imageUri: string, reportId: string, imageName: string): Promise<string> {
     try {
-      devLog.log('📝 차량 진단 리포트 생성 시작');
+      devLog.log(`📸 리포트 이미지 업로드 시작: ${imageName}`, imageUri);
 
-      // 새 리포트 ID 생성
-      const reportId = doc(collection(this.db, 'vehicleDiagnosisReports')).id;
+      // 이미지를 Blob으로 변환
+      const response = await fetch(imageUri);
+      const blob = await response.blob();
+
+      // Storage 경로 생성: reports/{reportId}/{imageName}.jpg
+      const storageRef = ref(this.storage, `reports/${reportId}/${imageName}.jpg`);
+
+      // 이미지 업로드
+      await uploadBytes(storageRef, blob);
+
+      // 다운로드 URL 가져오기
+      const downloadURL = await getDownloadURL(storageRef);
+
+      devLog.log(`✅ 리포트 이미지 업로드 완료: ${imageName}`, downloadURL);
+      return downloadURL;
+    } catch (error) {
+      devLog.error(`❌ 리포트 이미지 업로드 실패: ${imageName}`, error);
+      throw new Error(`${imageName} 이미지 업로드에 실패했습니다.`);
+    }
+  }
+
+  /**
+   * 리포트 ID 생성 (이미지 업로드용)
+   */
+  generateReportId(): string {
+    return doc(collection(this.db, 'vehicleDiagnosisReports')).id;
+  }
+
+  /**
+   * 차량 진단 리포트 생성 (이미 생성된 ID 사용)
+   */
+  async createVehicleDiagnosisReport(
+    reportId: string,
+    reportData: Omit<VehicleDiagnosisReport, 'id' | 'createdAt' | 'updatedAt'>
+  ): Promise<string> {
+    try {
+      devLog.log('📝 차량 진단 리포트 생성 시작:', reportId);
 
       // 현재 시각
       const now = serverTimestamp();

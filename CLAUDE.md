@@ -6,7 +6,7 @@
 
 ### 프로젝트 개요
 
-**버전**: 1.1.0
+**버전**: 1.1.1
 **설명**: 한국 전기차 소유자를 위한 배터리 진단 예약 및 실시간 진단 리포트 작성 앱
 **플랫폼**: iOS, Android (React Native + Expo)
 
@@ -41,6 +41,9 @@ src/
 │   ├── BatteryCellDetailModal.tsx  # 개별 셀 상세 편집 ⭐ 신규
 │   ├── DiagnosisDetailCard.tsx     # 진단 항목 카드 ⭐ 신규
 │   ├── InspectionImageCard.tsx     # 검사 이미지 카드 ⭐ 신규
+│   ├── SteeringBottomSheet.tsx     # 조향 장치 검사 (4개 항목) ⭐ 신규
+│   ├── BrakingBottomSheet.tsx      # 제동 장치 검사 (3개 항목) ⭐ 신규
+│   ├── ElectricalBottomSheet.tsx   # 전기 장치 검사 (5개 항목) ⭐ 신규
 │   ├── VehicleAccordionSelector.tsx # 차량 선택 아코디언
 │   ├── KakaoMapView.tsx            # 카카오 지도 WebView
 │   ├── Header.tsx                  # 공통 헤더
@@ -121,7 +124,7 @@ src/
 
 **역할**: 정비사/관리자가 차량 진단 리포트를 작성하는 핵심 화면
 
-**아코디언 구조 (5개 섹션)**:
+**아코디언 구조 (6개 섹션)**:
 
 #### 1. 차량 기본 정보 (`vehicleInfo`)
 - 브랜드, 차량명, 연식, 차대번호
@@ -167,12 +170,67 @@ src/
    - defectiveCellCount: count(cells[].isDefective)
 ```
 
-#### 4. 진단 세부사항 (`diagnosis`)
+#### 4. 주요 장치 검사 (`majorDevices`) ⭐ **신규 추가**
+
+**3개 InputButton 구조**:
+- **조향 (Steering)** - SteeringBottomSheet
+  - 동력조향 작동 오일 누유
+  - 스티어링 기어
+  - 스티어링 펌프
+  - 타이로드엔드 및 볼 조인트
+- **제동 (Braking)** - BrakingBottomSheet
+  - 브레이크 오일 유량 상태
+  - 브레이크 오일 누유
+  - 배력장치 상태
+- **전기 (Electrical)** - ElectricalBottomSheet
+  - 발전기 출력
+  - 시동 모터
+  - 와이퍼 모터 기능
+  - 실내송풍 모터
+  - 라디에이터 팬 모터
+
+**각 항목 구성**:
+- 이미지 업로드 (카메라 촬영 / 갤러리)
+- 상태 선택 (양호 / 문제 있음)
+- 문제 내용 입력 (문제 있음 선택 시)
+
+**데이터 구조**:
+```typescript
+interface MajorDeviceItem {
+  name: string;
+  status?: 'good' | 'problem';
+  issueDescription?: string;
+  imageUri?: string;
+}
+
+interface MajorDevicesInspection {
+  steering: {
+    powerSteeringOilLeak?: MajorDeviceItem;
+    steeringGear?: MajorDeviceItem;
+    steeringPump?: MajorDeviceItem;
+    tierodEndBallJoint?: MajorDeviceItem;
+  };
+  braking: {
+    brakeOilLevel?: MajorDeviceItem;
+    brakeOilLeak?: MajorDeviceItem;
+    boosterCondition?: MajorDeviceItem;
+  };
+  electrical: {
+    generatorOutput?: MajorDeviceItem;
+    startMotor?: MajorDeviceItem;
+    wiperMotor?: MajorDeviceItem;
+    blowerMotor?: MajorDeviceItem;
+    radiatorFanMotor?: MajorDeviceItem;
+  };
+}
+```
+
+#### 5. 진단 세부사항 (`diagnosis`)
 - `DiagnosisDetailCard` 컴포넌트 사용
 - 카테고리, 측정값, 해석 입력
 - 항목 추가/삭제 (2개 이상일 때)
 
-#### 5. 검사 이미지 (`images`)
+#### 6. 검사 이미지 (`images`)
 - `InspectionImageCard` 컴포넌트 사용
 - 카메라 촬영 / 갤러리 선택
 - 카테고리, 상태 입력
@@ -296,6 +354,10 @@ Firestore
 │   ├── fastChargeCount: number
 │   ├── cellsData: BatteryCell[]  # 셀 정보 배열
 │   ├── diagnosisDetails: DiagnosisDetail[]
+│   ├── majorDevicesInspection?: MajorDevicesInspection  # ⭐ 신규 (주요 장치 검사)
+│   │   ├── steering: { powerSteeringOilLeak?, steeringGear?, steeringPump?, tierodEndBallJoint? }
+│   │   ├── braking: { brakeOilLevel?, brakeOilLeak?, boosterCondition? }
+│   │   └── electrical: { generatorOutput?, startMotor?, wiperMotor?, blowerMotor?, radiatorFanMotor? }
 │   ├── comprehensiveInspection: {
 │   │     inspectionImages: InspectionImageItem[]
 │   │     additionalInfo: string
@@ -875,40 +937,268 @@ SENTRY_DSN
 
 ---
 
-## 🔄 최근 변경사항 (2024년 11월)
+## 📊 진단 리포트 검수 플로우 (2025-11-13 신규)
+
+### 개요
+
+진단 리포트 작성 후 관리자 웹에서 검수하고 승인하는 2단계 검증 시스템 도입.
+
+### 플로우 다이어그램
+
+```
+[앱] 정비사가 진단 리포트 작성
+    ↓
+[Firestore] status: 'pending_review' 저장
+    ↓
+[웹] charzing-admin에서 리포트 조회 및 검수
+    ↓
+[웹] 수정 사항 반영 (필요시)
+    ↓
+[웹] 승인 버튼 클릭
+    ↓
+[Firestore] status: 'approved' 업데이트
+    ↓
+[푸시알림] 사용자에게 리포트 완료 알림 전송
+    ↓
+[앱] 사용자가 승인된 리포트 조회
+```
+
+### 데이터 스키마
+
+#### VehicleDiagnosisReport Status 필드 확장
+
+**변경 전:**
+```typescript
+status: 'draft' | 'completed';
+```
+
+**변경 후:**
+```typescript
+status:
+  | 'draft'              // 작성 중 (임시 저장)
+  | 'pending_review'     // 검수 대기 (정비사가 제출)
+  | 'approved'           // 승인됨 (관리자 승인 완료)
+  | 'rejected'           // 반려됨 (수정 필요)
+  | 'published';         // 발행됨 (사용자에게 공개)
+```
+
+#### 차량 모델 정보 명확화
+
+**기존 구조:**
+```typescript
+{
+  vehicleBrand?: string;    // 옵셔널
+  vehicleName: string;      // 필수
+  vehicleYear: string;      // 필수
+}
+```
+
+**새 구조 (권장):**
+```typescript
+{
+  vehicleBrand: string;     // 필수 - 브랜드 (예: 현대, 기아, 테슬라)
+  vehicleName: string;      // 필수 - 차량명 (예: 아이오닉 5, EV6)
+  vehicleGrade?: string;    // 옵셔널 - 등급/트림 (예: Long Range AWD, GT-Line)
+  vehicleYear: string;      // 필수 - 년식 (예: 2023)
+}
+```
+
+### 구현 위치
+
+#### 1. 앱 (CharzingApp-Expo)
+
+**파일:** `src/screens/VehicleInspectionScreen.tsx`
+- 리포트 제출 시 `status: 'pending_review'` 설정
+- 차량 모델 섹션 UI 개선 (브랜드, 차량명, 등급, 년식 분리)
+
+**주요 로직:**
+```typescript
+const submitReport = async () => {
+  const reportData: VehicleDiagnosisReport = {
+    ...formData,
+    status: 'pending_review',  // ⭐ 검수 대기 상태
+    vehicleBrand,              // ⭐ 필수
+    vehicleName,               // ⭐ 필수
+    vehicleGrade,              // ⭐ 옵셔널 (등급)
+    vehicleYear,               // ⭐ 필수
+    createdAt: serverTimestamp(),
+    updatedAt: serverTimestamp(),
+  };
+  await firebaseService.createVehicleDiagnosisReport(reportData);
+};
+```
+
+#### 2. 관리자 웹 (charzing-admin)
+
+**파일:** `components/VehicleReportModal.tsx`
+- pending_review 상태 리포트 조회 UI
+- 수정 및 승인/반려 버튼 추가
+- 승인 시 `status: 'approved'` 업데이트 + 푸시 알림 전송
+
+**주요 기능:**
+```typescript
+// 리포트 조회 (pending_review 필터)
+const pendingReports = await fetchReportsByStatus('pending_review');
+
+// 승인 처리
+const approveReport = async (reportId: string) => {
+  await updateReportStatus(reportId, 'approved');
+  await sendNotificationToUser(userId, '진단 리포트가 완료되었습니다');
+};
+
+// 반려 처리
+const rejectReport = async (reportId: string, reason: string) => {
+  await updateReportStatus(reportId, 'rejected');
+  await addReviewComment(reportId, reason);
+};
+```
+
+### Firestore Security Rules
+
+```javascript
+match /vehicleDiagnosisReports/{reportId} {
+  // 정비사/관리자는 작성 가능
+  allow create: if request.auth != null &&
+    (get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role in ['mechanic', 'admin']);
+
+  // 자신의 리포트 또는 관리자는 조회 가능
+  allow read: if request.auth != null &&
+    (resource.data.userId == request.auth.uid ||
+     get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role in ['mechanic', 'admin']);
+
+  // 관리자만 승인/반려 가능
+  allow update: if request.auth != null &&
+    get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin';
+}
+```
+
+### 알림 트리거 (Firebase Functions)
+
+```typescript
+// functions/src/index.ts
+export const onReportStatusChange = functions.firestore
+  .document('vehicleDiagnosisReports/{reportId}')
+  .onUpdate(async (change, context) => {
+    const before = change.before.data();
+    const after = change.after.data();
+
+    // pending_review → approved 변경 감지
+    if (before.status === 'pending_review' && after.status === 'approved') {
+      const userId = after.userId;
+      const userDoc = await admin.firestore().collection('users').doc(userId).get();
+      const pushToken = userDoc.data()?.pushToken;
+
+      if (pushToken) {
+        await sendPushNotification(pushToken, {
+          title: '진단 리포트 완료',
+          body: `${after.vehicleBrand} ${after.vehicleName} 진단 리포트가 완료되었습니다.`,
+          data: { reportId: context.params.reportId, type: 'report_approved' }
+        });
+      }
+    }
+  });
+```
+
+### UI/UX 개선 사항
+
+#### 앱 (VehicleInspectionScreen)
+
+1. **차량 모델 섹션 개선**
+   ```
+   [브랜드 선택]    ▼
+   [차량명 선택]    ▼
+   [등급 입력]      (선택사항)
+   [년식 선택]      ▼
+   ```
+
+2. **제출 버튼 상태**
+   - "임시 저장" (status: 'draft')
+   - "검수 요청" (status: 'pending_review') ⭐
+
+#### 웹 (charzing-admin)
+
+1. **검수 대시보드**
+   ```
+   [검수 대기] (5건)  [승인 완료] (120건)  [반려] (3건)
+   ```
+
+2. **리포트 상세 화면**
+   - 모든 필드 수정 가능
+   - [승인] [반려] 버튼
+   - 반려 시 사유 입력
+
+### 마이그레이션 계획
+
+1. **기존 리포트 처리**
+   ```typescript
+   // 기존 'completed' 상태 리포트 → 'approved'로 마이그레이션
+   const migrateOldReports = async () => {
+     const oldReports = await firestore
+       .collection('vehicleDiagnosisReports')
+       .where('status', '==', 'completed')
+       .get();
+
+     const batch = firestore.batch();
+     oldReports.docs.forEach(doc => {
+       batch.update(doc.ref, { status: 'approved' });
+     });
+     await batch.commit();
+   };
+   ```
+
+2. **vehicleGrade 필드 추가**
+   - 기존 리포트는 `vehicleGrade: undefined` (하위 호환)
+   - 새 리포트부터 등급 입력 가능
+
+---
+
+## 🔄 최근 변경사항 (2025년 11월)
 
 ### 주요 추가 기능 ⭐
 
 1. **차량 진단 리포트 작성 시스템**
    - VehicleInspectionScreen (1,970줄)
-   - 아코디언 UI (5개 섹션)
+   - 아코디언 UI (6개 섹션) - ⭐ 주요 장치 검사 추가
    - 배터리 셀 관리 (100개+ 셀 지원)
    - 자동 계산 (최대/최소 전압, 불량 셀)
    - 이미지 업로드 (Firebase Storage)
 
-2. **정비사/관리자 시스템**
+2. **주요 장치 검사 시스템** ⭐ **신규 추가 (2025-11-10)**
+   - 3개 별도 BottomSheet 컴포넌트 (조향, 제동, 전기)
+   - 조향 (4개 항목), 제동 (3개 항목), 전기 (5개 항목)
+   - 각 항목별 이미지 업로드 + 상태 선택 + 문제 내용 입력
+   - VehicleDiagnosisReportScreen에 모달 표시 추가
+   - Firebase majorDevicesInspection 필드 추가
+
+3. **정비사/관리자 시스템**
    - ReservationApprovalScreen (예약 승인)
    - ReservationsManagementScreen (예약 관리)
    - 예약 할당 기능
    - 담당 예약 추적
 
-3. **Sentry 통합**
+4. **Sentry 통합**
    - Crashlytics → Sentry 완전 교체
    - Firebase Functions에도 Sentry 추가
    - 에러 추적 + 성공 로깅
    - 통계 및 모니터링 강화
 
-4. **카카오 로그인 보안 강화**
+5. **카카오 로그인 보안 강화**
    - 서버 사이드 검증 (Firebase Functions)
    - photoURL null 처리
    - Provider 필드 업데이트 로직
 
 ### 컴포넌트 추가
 
+**배터리 진단**:
 - `BatteryCellGridModal.tsx`
 - `BatteryCellDetailModal.tsx`
 - `DiagnosisDetailCard.tsx`
 - `InspectionImageCard.tsx`
+
+**주요 장치 검사** ⭐ **신규**:
+- `SteeringBottomSheet.tsx` - 조향 장치 검사 (4개 항목)
+- `BrakingBottomSheet.tsx` - 제동 장치 검사 (3개 항목)
+- `ElectricalBottomSheet.tsx` - 전기 장치 검사 (5개 항목)
 
 ### 알려진 이슈 🐛
 
@@ -958,6 +1248,6 @@ SENTRY_DSN
 
 ---
 
-**마지막 업데이트**: 2024년 11월 9일
-**버전**: 1.1.0
+**마지막 업데이트**: 2025년 11월 10일
+**버전**: 1.1.1
 **작성**: Claude Code 분석 기반

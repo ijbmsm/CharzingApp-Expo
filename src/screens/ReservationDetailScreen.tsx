@@ -13,15 +13,16 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRoute, useNavigation, CommonActions } from '@react-navigation/native';
 import { StackNavigationProp } from '@react-navigation/stack';
 import { Ionicons } from '@expo/vector-icons';
+import { Timestamp, FieldValue } from 'firebase/firestore';
 import Header from '../components/Header';
 import firebaseService, { DiagnosisReservation, VehicleDiagnosisReport } from '../services/firebaseService';
 import { RootStackParamList } from '../navigation/RootNavigator';
 
 // Date 필드가 string으로 변환된 reservation 타입
 type SerializableReservation = Omit<DiagnosisReservation, 'requestedDate' | 'createdAt' | 'updatedAt'> & {
-  requestedDate: string | Date | any;
-  createdAt: string | Date | any;
-  updatedAt: string | Date | any;
+  requestedDate: string | Date | Timestamp | FieldValue;
+  createdAt: string | Date | Timestamp | FieldValue;
+  updatedAt: string | Date | Timestamp | FieldValue;
 };
 
 type RouteProps = {
