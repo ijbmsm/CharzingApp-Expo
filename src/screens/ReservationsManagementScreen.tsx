@@ -150,8 +150,12 @@ const ReservationsManagementScreen: React.FC = () => {
       const oneDayAgo = new Date(now.getTime() - 24 * 60 * 60 * 1000);
 
       filtered = sourceReservations.filter((reservation) => {
-        // 완료/취소된 예약 제외
-        if (reservation.status === 'completed' || reservation.status === 'cancelled') {
+        // 완료/취소/검수 대기된 예약 제외 (⭐ pending_review 추가)
+        if (
+          reservation.status === 'completed' ||
+          reservation.status === 'cancelled' ||
+          reservation.status === 'pending_review'
+        ) {
           return false;
         }
 
@@ -338,6 +342,7 @@ const ReservationsManagementScreen: React.FC = () => {
         pending: '#F59E0B',
         confirmed: '#10B981',
         in_progress: '#3B82F6',
+        pending_review: '#8B5CF6', // ⭐ 검수 대기 (보라색)
         completed: '#6B7280',
         cancelled: '#EF4444',
       };
@@ -346,6 +351,7 @@ const ReservationsManagementScreen: React.FC = () => {
         pending: '대기',
         confirmed: '확정',
         in_progress: '진행중',
+        pending_review: '검수 대기', // ⭐ 검수 대기
         completed: '완료',
         cancelled: '취소',
       };
@@ -438,8 +444,12 @@ const ReservationsManagementScreen: React.FC = () => {
       const oneDayAgo = new Date(now.getTime() - 24 * 60 * 60 * 1000);
 
       return myReservations.filter((reservation) => {
-        // 완료/취소된 예약 제외
-        if (reservation.status === 'completed' || reservation.status === 'cancelled') {
+        // 완료/취소/검수 대기된 예약 제외 (⭐ pending_review 추가)
+        if (
+          reservation.status === 'completed' ||
+          reservation.status === 'cancelled' ||
+          reservation.status === 'pending_review'
+        ) {
           return false;
         }
 

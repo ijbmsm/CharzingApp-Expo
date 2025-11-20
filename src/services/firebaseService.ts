@@ -326,7 +326,7 @@ export interface DiagnosisReservation {
   vehicleYear: string;          // Required (웹과 동일)
   serviceType: string;          // Required (웹과 동일)
   servicePrice: number;         // Required (웹과 동일)
-  status: 'pending' | 'confirmed' | 'in_progress' | 'completed' | 'cancelled';
+  status: 'pending' | 'confirmed' | 'in_progress' | 'pending_review' | 'completed' | 'cancelled';
   requestedDate: Date | FieldValue;
   notes?: string;
   adminNotes?: string;
@@ -339,6 +339,9 @@ export interface DiagnosisReservation {
   assignedToName?: string;      // 정비사 이름 (표시용)
   assignedAt?: Date | FieldValue; // 할당된 시간
   confirmedBy?: string;         // 예약을 확정한 사람 UID (assignedTo와 동일할 수도 있음)
+
+  // 진단 리포트 연결 (2025-11-20 추가)
+  reportId?: string | null;     // 제출된 진단 리포트 ID
 }
 
 export interface DiagnosisReportFile {
@@ -709,8 +712,13 @@ export interface StatusChangeLog {
 
 export interface VehicleDiagnosisReport {
   id: string;
-  reservationId?: string | null; // 예약과 연결 (선택사항)
+  reservationId?: string | null; // 예약과 연결 (예약으로부터 작성된 경우 필수)
   userId: string;
+
+  // 정비사 정보 (2025-11-20 추가)
+  mechanicId?: string; // 작성한 정비사 ID (userId와 다를 수 있음)
+  mechanicName?: string; // 작성한 정비사 이름
+  submittedAt?: Date | FieldValue; // 제출 시간 (createdAt과 다를 수 있음)
 
   // 사용자 정보 (점검시 기록)
   userName?: string; // 사용자 이름
@@ -1809,6 +1817,30 @@ class FirebaseService {
       devLog.log('✅ 진단 예약 취소 완료:', reservationId);
     } catch (error) {
       devLog.error('❌ 진단 예약 취소 실패:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * 예약에 진단 리포트 ID 연결
+   * @param reservationId 예약 ID
+   * @param reportId 진단 리포트 ID
+   * @description 진단 리포트 제출 시 예약 문서에 reportId 저장
+   */
+  async updateReservationReportId(reservationId: string, reportId: string): Promise<void> {
+    try {
+      devLog.log('예약에 리포트 ID 연결:', reservationId, reportId);
+
+      const reservationRef = doc(this.db, 'diagnosisReservations', reservationId);
+
+      await updateDoc(reservationRef, {
+        reportId,
+        updatedAt: serverTimestamp(),
+      });
+
+      devLog.log('✅ 예약에 리포트 ID 연결 완료:', reservationId, reportId);
+    } catch (error) {
+      devLog.error('❌ 예약에 리포트 ID 연결 실패:', error);
       throw error;
     }
   }

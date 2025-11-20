@@ -73,7 +73,7 @@ interface ReservationItem {
   vehicleModel?: string;
   vehicleYear?: string;
   requestedDate: Date | Timestamp;
-  status: 'pending' | 'confirmed' | 'in_progress' | 'completed' | 'cancelled';
+  status: 'pending' | 'confirmed' | 'in_progress' | 'pending_review' | 'completed' | 'cancelled'; // ⭐ pending_review 추가
 }
 
 type InspectionMode = 'reservation_list' | 'inspection';
@@ -87,6 +87,7 @@ const VehicleInspectionScreen: React.FC = () => {
   // Mode & User
   const [inspectionMode, setInspectionMode] = useState<InspectionMode>('reservation_list');
   const [selectedUser, setSelectedUser] = useState<UserProfile | null>(null);
+  const [selectedReservation, setSelectedReservation] = useState<ReservationItem | null>(null); // ⭐ 예약 정보 저장
   const [lastSaved, setLastSaved] = useState<Date | null>(null);
   const [autoSaveEnabled, setAutoSaveEnabled] = useState(true);
 
@@ -288,6 +289,9 @@ const VehicleInspectionScreen: React.FC = () => {
   };
 
   const handleSelectReservation = async (reservation: ReservationItem) => {
+    // ⭐ 예약 정보 저장 (reservationId 전달용)
+    setSelectedReservation(reservation);
+
     const user = {
       uid: reservation.userId || '',
       displayName: reservation.userName,
@@ -835,10 +839,27 @@ const VehicleInspectionScreen: React.FC = () => {
       formData,
       selectedUser.uid,
       selectedUser.displayName || '',
-      selectedUser.phoneNumber || ''
+      selectedUser.phoneNumber || '',
+      selectedReservation?.id,              // ⭐ reservationId 전달
+      currentUser?.uid,                     // ⭐ mechanicId 전달 (작성자)
+      currentUser?.displayName || currentUser?.realName // ⭐ mechanicName 전달
     );
 
     if (success) {
+      // ⭐ 예약 상태를 'pending_review'로 변경 (검수 대기)
+      if (selectedReservation?.id) {
+        try {
+          await firebaseService.updateDiagnosisReservationStatus(
+            selectedReservation.id,
+            'pending_review'
+          );
+          console.log('✅ 예약 상태 업데이트 완료: pending_review');
+        } catch (error) {
+          console.error('❌ 예약 상태 업데이트 실패:', error);
+          // 예약 상태 업데이트 실패는 치명적이지 않으므로 계속 진행
+        }
+      }
+
       // 제출 성공 시 draft 삭제
       await draftStorage.clearDraft(selectedUser.uid);
       await imageStorage.clearUserImages(selectedUser.uid);

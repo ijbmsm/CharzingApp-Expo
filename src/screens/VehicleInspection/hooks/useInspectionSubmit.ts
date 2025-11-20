@@ -72,7 +72,10 @@ export const useInspectionSubmit = () => {
     data: InspectionFormData,
     selectedUserId: string,
     selectedUserName: string,
-    selectedUserPhone: string
+    selectedUserPhone: string,
+    reservationId?: string | null, // ⭐ 예약 ID (예약으로부터 작성된 경우)
+    mechanicId?: string,           // ⭐ 작성한 정비사 ID
+    mechanicName?: string          // ⭐ 작성한 정비사 이름
   ) => {
     try {
       setIsSubmitting(true);
@@ -82,6 +85,9 @@ export const useInspectionSubmit = () => {
       sentryLogger.log('진단 리포트 제출 시작', {
         userId: selectedUserId,
         userName: selectedUserName,
+        reservationId: reservationId || 'N/A', // ⭐ 예약 ID 로깅
+        mechanicId: mechanicId || 'N/A',       // ⭐ 정비사 ID 로깅
+        mechanicName: mechanicName || 'N/A',   // ⭐ 정비사 이름 로깅
         vehicleBrand: data.vehicleInfo.vehicleBrand,
         vehicleName: data.vehicleInfo.vehicleName,
         vehicleYear: data.vehicleInfo.vehicleYear,
@@ -113,12 +119,15 @@ export const useInspectionSubmit = () => {
 
       // 🔥 Step 4: Report 데이터 생성 (업로드된 이미지 URL 사용)
       const reportData: Omit<VehicleDiagnosisReport, 'id' | 'createdAt' | 'updatedAt'> = {
-        reservationId: null,
+        reservationId: reservationId || null, // ⭐ 예약 ID (전달된 값 사용)
         userId: selectedUserId,
         userName: selectedUserName,
         userPhone: selectedUserPhone,
         userPhoneNormalized: normalizePhoneNumber(selectedUserPhone), // ✅ 전화번호 정규화
         isGuest: selectedUserId.startsWith('guest_'),                 // ✅ Guest 여부
+        mechanicId: mechanicId || undefined,   // ⭐ 작성한 정비사 ID
+        mechanicName: mechanicName || undefined, // ⭐ 작성한 정비사 이름
+        submittedAt: new Date(),                 // ⭐ 제출 시간
         vehicleBrand: uploadedData.vehicleInfo.vehicleBrand,
         vehicleName: uploadedData.vehicleInfo.vehicleName,
         vehicleGrade: uploadedData.vehicleInfo.vehicleGrade || undefined,
@@ -172,6 +181,9 @@ export const useInspectionSubmit = () => {
       // 성공 로그 (상세 정보 포함)
       sentryLogger.log('✅ 진단 리포트 제출 성공', {
         reportId,
+        reservationId: reservationId || 'N/A',  // ⭐ 예약 ID 로깅
+        mechanicId: mechanicId || 'N/A',        // ⭐ 정비사 ID 로깅
+        mechanicName: mechanicName || 'N/A',    // ⭐ 정비사 이름 로깅
         userId: selectedUserId,
         userName: selectedUserName,
         vehicleBrand: reportData.vehicleBrand,
@@ -198,6 +210,23 @@ export const useInspectionSubmit = () => {
         status: reportData.status,
         timestamp: new Date().toISOString(),
       });
+
+      // ⭐ Step 6: 예약에 리포트 ID 연결 (예약으로부터 작성된 경우에만)
+      if (reservationId) {
+        try {
+          await firebaseService.updateReservationReportId(reservationId, reportId);
+          sentryLogger.log('✅ 예약에 리포트 ID 연결 완료', {
+            reservationId,
+            reportId,
+          });
+        } catch (error) {
+          // 연결 실패는 치명적이지 않으므로 로그만 남기고 계속 진행
+          sentryLogger.logError('⚠️ 예약에 리포트 ID 연결 실패', error as Error, {
+            reservationId,
+            reportId,
+          });
+        }
+      }
 
       Alert.alert('성공', '진단 리포트가 성공적으로 제출되었습니다.');
 

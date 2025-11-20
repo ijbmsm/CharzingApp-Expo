@@ -119,7 +119,7 @@ export type RootStackParamList = {
       vehicleModel?: string;
       vehicleYear?: string;
       requestedDate: Date | Timestamp | string | FieldValue;
-      status: 'pending' | 'confirmed' | 'in_progress' | 'completed' | 'cancelled';
+      status: 'pending' | 'confirmed' | 'in_progress' | 'pending_review' | 'completed' | 'cancelled'; // ⭐ pending_review 추가
     };
   } | undefined;
   AdminReservationList: undefined;
