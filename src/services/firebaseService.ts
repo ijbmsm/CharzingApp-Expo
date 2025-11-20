@@ -31,6 +31,7 @@ import { v4 as uuidv4 } from 'uuid';
 import { getDb, getAuthInstance, getStorageInstance } from '../firebase/config';
 import logger from './logService';
 import devLog from '../utils/devLog';
+import sentryLogger from '../utils/sentryLogger'; // ⭐ Sentry 로거 추가
 import { handleFirebaseError, handleNetworkError, handleError } from './errorHandler';
 
 // 차량 이미지 URL 생성 유틸리티
@@ -719,6 +720,11 @@ export interface VehicleDiagnosisReport {
   mechanicId?: string; // 작성한 정비사 ID (userId와 다를 수 있음)
   mechanicName?: string; // 작성한 정비사 이름
   submittedAt?: Date | FieldValue; // 제출 시간 (createdAt과 다를 수 있음)
+
+  // 재할당 정보 (2025-11-20 추가 - 안전장치)
+  reassignedAt?: Date | FieldValue; // 재할당 시간
+  reassignedBy?: string; // 재할당한 관리자 UID
+  reassignedReason?: string; // 재할당 사유 (선택)
 
   // 사용자 정보 (점검시 기록)
   userName?: string; // 사용자 이름
@@ -2827,6 +2833,99 @@ class FirebaseService {
     } catch (error) {
       devLog.error('❌ 차량 진단 리포트 생성 실패:', error);
       throw new Error('진단 리포트 생성에 실패했습니다.');
+    }
+  }
+
+  /**
+   * 진단 리포트 수동 재할당 (관리자 전용)
+   * @description 자동 매칭 실패 시 관리자가 수동으로 리포트 소유자를 변경하는 안전장치
+   * @param reportId 재할당할 리포트 ID
+   * @param newUserId 새 소유자 UID
+   * @param newUserName 새 소유자 이름
+   * @param newUserPhone 새 소유자 전화번호
+   * @param adminUid 재할당하는 관리자 UID
+   * @param reason 재할당 사유 (선택)
+   */
+  async reassignDiagnosisReport(
+    reportId: string,
+    newUserId: string,
+    newUserName: string,
+    newUserPhone: string,
+    adminUid: string,
+    reason?: string
+  ): Promise<void> {
+    try {
+      devLog.log('🔄 리포트 재할당 시작:', { reportId, newUserId, adminUid });
+
+      // 1️⃣ 관리자 권한 체크
+      const adminProfile = await this.getUserProfile(adminUid);
+      if (!adminProfile || adminProfile.role !== 'admin') {
+        throw new Error('관리자만 리포트를 재할당할 수 있습니다.');
+      }
+
+      // 2️⃣ 기존 리포트 조회
+      const reportDoc = await getDoc(doc(this.db, 'vehicleDiagnosisReports', reportId));
+      if (!reportDoc.exists()) {
+        throw new Error('리포트를 찾을 수 없습니다.');
+      }
+
+      const oldReport = reportDoc.data() as VehicleDiagnosisReport;
+      const oldUserId = oldReport.userId;
+
+      // 3️⃣ 리포트 소유자 업데이트
+      await updateDoc(doc(this.db, 'vehicleDiagnosisReports', reportId), {
+        userId: newUserId,
+        userName: newUserName,
+        userPhone: newUserPhone,
+        userPhoneNormalized: normalizePhoneNumber(newUserPhone),
+        isGuest: newUserId.startsWith('guest_'),
+        reassignedAt: serverTimestamp(),
+        reassignedBy: adminUid,
+        reassignedReason: reason || undefined,
+        updatedAt: serverTimestamp(),
+      });
+
+      devLog.log('✅ 리포트 소유자 업데이트 완료');
+
+      // 4️⃣ 연결된 예약도 업데이트 (있으면)
+      if (oldReport.reservationId) {
+        try {
+          await updateDoc(doc(this.db, 'diagnosisReservations', oldReport.reservationId), {
+            userId: newUserId,
+            userName: newUserName,
+            userPhone: newUserPhone,
+            updatedAt: serverTimestamp(),
+          });
+          devLog.log('✅ 연결된 예약 업데이트 완료:', oldReport.reservationId);
+        } catch (error) {
+          // 예약 업데이트 실패는 치명적이지 않으므로 로그만 남김
+          devLog.error('⚠️ 예약 업데이트 실패 (계속 진행):', error);
+        }
+      }
+
+      // 5️⃣ Sentry 로그
+      sentryLogger.log('✅ 리포트 재할당 완료', {
+        reportId,
+        oldUserId,
+        newUserId,
+        newUserName,
+        newUserPhone,
+        adminUid,
+        adminName: adminProfile.displayName || adminProfile.email,
+        reason: reason || 'N/A',
+        reservationId: oldReport.reservationId || 'N/A',
+        timestamp: new Date().toISOString(),
+      });
+
+      devLog.log('✅ 리포트 재할당 완료:', reportId);
+    } catch (error) {
+      devLog.error('❌ 리포트 재할당 실패:', error);
+      sentryLogger.logError('❌ 리포트 재할당 실패', error as Error, {
+        reportId,
+        newUserId,
+        adminUid,
+      });
+      throw error;
     }
   }
 
