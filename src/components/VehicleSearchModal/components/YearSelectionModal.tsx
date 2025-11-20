@@ -8,10 +8,10 @@ import {
   ScrollView,
   Dimensions,
   Alert,
+  SafeAreaView,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import * as Animatable from 'react-native-animatable';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { convertToLineSeedFont } from '../../../styles/fonts';
 import { type Vehicle, type VehicleVariant, type VehicleGroup } from '../types';
 
@@ -38,8 +38,6 @@ const YearSelectionModal: React.FC<YearSelectionModalProps> = ({
   onYearSelect,
   onBackFromYearSelection,
 }) => {
-  const insets = useSafeAreaInsets();
-
   const handleSelectVehicle = (year: number) => {
     if (!selectedVariant || !selectedGroup) return;
 
@@ -90,7 +88,7 @@ const YearSelectionModal: React.FC<YearSelectionModalProps> = ({
       presentationStyle="pageSheet"
       onRequestClose={onClose}
     >
-      <View style={[styles.container, { paddingTop: insets.top }]}>
+      <SafeAreaView style={styles.container}>
         {/* 헤더 */}
         <View style={styles.header}>
           {onBackFromYearSelection ? (
@@ -158,7 +156,7 @@ const YearSelectionModal: React.FC<YearSelectionModalProps> = ({
             취소
           </Text>
         </TouchableOpacity>
-      </View>
+      </SafeAreaView>
     </Modal>
   );
 };
@@ -227,14 +225,6 @@ const styles = StyleSheet.create({
     borderRadius: 12,
     padding: 16,
     marginBottom: 12,
-    shadowColor: '#000',
-    shadowOffset: {
-      width: 0,
-      height: 2,
-    },
-    shadowOpacity: 0.1,
-    shadowRadius: 3.84,
-    elevation: 5,
   },
   yearItemContent: {
     flex: 1,

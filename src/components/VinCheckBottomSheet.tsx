@@ -5,13 +5,14 @@ import {
   StyleSheet,
   Modal,
   TouchableOpacity,
-  SafeAreaView,
   KeyboardAvoidingView,
   Platform,
   ScrollView,
   Animated,
   TextInput,
+  Keyboard,
 } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import MultipleImagePicker from './MultipleImagePicker';
 
@@ -50,6 +51,7 @@ const VinCheckBottomSheet: React.FC<VinCheckBottomSheetProps> = ({
   initialModificationIssue = '',
   initialFloodIssue = '',
 }) => {
+  const insets = useSafeAreaInsets();
   const [imageUris, setImageUris] = useState<string[]>(initialImageUris);
   const [vinStatus, setVinStatus] = useState<'good' | 'problem' | undefined>(
     initialIsVinVerified === true ? 'good' : initialIsVinVerified === false ? 'problem' : undefined
@@ -113,6 +115,10 @@ const VinCheckBottomSheet: React.FC<VinCheckBottomSheetProps> = ({
 
   const handleImageRemoved = (index: number) => {
     setImageUris((prev) => prev.filter((_, i) => i !== index));
+  };
+
+  const handleImageEdited = (index: number, newUri: string) => {
+    setImageUris((prev) => prev.map((uri, i) => i === index ? newUri : uri));
   };
 
   const handleConfirm = () => {
@@ -217,6 +223,9 @@ const VinCheckBottomSheet: React.FC<VinCheckBottomSheetProps> = ({
         onChangeText={onChangeText}
         multiline
         textAlignVertical="top"
+        returnKeyType="done"
+        blurOnSubmit={true}
+        onSubmitEditing={Keyboard.dismiss}
       />
     </Animated.View>
   );
@@ -228,7 +237,17 @@ const VinCheckBottomSheet: React.FC<VinCheckBottomSheetProps> = ({
       presentationStyle="pageSheet"
       onRequestClose={onClose}
     >
-      <SafeAreaView style={styles.container}>
+      <View
+        style={[
+          styles.container,
+          {
+            paddingTop: Platform.OS === 'ios' ? 0 : insets.top,
+            paddingBottom: insets.bottom,
+            paddingLeft: insets.left,
+            paddingRight: insets.right,
+          },
+        ]}
+      >
         <KeyboardAvoidingView
           behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
           style={styles.keyboardView}
@@ -243,7 +262,12 @@ const VinCheckBottomSheet: React.FC<VinCheckBottomSheetProps> = ({
           </View>
 
           {/* Content */}
-          <ScrollView style={styles.content}>
+          <ScrollView
+            style={styles.content}
+            contentContainerStyle={{ paddingBottom: 100 + insets.bottom }}
+            showsVerticalScrollIndicator={false}
+            keyboardShouldPersistTaps="handled"
+          >
             {/* 차대번호 사진 */}
             <View style={styles.inputGroup}>
               <Text style={styles.inputLabel}>차대번호 사진 *</Text>
@@ -251,6 +275,7 @@ const VinCheckBottomSheet: React.FC<VinCheckBottomSheetProps> = ({
                 imageUris={imageUris}
                 onImagesAdded={handleImagesAdded}
                 onImageRemoved={handleImageRemoved}
+                onImageEdited={handleImageEdited}
                 label="차대번호 사진"
               />
             </View>
@@ -293,7 +318,7 @@ const VinCheckBottomSheet: React.FC<VinCheckBottomSheetProps> = ({
           </ScrollView>
 
           {/* Footer */}
-          <View style={styles.footer}>
+          <View style={[styles.footer, { paddingBottom: insets.bottom }]}>
             <TouchableOpacity
               style={[
                 styles.confirmButton,
@@ -302,11 +327,11 @@ const VinCheckBottomSheet: React.FC<VinCheckBottomSheetProps> = ({
               onPress={handleConfirm}
               disabled={!isComplete}
             >
-              <Text style={styles.confirmButtonText}>확인</Text>
+              <Text style={styles.confirmButtonText}>저장</Text>
             </TouchableOpacity>
           </View>
         </KeyboardAvoidingView>
-      </SafeAreaView>
+      </View>
     </Modal>
   );
 };
@@ -324,10 +349,8 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'space-between',
     paddingHorizontal: 16,
-    paddingVertical: 16,
+    paddingVertical: 8,
     backgroundColor: '#FFFFFF',
-    borderBottomWidth: 1,
-    borderBottomColor: '#E5E7EB',
   },
   closeButton: {
     width: 40,
@@ -336,9 +359,9 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   headerTitle: {
-    fontSize: 18,
-    fontWeight: '700',
-    color: '#1F2937',
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#6B7280',
   },
   placeholder: {
     width: 40,
@@ -398,6 +421,10 @@ const styles = StyleSheet.create({
     color: '#1F2937',
   },
   footer: {
+    position: 'absolute',
+    bottom: 0,
+    left: 0,
+    right: 0,
     padding: 16,
     backgroundColor: '#FFFFFF',
     borderTopWidth: 1,

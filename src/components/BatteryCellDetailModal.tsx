@@ -6,10 +6,13 @@ import {
   TouchableOpacity,
   TextInput,
   StyleSheet,
+  Platform,
+  Keyboard,
 } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { scale, verticalScale, moderateScale } from 'react-native-size-matters';
-import { BatteryCell } from '../../adminWeb/index';
+import { BatteryCell } from '../services/firebaseService';
 
 interface BatteryCellDetailModalProps {
   visible: boolean;
@@ -26,6 +29,8 @@ const BatteryCellDetailModal: React.FC<BatteryCellDetailModalProps> = ({
   onToggleDefective,
   onUpdateVoltage,
 }) => {
+  const insets = useSafeAreaInsets();
+
   if (!cell) return null;
 
   return (
@@ -35,14 +40,26 @@ const BatteryCellDetailModal: React.FC<BatteryCellDetailModalProps> = ({
       transparent={true}
       onRequestClose={onClose}
     >
-      <View style={styles.overlay}>
-        <View style={styles.container}>
+      <View
+        style={[
+          styles.safeArea,
+          {
+            paddingTop: Platform.OS === 'ios' ? 0 : insets.top,
+            paddingBottom: insets.bottom,
+            paddingLeft: insets.left,
+            paddingRight: insets.right,
+          },
+        ]}
+      >
+        <View style={styles.overlay}>
+          <View style={styles.container}>
           {/* Header */}
           <View style={styles.header}>
-            <Text style={styles.title}>셀 #{cell.cellNumber}</Text>
             <TouchableOpacity onPress={onClose} activeOpacity={0.7}>
               <Ionicons name="close" size={24} color="#1F2937" />
             </TouchableOpacity>
+            <Text style={styles.title}>셀 #{cell.id}</Text>
+            <View style={{ width: 24 }} />
           </View>
 
           {/* Defective Checkbox */}
@@ -75,6 +92,8 @@ const BatteryCellDetailModal: React.FC<BatteryCellDetailModalProps> = ({
               keyboardType="default"
               placeholder="0.00"
               placeholderTextColor="#9CA3AF"
+              returnKeyType="done"
+              onSubmitEditing={Keyboard.dismiss}
             />
           </View>
 
@@ -86,6 +105,7 @@ const BatteryCellDetailModal: React.FC<BatteryCellDetailModalProps> = ({
           >
             <Text style={styles.confirmButtonText}>확인</Text>
           </TouchableOpacity>
+          </View>
         </View>
       </View>
     </Modal>
@@ -93,6 +113,9 @@ const BatteryCellDetailModal: React.FC<BatteryCellDetailModalProps> = ({
 };
 
 const styles = StyleSheet.create({
+  safeArea: {
+    flex: 1,
+  },
   overlay: {
     flex: 1,
     backgroundColor: 'rgba(0, 0, 0, 0.6)',
@@ -114,9 +137,9 @@ const styles = StyleSheet.create({
     marginBottom: verticalScale(20),
   },
   title: {
-    fontSize: moderateScale(20),
-    fontWeight: '700',
-    color: '#1F2937',
+    fontSize: moderateScale(18),
+    fontWeight: '600',
+    color: '#6B7280',
   },
   defectiveRow: {
     flexDirection: 'row',

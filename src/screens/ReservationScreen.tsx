@@ -852,7 +852,7 @@ const ReservationScreen: React.FC = () => {
       }
     } catch (error) {
       devLog.error('❌ 예약 생성 실패:', error);
-      sentryLogger.logError(error as Error, '예약 생성/수정');
+      sentryLogger.logError('예약 생성/수정 실패', error as Error);
       Alert.alert('예약 실패', '예약 처리 중 오류가 발생했습니다.\\n잠시 후 다시 시도해주세요.');
     } finally {
       hideLoading();

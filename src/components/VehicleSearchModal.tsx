@@ -12,8 +12,8 @@ import {
   Dimensions,
   ScrollView,
 } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { VEHICLE_BRANDS, VEHICLE_MODELS, getBrandById, getModelsByBrand } from '../constants/vehicles';
 
 const { height: screenHeight } = Dimensions.get('window');
@@ -76,7 +76,6 @@ const VehicleSearchModal: React.FC<VehicleSearchModalProps> = ({
   editMode = false,
   existingVehicle,
 }) => {
-  const insets = useSafeAreaInsets();
   const [searchQuery, setSearchQuery] = useState(editMode && existingVehicle ? `${existingVehicle.make} ${existingVehicle.model}` : '');
   const [filteredVehicles, setFilteredVehicles] = useState<Vehicle[]>(ALL_VEHICLES);
   const [isLoading, setIsLoading] = useState(false);
@@ -207,7 +206,7 @@ const VehicleSearchModal: React.FC<VehicleSearchModalProps> = ({
       presentationStyle="pageSheet"
       onRequestClose={handleClose}
     >
-      <View style={[styles.container, { paddingTop: insets.top }]}>
+      <SafeAreaView style={styles.container}>
         {/* 헤더 */}
         <View style={styles.header}>
           <TouchableOpacity onPress={handleClose} style={styles.closeButton}>
@@ -269,7 +268,7 @@ const VehicleSearchModal: React.FC<VehicleSearchModalProps> = ({
             찾으시는 차량이 없으신가요? 고객센터로 문의주시면 도움드리겠습니다.
           </Text>
         </View>
-      </View>
+      </SafeAreaView>
 
       {/* 연식 선택 모달 */}
       <Modal
@@ -380,14 +379,6 @@ const styles = StyleSheet.create({
     borderRadius: 12,
     padding: 16,
     marginBottom: 8,
-    shadowColor: '#000',
-    shadowOffset: {
-      width: 0,
-      height: 1,
-    },
-    shadowOpacity: 0.05,
-    shadowRadius: 2,
-    elevation: 2,
   },
   vehicleInfo: {
     flexDirection: 'row',

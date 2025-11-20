@@ -34,16 +34,17 @@ import firebaseService from "../services/firebaseService";
 import sentryLogger from "../utils/sentryLogger";
 
 // Types
-import {
+import type {
   VehicleDiagnosisReport,
   DiagnosisDetail,
   BatteryCell,
   MajorDevicesInspection,
   PaintThicknessInspection,
-  TireTreadInspection,
-  VehiclePhotoInspection,
+  VehicleExteriorInspection,
+  VehicleUndercarriageInspection,
+  TireAndWheelItem,
   OtherInspectionItem,
-} from "../../adminWeb/index";
+} from "../services/firebaseService";
 
 // Components
 import BatteryCellGridModal from "../components/BatteryCellGridModal";
@@ -54,8 +55,10 @@ import DashboardInfoBottomSheet from "../components/DashboardInfoBottomSheet";
 import VinCheckBottomSheet from "../components/VinCheckBottomSheet";
 import MajorDeviceBottomSheet from "../components/MajorDeviceBottomSheet";
 import PaintThicknessBottomSheet from "../components/PaintThicknessBottomSheet";
-import TireTreadBottomSheet from "../components/TireTreadBottomSheet";
-import VehiclePhotoBottomSheet from "../components/VehiclePhotoBottomSheet";
+import VehicleExteriorPhotoBottomSheet from "../components/VehicleExteriorPhotoBottomSheet";
+import TiresAndWheelsBottomSheet from "../components/TiresAndWheelsBottomSheet";
+import SuspensionBottomSheet from "../components/SuspensionBottomSheet";
+import BatteryPackBottomSheet from "../components/BatteryPackBottomSheet";
 
 type NavigationProp = StackNavigationProp<
   RootStackParamList,
@@ -92,9 +95,10 @@ type InspectionMode = "reservation_list" | "inspection";
 
 type InspectionSection =
   | "vehicleInfo"
-  | "vehicleStatus"
   | "batteryInfo"
   | "majorDevices"
+  | "vehicleExteriorInspection"
+  | "vehicleUndercarriageInspection"
   | "diagnosis"
   | "images";
 
@@ -106,72 +110,13 @@ interface SectionCompletion {
 
 interface ExpandedSectionsState {
   vehicleInfo: boolean;
-  vehicleStatus: boolean;
   batteryInfo: boolean;
   majorDevices: boolean;
+  vehicleExteriorInspection: boolean;
+  vehicleUndercarriageInspection: boolean;
   diagnosis: boolean;
   images: boolean;
 }
-
-// ============================================================================
-// HELPER FUNCTIONS
-// ============================================================================
-
-/**
- * 차량 사진 데이터가 하나라도 있는지 확인
- */
-const isVehiclePhotoComplete = (data: VehiclePhotoInspection): boolean => {
-  const overallCount = [
-    data.overallPhotos.front,
-    data.overallPhotos.leftSide,
-    data.overallPhotos.rear,
-    data.overallPhotos.rightSide,
-  ].filter(Boolean).length;
-
-  const suspensionCount = [
-    data.suspensionStructure.driverFrontWheel,
-    data.suspensionStructure.driverRearWheel,
-    data.suspensionStructure.passengerRearWheel,
-    data.suspensionStructure.passengerFrontWheel,
-  ].filter(Boolean).length;
-
-  const batteryCount = [
-    data.undercarriageBattery.front,
-    data.undercarriageBattery.leftSide,
-    data.undercarriageBattery.rear,
-    data.undercarriageBattery.rightSide,
-  ].filter(Boolean).length;
-
-  return overallCount + suspensionCount + batteryCount > 0;
-};
-
-/**
- * 차량 사진 개수 계산 (전체 + 하부)
- */
-const getVehiclePhotoCount = (data: VehiclePhotoInspection): number => {
-  const overallCount = [
-    data.overallPhotos.front,
-    data.overallPhotos.leftSide,
-    data.overallPhotos.rear,
-    data.overallPhotos.rightSide,
-  ].filter(Boolean).length;
-
-  const suspensionCount = [
-    data.suspensionStructure.driverFrontWheel,
-    data.suspensionStructure.driverRearWheel,
-    data.suspensionStructure.passengerRearWheel,
-    data.suspensionStructure.passengerFrontWheel,
-  ].filter(Boolean).length;
-
-  const batteryCount = [
-    data.undercarriageBattery.front,
-    data.undercarriageBattery.leftSide,
-    data.undercarriageBattery.rear,
-    data.undercarriageBattery.rightSide,
-  ].filter(Boolean).length;
-
-  return overallCount + suspensionCount + batteryCount;
-};
 
 // ============================================================================
 // MAIN COMPONENT
@@ -206,9 +151,10 @@ const VehicleInspectionScreen: React.FC = () => {
   const [expandedSections, setExpandedSections] =
     useState<ExpandedSectionsState>({
       vehicleInfo: true,
-      vehicleStatus: false,
       batteryInfo: false,
       majorDevices: false,
+      vehicleExteriorInspection: false,
+      vehicleUndercarriageInspection: false,
       diagnosis: false,
       images: false,
     });
@@ -216,9 +162,10 @@ const VehicleInspectionScreen: React.FC = () => {
   // Accordion Animation Values
   const accordionAnimations = useRef({
     vehicleInfo: new Animated.Value(1),
-    vehicleStatus: new Animated.Value(0),
     batteryInfo: new Animated.Value(0),
     majorDevices: new Animated.Value(0),
+    vehicleExteriorInspection: new Animated.Value(0),
+    vehicleUndercarriageInspection: new Animated.Value(0),
     diagnosis: new Animated.Value(0),
     images: new Animated.Value(0),
   }).current;
@@ -258,33 +205,30 @@ const VehicleInspectionScreen: React.FC = () => {
   const [carKeyCount, setCarKeyCount] = useState<string>(''); // 차키 개수
 
   // ============================================================================
-  // STATE - Section 2.5: Vehicle Status (외판 도막, 타이어, 차량 사진)
+  // STATE - Section 2.5: Vehicle Exterior Inspection (차량 외부 점검)
   // ============================================================================
-  const [paintThicknessData, setPaintThicknessData] = useState<PaintThicknessInspection[]>([]);
-  const [tireTreadData, setTireTreadData] = useState<TireTreadInspection[]>([]);
-  const [vehiclePhotoData, setVehiclePhotoData] = useState<VehiclePhotoInspection>({
-    overallPhotos: {
-      front: undefined,
-      leftSide: undefined,
-      rear: undefined,
-      rightSide: undefined,
-    },
-    suspensionStructure: {
-      driverFrontWheel: undefined,
-      driverRearWheel: undefined,
-      passengerRearWheel: undefined,
-      passengerFrontWheel: undefined,
-    },
-    undercarriageBattery: {
-      front: undefined,
-      leftSide: undefined,
-      rear: undefined,
-      rightSide: undefined,
-    },
+  const [vehicleExteriorData, setVehicleExteriorData] = useState<VehicleExteriorInspection>({
+    vehicleExterior: {},
+    bodyPanel: [],
+    tiresAndWheels: {},
   });
-  const [isPaintThicknessModalVisible, setIsPaintThicknessModalVisible] = useState(false);
-  const [isTireTreadModalVisible, setIsTireTreadModalVisible] = useState(false);
-  const [isVehiclePhotoModalVisible, setIsVehiclePhotoModalVisible] = useState(false);
+  const [isVehicleExteriorPhotoModalVisible, setIsVehicleExteriorPhotoModalVisible] = useState(false);
+  const [isBodyPanelModalVisible, setIsBodyPanelModalVisible] = useState(false);
+  const [isTiresAndWheelsModalVisible, setIsTiresAndWheelsModalVisible] = useState(false);
+
+  // ============================================================================
+  // STATE - Section 2.6: Vehicle Undercarriage Inspection (차량 하부 점검)
+  // ============================================================================
+  const [vehicleUndercarriageData, setVehicleUndercarriageData] = useState<VehicleUndercarriageInspection>({
+    suspensionArms: {},
+    underBatteryPack: {},
+    steering: {},
+    braking: {},
+  });
+  const [isSuspensionArmsModalVisible, setIsSuspensionArmsModalVisible] = useState(false);
+  const [isUnderBatteryPackModalVisible, setIsUnderBatteryPackModalVisible] = useState(false);
+  const [isSteeringModalVisible, setIsSteeringModalVisible] = useState(false);
+  const [isBrakingModalVisible, setIsBrakingModalVisible] = useState(false);
 
   // ============================================================================
   // STATE - Section 3: Battery Information
@@ -316,13 +260,9 @@ const VehicleInspectionScreen: React.FC = () => {
   const [recentErrorCodeValue, setRecentErrorCodeValue] = useState(""); // 최근 오류 코드 (직접 입력)
 
   // ============================================================================
-  // STATE - Section 4: Major Devices (조향, 제동, 전기)
+  // STATE - Section 4: Major Devices (전기)
   // ============================================================================
-  const [steeringData, setSteeringData] = useState<MajorDevicesInspection['steering']>({});
-  const [brakingData, setBrakingData] = useState<MajorDevicesInspection['braking']>({});
   const [electricalData, setElectricalData] = useState<MajorDevicesInspection['electrical']>({});
-  const [isSteeringModalVisible, setIsSteeringModalVisible] = useState(false);
-  const [isBrakingModalVisible, setIsBrakingModalVisible] = useState(false);
   const [isElectricalModalVisible, setIsElectricalModalVisible] = useState(false);
 
   // ============================================================================
@@ -656,30 +596,19 @@ const VehicleInspectionScreen: React.FC = () => {
       modificationIssue: '',
       floodIssue: '',
     });
-    setSteeringData({});
-    setBrakingData({});
     setElectricalData({});
-    setPaintThicknessData([]);
-    setTireTreadData([]);
-    setVehiclePhotoData({
-      overallPhotos: {
-        front: undefined,
-        leftSide: undefined,
-        rear: undefined,
-        rightSide: undefined,
-      },
-      suspensionStructure: {
-        driverFrontWheel: undefined,
-        driverRearWheel: undefined,
-        passengerRearWheel: undefined,
-        passengerFrontWheel: undefined,
-      },
-      undercarriageBattery: {
-        front: undefined,
-        leftSide: undefined,
-        rear: undefined,
-        rightSide: undefined,
-      },
+    // 차량 외부 점검 초기화
+    setVehicleExteriorData({
+      vehicleExterior: {},
+      bodyPanel: [],
+      tiresAndWheels: {},
+    });
+    // 차량 하부 점검 초기화
+    setVehicleUndercarriageData({
+      suspensionArms: {},
+      underBatteryPack: {},
+      steering: {},
+      braking: {},
     });
   };
 
@@ -743,18 +672,16 @@ const VehicleInspectionScreen: React.FC = () => {
   ]);
 
   const calculateMajorDevicesCompletion = useCallback((): SectionCompletion => {
-    const steeringItems = Object.values(steeringData).filter(item => item && item.status !== undefined);
-    const brakingItems = Object.values(brakingData).filter(item => item && item.status !== undefined);
     const electricalItems = Object.values(electricalData).filter(item => item && item.status !== undefined);
 
-    const completedCount = (steeringItems.length > 0 ? 1 : 0) + (brakingItems.length > 0 ? 1 : 0) + (electricalItems.length > 0 ? 1 : 0);
+    const completedCount = electricalItems.length > 0 ? 1 : 0;
 
     return {
       completed: completedCount,
-      total: 3, // 조향 + 제동 + 전기
-      isAllRequiredComplete: completedCount > 0, // 최소 1개 이상 입력 필요
+      total: 1, // 전기만
+      isAllRequiredComplete: completedCount > 0, // 전기 장치 입력 필요
     };
-  }, [steeringData, brakingData, electricalData]);
+  }, [electricalData]);
 
   const calculateImagesCompletion = useCallback((): SectionCompletion => {
     const count = otherInspectionItems.length;
@@ -765,27 +692,70 @@ const VehicleInspectionScreen: React.FC = () => {
     };
   }, [otherInspectionItems]);
 
+  const calculateVehicleExteriorInspectionCompletion = useCallback((): SectionCompletion => {
+    // 3개 InputButton 기준 - 모두 필수
+    const items = [
+      // 차량 외관 사진 (4방향) - 필수
+      Object.values(vehicleExteriorData.vehicleExterior || {}).filter(Boolean).length > 0,
+      // 외판 수리/교체 확인 및 도막 측정 - 필수
+      (vehicleExteriorData.bodyPanel || []).length > 0,
+      // 타이어 및 휠 (4개 타이어) - 필수
+      Object.values(vehicleExteriorData.tiresAndWheels || {}).filter((item): item is TireAndWheelItem => {
+        const tire = item as TireAndWheelItem;
+        return tire !== undefined && tire !== null && (tire.treadDepth !== undefined || tire.wheelStatus !== undefined);
+      }).length > 0,
+    ];
+
+    const completedCount = items.filter(Boolean).length;
+    return {
+      completed: completedCount,
+      total: 3,
+      isAllRequiredComplete: completedCount === 3, // 모두 필수
+    };
+  }, [vehicleExteriorData]);
+
+  const calculateVehicleUndercarriageInspectionCompletion = useCallback((): SectionCompletion => {
+    // 4개 InputButton 기준 (서스펜션 암, 배터리 팩, 조향, 제동)
+    const items = [
+      // 서스펜션 암 및 링크 구조물 사진 (4개 휠)
+      Object.values(vehicleUndercarriageData.suspensionArms || {}).filter(Boolean).length > 0,
+      // 하부 배터리 팩 상태 사진 (4방향)
+      Object.values(vehicleUndercarriageData.underBatteryPack || {}).filter(Boolean).length > 0,
+      // 조향 장치 (4개 항목)
+      Object.values(vehicleUndercarriageData.steering || {}).filter((item) => item && item.status).length > 0,
+      // 제동 장치 (3개 항목)
+      Object.values(vehicleUndercarriageData.braking || {}).filter((item) => item && item.status).length > 0,
+    ];
+
+    const completedCount = items.filter(Boolean).length;
+    return {
+      completed: completedCount,
+      total: 4,
+      isAllRequiredComplete: completedCount === 4, // 모두 필수
+    };
+  }, [vehicleUndercarriageData]);
+
   const isAllRequiredSectionsComplete = useCallback((): boolean => {
     const vehicleInfo = calculateVehicleInfoCompletion();
     const batteryInfo = calculateBatteryInfoCompletion();
     const majorDevices = calculateMajorDevicesCompletion();
+    const vehicleExterior = calculateVehicleExteriorInspectionCompletion();
+    const vehicleUndercarriage = calculateVehicleUndercarriageInspectionCompletion();
 
-    // 자동차 상태: 최소 1개 이상 입력 필요
-    const vehicleStatusComplete = (paintThicknessData.length > 0 || tireTreadData.length > 0 || isVehiclePhotoComplete(vehiclePhotoData));
-
+    // 기타(images)를 제외한 모든 섹션이 필수
     return (
       vehicleInfo.isAllRequiredComplete &&
       batteryInfo.isAllRequiredComplete &&
-      vehicleStatusComplete &&
-      majorDevices.completed > 0
+      majorDevices.completed > 0 &&
+      vehicleExterior.isAllRequiredComplete &&
+      vehicleUndercarriage.isAllRequiredComplete
     );
   }, [
     calculateVehicleInfoCompletion,
     calculateBatteryInfoCompletion,
     calculateMajorDevicesCompletion,
-    paintThicknessData,
-    tireTreadData,
-    vehiclePhotoData,
+    calculateVehicleExteriorInspectionCompletion,
+    calculateVehicleUndercarriageInspectionCompletion,
   ]);
 
   // ============================================================================
@@ -801,9 +771,10 @@ const VehicleInspectionScreen: React.FC = () => {
         if (isCurrentlyExpanded) {
           const newState: ExpandedSectionsState = {
             vehicleInfo: false,
-            vehicleStatus: false,
             batteryInfo: false,
             majorDevices: false,
+            vehicleExteriorInspection: false,
+            vehicleUndercarriageInspection: false,
             diagnosis: false,
             images: false,
           };
@@ -825,9 +796,10 @@ const VehicleInspectionScreen: React.FC = () => {
         // 모든 섹션 닫고, 선택한 섹션만 열기
         const newState: ExpandedSectionsState = {
           vehicleInfo: false,
-          vehicleStatus: false,
           batteryInfo: false,
           majorDevices: false,
+          vehicleExteriorInspection: false,
+          vehicleUndercarriageInspection: false,
           diagnosis: false,
           images: false,
           [section]: true,
@@ -971,7 +943,7 @@ const VehicleInspectionScreen: React.FC = () => {
     if (!isAllRequiredSectionsComplete()) {
       Alert.alert(
         "필수 항목 미완료",
-        "모든 필수 항목을 완료해주세요.\n\n필수 섹션:\n• 차량 기본 정보\n• 차대번호 및 상태 확인\n• 배터리 정보 (셀 개수)",
+        "모든 필수 항목을 완료해주세요.\n\n필수 섹션:\n• 차량 기본 정보\n• 배터리 정보\n• 주요 장치\n• 차량 외부 점검\n• 차량 하부 점검",
         [{ text: "확인" }]
       );
       return;
@@ -1072,7 +1044,144 @@ const VehicleInspectionScreen: React.FC = () => {
               }
             }
 
-            setUploadProgress(85);
+            // 5. 차량 외부 점검 이미지들 업로드
+            const uploadedVehicleExteriorData: VehicleExteriorInspection = {
+              vehicleExterior: {},
+              bodyPanel: [],
+              tiresAndWheels: vehicleExteriorData.tiresAndWheels || {},
+            };
+
+            // 5-1. 차량 외관 사진 업로드
+            if (vehicleExteriorData.vehicleExterior) {
+              const positions = ['front', 'leftSide', 'rear', 'rightSide'] as const;
+              for (const position of positions) {
+                const imageUri = vehicleExteriorData.vehicleExterior[position];
+                if (imageUri) {
+                  const uploadedUrl = await firebaseService.uploadReportImage(
+                    imageUri,
+                    reportId,
+                    `vehicle_exterior_${position}`
+                  );
+                  uploadedVehicleExteriorData.vehicleExterior![position] = uploadedUrl;
+                }
+              }
+            }
+            setUploadProgress(60);
+
+            // 5-2. 외판 수리/교체 확인 및 도막 측정 이미지 업로드
+            const uploadedBodyPanelData: PaintThicknessInspection[] = [];
+            for (let i = 0; i < (vehicleExteriorData.bodyPanel || []).length; i++) {
+              const item = vehicleExteriorData.bodyPanel[i];
+              if (!item) continue; // undefined 체크
+
+              const uploadedImageUris: string[] = [];
+
+              // 각 항목의 이미지들 업로드
+              if (item.imageUris && item.imageUris.length > 0) {
+                for (let imgIndex = 0; imgIndex < item.imageUris.length; imgIndex++) {
+                  const imageUri = item.imageUris[imgIndex];
+                  if (imageUri) {
+                    const uploadedUrl = await firebaseService.uploadReportImage(
+                      imageUri,
+                      reportId,
+                      `body_panel_${i}_${imgIndex}`
+                    );
+                    uploadedImageUris.push(uploadedUrl);
+                  }
+                }
+              }
+
+              // 업로드된 이미지 URL로 데이터 생성
+              uploadedBodyPanelData.push({
+                location: item.location,
+                thickness: item.thickness,
+                status: item.status,
+                imageUris: uploadedImageUris.length > 0 ? uploadedImageUris : undefined,
+                notes: item.notes,
+              });
+            }
+            uploadedVehicleExteriorData.bodyPanel = uploadedBodyPanelData;
+            setUploadProgress(65);
+
+            // 6. 차량 하부 점검 이미지들 업로드
+            const uploadedVehicleUndercarriageData: VehicleUndercarriageInspection = {
+              suspensionArms: {},
+              underBatteryPack: {},
+              steering: {},
+              braking: {},
+            };
+
+            // 6-1. 서스펜션 암 및 링크 구조물 사진 업로드
+            if (vehicleUndercarriageData.suspensionArms) {
+              const suspensionPositions = ['driverFrontWheel', 'driverRearWheel', 'passengerRearWheel', 'passengerFrontWheel'] as const;
+              for (const position of suspensionPositions) {
+                const imageUri = vehicleUndercarriageData.suspensionArms[position];
+                if (imageUri) {
+                  const uploadedUrl = await firebaseService.uploadReportImage(
+                    imageUri,
+                    reportId,
+                    `suspension_arms_${position}`
+                  );
+                  uploadedVehicleUndercarriageData.suspensionArms![position] = uploadedUrl;
+                }
+              }
+            }
+
+            // 6-2. 하부 배터리 팩 상태 사진 업로드
+            if (vehicleUndercarriageData.underBatteryPack) {
+              const batteryPackPositions = ['front', 'leftSide', 'rear', 'rightSide'] as const;
+              for (const position of batteryPackPositions) {
+                const imageUri = vehicleUndercarriageData.underBatteryPack[position];
+                if (imageUri) {
+                  const uploadedUrl = await firebaseService.uploadReportImage(
+                    imageUri,
+                    reportId,
+                    `under_battery_pack_${position}`
+                  );
+                  uploadedVehicleUndercarriageData.underBatteryPack![position] = uploadedUrl;
+                }
+              }
+            }
+
+            // 6-3. 조향 장치 검사 이미지 업로드
+            if (vehicleUndercarriageData.steering) {
+              for (const [key, item] of Object.entries(vehicleUndercarriageData.steering)) {
+                if (item && item.imageUri) {
+                  const uploadedUrl = await firebaseService.uploadReportImage(
+                    item.imageUri,
+                    reportId,
+                    `steering_${key}`
+                  );
+                  uploadedVehicleUndercarriageData.steering![key as keyof typeof vehicleUndercarriageData.steering] = {
+                    ...item,
+                    imageUri: uploadedUrl,
+                  };
+                } else if (item) {
+                  uploadedVehicleUndercarriageData.steering![key as keyof typeof vehicleUndercarriageData.steering] = item;
+                }
+              }
+            }
+
+            // 6-4. 제동 장치 검사 이미지 업로드
+            if (vehicleUndercarriageData.braking) {
+              for (const [key, item] of Object.entries(vehicleUndercarriageData.braking)) {
+                if (item && item.imageUri) {
+                  const uploadedUrl = await firebaseService.uploadReportImage(
+                    item.imageUri,
+                    reportId,
+                    `braking_${key}`
+                  );
+                  uploadedVehicleUndercarriageData.braking![key as keyof typeof vehicleUndercarriageData.braking] = {
+                    ...item,
+                    imageUri: uploadedUrl,
+                  };
+                } else if (item) {
+                  uploadedVehicleUndercarriageData.braking![key as keyof typeof vehicleUndercarriageData.braking] = item;
+                }
+              }
+            }
+
+            setUploadProgress(80);
 
             // Prepare report data
             const reportData: Omit<
@@ -1113,16 +1222,13 @@ const VehicleInspectionScreen: React.FC = () => {
               })),
               diagnosisDetails: [], // 세부 진단 결과 탭 제거로 빈 배열
               comprehensiveInspection: {
-                paintThickness: paintThicknessData.length > 0 ? paintThicknessData : undefined,
-                tireTread: tireTreadData.length > 0 ? tireTreadData : undefined,
-                vehiclePhotos: isVehiclePhotoComplete(vehiclePhotoData) ? vehiclePhotoData : undefined,
                 otherInspection: uploadedOtherInspectionItems.length > 0 ? uploadedOtherInspectionItems : undefined,
               },
               majorDevicesInspection: {
-                steering: steeringData,
-                braking: brakingData,
                 electrical: electricalData,
               },
+              vehicleExteriorInspection: uploadedVehicleExteriorData,
+              vehicleUndercarriageInspection: uploadedVehicleUndercarriageData,
               status: "pending_review", // 검수 대기 상태
             };
 
@@ -1637,97 +1743,6 @@ const VehicleInspectionScreen: React.FC = () => {
   // ============================================================================
   // RENDER - Section 2: Vehicle Status
   // ============================================================================
-
-  const renderVehicleStatusSection = () => {
-    const animatedHeight = accordionAnimations.vehicleStatus.interpolate({
-      inputRange: [0, 1],
-      outputRange: [0, 500], // 최대 높이
-    });
-
-    const animatedOpacity = accordionAnimations.vehicleStatus.interpolate({
-      inputRange: [0, 1],
-      outputRange: [0, 1],
-    });
-
-    if (!expandedSections.vehicleStatus) return null;
-
-    return (
-      <Animated.View
-        style={[
-          styles.sectionContent,
-          {
-            maxHeight: animatedHeight,
-            opacity: animatedOpacity,
-            overflow: "hidden",
-          },
-        ]}
-      >
-        <View style={styles.inputButtonGroup}>
-          {/* 전체 사진 촬영 - 차량 사진 (가장 위로) */}
-          <InputButton
-            label="전체 사진 촬영"
-            isCompleted={isVehiclePhotoComplete(vehiclePhotoData)}
-            onPress={() => setIsVehiclePhotoModalVisible(true)}
-            value={
-              isVehiclePhotoComplete(vehiclePhotoData)
-                ? `${getVehiclePhotoCount(vehiclePhotoData)}/12 장 촬영`
-                : undefined
-            }
-          />
-
-          {/* 외판 도막 두께 측정 */}
-          <InputButton
-            label="외판 도막 두께 측정"
-            isCompleted={paintThicknessData.length > 0}
-            onPress={() => setIsPaintThicknessModalVisible(true)}
-            value={
-              paintThicknessData.length > 0
-                ? `${paintThicknessData.length}개 부위 측정`
-                : undefined
-            }
-          />
-
-          {/* 타이어 트레드 깊이 */}
-          <InputButton
-            label="타이어 트레드 깊이"
-            isCompleted={tireTreadData.length > 0}
-            onPress={() => setIsTireTreadModalVisible(true)}
-            value={
-              tireTreadData.length > 0
-                ? `${tireTreadData.length}개 타이어 측정`
-                : undefined
-            }
-          />
-        </View>
-
-        {/* 외판 도막 두께 측정 모달 */}
-        <PaintThicknessBottomSheet
-          visible={isPaintThicknessModalVisible}
-          onClose={() => setIsPaintThicknessModalVisible(false)}
-          onConfirm={(data) => setPaintThicknessData(data)}
-          initialData={paintThicknessData}
-        />
-
-        {/* 타이어 트레드 깊이 모달 */}
-        <TireTreadBottomSheet
-          visible={isTireTreadModalVisible}
-          onClose={() => setIsTireTreadModalVisible(false)}
-          onConfirm={(data) => setTireTreadData(data)}
-          initialData={tireTreadData}
-        />
-
-        {/* 차량 사진 모달 */}
-        <VehiclePhotoBottomSheet
-          visible={isVehiclePhotoModalVisible}
-          onClose={() => setIsVehiclePhotoModalVisible(false)}
-          onConfirm={(data) => setVehiclePhotoData(data)}
-          initialData={vehiclePhotoData}
-        />
-      </Animated.View>
-    );
-  };
-
-  // ============================================================================
   // RENDER - Section 3: Major Devices Modals
   // ============================================================================
 
@@ -1761,9 +1776,12 @@ const VehicleInspectionScreen: React.FC = () => {
           title="조향 검사"
           items={steeringItems}
           onConfirm={(data) => {
-            setSteeringData(data);
+            setVehicleUndercarriageData((prev) => ({
+              ...prev,
+              steering: data,
+            }));
           }}
-          initialData={steeringData}
+          initialData={vehicleUndercarriageData.steering || {}}
         />
 
         <MajorDeviceBottomSheet
@@ -1772,9 +1790,12 @@ const VehicleInspectionScreen: React.FC = () => {
           title="제동 검사"
           items={brakingItems}
           onConfirm={(data) => {
-            setBrakingData(data);
+            setVehicleUndercarriageData((prev) => ({
+              ...prev,
+              braking: data,
+            }));
           }}
-          initialData={brakingData}
+          initialData={vehicleUndercarriageData.braking || {}}
         />
 
         <MajorDeviceBottomSheet
@@ -1951,7 +1972,7 @@ const VehicleInspectionScreen: React.FC = () => {
   const renderMajorDevicesSection = () => {
     const animatedHeight = accordionAnimations.majorDevices.interpolate({
       inputRange: [0, 1],
-      outputRange: [0, 500],
+      outputRange: [0, 200],
     });
 
     const animatedOpacity = accordionAnimations.majorDevices.interpolate({
@@ -1962,16 +1983,6 @@ const VehicleInspectionScreen: React.FC = () => {
     if (!expandedSections.majorDevices) {
       return null;
     }
-
-    const getSteeringValue = () => {
-      const count = Object.values(steeringData).filter(item => item && item.status !== undefined).length;
-      return count > 0 ? `${count}/4 입력됨` : undefined;
-    };
-
-    const getBrakingValue = () => {
-      const count = Object.values(brakingData).filter(item => item && item.status !== undefined).length;
-      return count > 0 ? `${count}/3 입력됨` : undefined;
-    };
 
     const getElectricalValue = () => {
       const count = Object.values(electricalData).filter(item => item && item.status !== undefined).length;
@@ -1991,6 +2002,156 @@ const VehicleInspectionScreen: React.FC = () => {
       >
         <View style={styles.inputButtonGroup}>
           <InputButton
+            label="전기"
+            isCompleted={getElectricalValue() !== undefined}
+            onPress={() => setIsElectricalModalVisible(true)}
+            value={getElectricalValue()}
+          />
+        </View>
+      </Animated.View>
+    );
+  };
+
+  // ============================================================================
+  // RENDER - Vehicle Exterior Inspection
+  // ============================================================================
+
+  const renderVehicleExteriorInspectionSection = () => {
+    const animatedHeight = accordionAnimations.vehicleExteriorInspection.interpolate({
+      inputRange: [0, 1],
+      outputRange: [0, 400],
+    });
+
+    const animatedOpacity = accordionAnimations.vehicleExteriorInspection.interpolate({
+      inputRange: [0, 1],
+      outputRange: [0, 1],
+    });
+
+    if (!expandedSections.vehicleExteriorInspection) {
+      return null;
+    }
+
+    const getVehicleExteriorPhotoValue = () => {
+      const count = Object.values(vehicleExteriorData.vehicleExterior || {}).filter(Boolean).length;
+      return count > 0 ? `${count}/4 촬영` : undefined;
+    };
+
+    const getBodyPanelValue = () => {
+      const count = (vehicleExteriorData.bodyPanel || []).length;
+      return count > 0 ? `${count}/20 측정` : undefined;
+    };
+
+    const getTiresAndWheelsValue = () => {
+      const count = Object.values(vehicleExteriorData.tiresAndWheels || {}).filter((item): item is TireAndWheelItem => {
+        const tire = item as TireAndWheelItem;
+        return tire !== undefined && tire !== null && (tire.treadDepth !== undefined || tire.wheelStatus !== undefined);
+      }).length;
+      return count > 0 ? `${count}/4 검사` : undefined;
+    };
+
+    return (
+      <Animated.View
+        style={[
+          styles.sectionContent,
+          {
+            maxHeight: animatedHeight,
+            opacity: animatedOpacity,
+            overflow: "hidden",
+          },
+        ]}
+      >
+        <View style={styles.inputButtonGroup}>
+          <InputButton
+            label="차량 외관 사진"
+            isCompleted={getVehicleExteriorPhotoValue() !== undefined}
+            onPress={() => setIsVehicleExteriorPhotoModalVisible(true)}
+            value={getVehicleExteriorPhotoValue()}
+          />
+
+          <InputButton
+            label="외판 수리/교체 확인 및 도막 측정"
+            isCompleted={getBodyPanelValue() !== undefined}
+            onPress={() => setIsBodyPanelModalVisible(true)}
+            value={getBodyPanelValue()}
+          />
+
+          <InputButton
+            label="타이어 및 휠 검사"
+            isCompleted={getTiresAndWheelsValue() !== undefined}
+            onPress={() => setIsTiresAndWheelsModalVisible(true)}
+            value={getTiresAndWheelsValue()}
+          />
+        </View>
+      </Animated.View>
+    );
+  };
+
+  // ============================================================================
+  // RENDER - Vehicle Undercarriage Inspection
+  // ============================================================================
+
+  const renderVehicleUndercarriageInspectionSection = () => {
+    const animatedHeight = accordionAnimations.vehicleUndercarriageInspection.interpolate({
+      inputRange: [0, 1],
+      outputRange: [0, 500],
+    });
+
+    const animatedOpacity = accordionAnimations.vehicleUndercarriageInspection.interpolate({
+      inputRange: [0, 1],
+      outputRange: [0, 1],
+    });
+
+    if (!expandedSections.vehicleUndercarriageInspection) {
+      return null;
+    }
+
+    const getSuspensionArmsValue = () => {
+      const count = Object.values(vehicleUndercarriageData.suspensionArms || {}).filter(Boolean).length;
+      return count > 0 ? `${count}/4 촬영` : undefined;
+    };
+
+    const getUnderBatteryPackValue = () => {
+      const count = Object.values(vehicleUndercarriageData.underBatteryPack || {}).filter(Boolean).length;
+      return count > 0 ? `${count}/4 촬영` : undefined;
+    };
+
+    const getSteeringValue = () => {
+      const count = Object.values(vehicleUndercarriageData.steering || {}).filter(item => item && item.status !== undefined).length;
+      return count > 0 ? `${count}/4 입력됨` : undefined;
+    };
+
+    const getBrakingValue = () => {
+      const count = Object.values(vehicleUndercarriageData.braking || {}).filter(item => item && item.status !== undefined).length;
+      return count > 0 ? `${count}/3 입력됨` : undefined;
+    };
+
+    return (
+      <Animated.View
+        style={[
+          styles.sectionContent,
+          {
+            maxHeight: animatedHeight,
+            opacity: animatedOpacity,
+            overflow: "hidden",
+          },
+        ]}
+      >
+        <View style={styles.inputButtonGroup}>
+          <InputButton
+            label="서스펜션 암 및 링크 구조물"
+            isCompleted={getSuspensionArmsValue() !== undefined}
+            onPress={() => setIsSuspensionArmsModalVisible(true)}
+            value={getSuspensionArmsValue()}
+          />
+
+          <InputButton
+            label="하부 배터리 팩 상태"
+            isCompleted={getUnderBatteryPackValue() !== undefined}
+            onPress={() => setIsUnderBatteryPackModalVisible(true)}
+            value={getUnderBatteryPackValue()}
+          />
+
+          <InputButton
             label="조향"
             isCompleted={getSteeringValue() !== undefined}
             onPress={() => setIsSteeringModalVisible(true)}
@@ -2002,13 +2163,6 @@ const VehicleInspectionScreen: React.FC = () => {
             isCompleted={getBrakingValue() !== undefined}
             onPress={() => setIsBrakingModalVisible(true)}
             value={getBrakingValue()}
-          />
-
-          <InputButton
-            label="전기"
-            isCompleted={getElectricalValue() !== undefined}
-            onPress={() => setIsElectricalModalVisible(true)}
-            value={getElectricalValue()}
           />
         </View>
       </Animated.View>
@@ -2107,6 +2261,8 @@ const VehicleInspectionScreen: React.FC = () => {
     const vehicleInfoCompletion = calculateVehicleInfoCompletion();
     const batteryInfoCompletion = calculateBatteryInfoCompletion();
     const majorDevicesCompletion = calculateMajorDevicesCompletion();
+    const vehicleExteriorInspectionCompletion = calculateVehicleExteriorInspectionCompletion();
+    const vehicleUndercarriageInspectionCompletion = calculateVehicleUndercarriageInspectionCompletion();
     const imagesCompletion = calculateImagesCompletion();
 
     return (
@@ -2138,22 +2294,7 @@ const VehicleInspectionScreen: React.FC = () => {
             {renderBatteryInfoSection()}
           </View>
 
-          {/* Section 3: Vehicle Status */}
-          <View style={styles.accordionSection}>
-            {renderSectionHeader(
-              "자동차 상태",
-              "vehicleStatus",
-              {
-                completed: (paintThicknessData.length > 0 ? 1 : 0) + (tireTreadData.length > 0 ? 1 : 0) + (isVehiclePhotoComplete(vehiclePhotoData) ? 1 : 0),
-                total: 3,
-                isAllRequiredComplete: (paintThicknessData.length > 0 || tireTreadData.length > 0 || isVehiclePhotoComplete(vehiclePhotoData)) // 최소 1개 이상 입력 필요
-              },
-              true
-            )}
-            {renderVehicleStatusSection()}
-          </View>
-
-          {/* Section 4: Major Devices */}
+          {/* Section 3: Major Devices */}
           <View style={styles.accordionSection}>
             {renderSectionHeader(
               "주요 장치",
@@ -2164,7 +2305,29 @@ const VehicleInspectionScreen: React.FC = () => {
             {renderMajorDevicesSection()}
           </View>
 
-          {/* Section 5: 기타 (이미지 + 텍스트) */}
+          {/* Section 4: Vehicle Exterior Inspection ⭐ 신규 */}
+          <View style={styles.accordionSection}>
+            {renderSectionHeader(
+              "차량 외부 점검",
+              "vehicleExteriorInspection",
+              vehicleExteriorInspectionCompletion,
+              true
+            )}
+            {renderVehicleExteriorInspectionSection()}
+          </View>
+
+          {/* Section 5: Vehicle Undercarriage Inspection ⭐ 신규 */}
+          <View style={styles.accordionSection}>
+            {renderSectionHeader(
+              "차량 하부 점검",
+              "vehicleUndercarriageInspection",
+              vehicleUndercarriageInspectionCompletion,
+              true
+            )}
+            {renderVehicleUndercarriageInspectionSection()}
+          </View>
+
+          {/* Section 6: 기타 (이미지 + 텍스트) */}
           <View style={styles.accordionSection}>
             {renderSectionHeader(
               "기타",
@@ -2177,7 +2340,7 @@ const VehicleInspectionScreen: React.FC = () => {
         </ScrollView>
 
         {/* Submit Button */}
-        <View style={[styles.submitButtonContainer, { paddingBottom: insets.bottom + scale(2) }]}>
+        <View style={[styles.submitButtonContainer, { paddingBottom: insets.bottom}]}>
           <TouchableOpacity
             style={[
               styles.submitButton,
@@ -2209,7 +2372,7 @@ const VehicleInspectionScreen: React.FC = () => {
   // ============================================================================
 
   return (
-    <SafeAreaView style={styles.container} edges={["top"]}>
+    <SafeAreaView style={styles.container} edges={["top", "bottom"]}>
       {/* Header */}
       <View style={styles.header}>
         <TouchableOpacity
@@ -2271,6 +2434,72 @@ const VehicleInspectionScreen: React.FC = () => {
         }}
         onConfirm={handleConfirmOtherInspection}
         initialData={selectedOtherInspectionItem}
+      />
+
+      {/* Vehicle Exterior Photo Modal */}
+      <VehicleExteriorPhotoBottomSheet
+        visible={isVehicleExteriorPhotoModalVisible}
+        photos={vehicleExteriorData.vehicleExterior || {}}
+        onClose={() => setIsVehicleExteriorPhotoModalVisible(false)}
+        onUpdate={(photos) => {
+          setVehicleExteriorData((prev) => ({
+            ...prev,
+            vehicleExterior: photos,
+          }));
+        }}
+      />
+
+      {/* Body Panel Modal - 외판 수리/교체 확인 및 도막 측정 */}
+      <PaintThicknessBottomSheet
+        visible={isBodyPanelModalVisible}
+        initialData={vehicleExteriorData.bodyPanel || []}
+        onClose={() => setIsBodyPanelModalVisible(false)}
+        onConfirm={(data) => {
+          setVehicleExteriorData((prev) => ({
+            ...prev,
+            bodyPanel: data,
+          }));
+          setIsBodyPanelModalVisible(false);
+        }}
+      />
+
+      {/* Tires and Wheels Modal */}
+      <TiresAndWheelsBottomSheet
+        visible={isTiresAndWheelsModalVisible}
+        data={vehicleExteriorData.tiresAndWheels || {}}
+        onClose={() => setIsTiresAndWheelsModalVisible(false)}
+        onUpdate={(data) => {
+          setVehicleExteriorData((prev) => ({
+            ...prev,
+            tiresAndWheels: data,
+          }));
+        }}
+      />
+
+      {/* Suspension Arms Modal */}
+      <SuspensionBottomSheet
+        visible={isSuspensionArmsModalVisible}
+        photos={vehicleUndercarriageData.suspensionArms || {}}
+        onClose={() => setIsSuspensionArmsModalVisible(false)}
+        onUpdate={(photos) => {
+          setVehicleUndercarriageData((prev) => ({
+            ...prev,
+            suspensionArms: photos,
+          }));
+        }}
+      />
+
+      {/* Under Battery Pack Modal */}
+      <BatteryPackBottomSheet
+        visible={isUnderBatteryPackModalVisible}
+        photos={vehicleUndercarriageData.underBatteryPack || {}}
+        onClose={() => setIsUnderBatteryPackModalVisible(false)}
+        onUpdate={(photos) => {
+          setVehicleUndercarriageData((prev) => ({
+            ...prev,
+            underBatteryPack: photos,
+          }));
+        }}
       />
     </SafeAreaView>
   );
@@ -2886,7 +3115,6 @@ const styles = StyleSheet.create({
     paddingHorizontal: 12,
     paddingVertical: 18,
     height: 80,
-    marginTop: 16,
   },
   carKeyCountContainerCompleted: {
     backgroundColor: '#E0F2FE', // InputButton 완료 상태와 동일

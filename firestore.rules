@@ -1,0 +1,197 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // ============================================
+    // 헬퍼 함수
+    // ============================================
+
+    // 인증된 사용자인지 확인
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+
+    // Guest User인지 확인 (uid가 guest_로 시작)
+    function isGuest() {
+      return request.resource.data.uid.matches('guest_.*');
+    }
+
+    // 특정 사용자인지 확인
+    function isUser(userId) {
+      return isAuthenticated() && request.auth.uid == userId;
+    }
+
+    // 사용자 role 조회 (없으면 'user'로 간주)
+    function getUserRole() {
+      return isAuthenticated()
+        ? get(/databases/$(database)/documents/users/$(request.auth.uid)).data.get('role', 'user')
+        : null;
+    }
+
+    // Admin 권한 확인
+    function isAdmin() {
+      return getUserRole() == 'admin';
+    }
+
+    // Mechanic 권한 확인
+    function isMechanic() {
+      return getUserRole() == 'mechanic';
+    }
+
+    // Admin 또는 Mechanic 권한 확인
+    function isAdminOrMechanic() {
+      return isAdmin() || isMechanic();
+    }
+
+
+    // ============================================
+    // 1. users - 사용자 프로필
+    // ============================================
+    match /users/{userId} {
+      // 읽기: 본인 또는 Admin
+      allow read: if isUser(userId) || isAdmin();
+
+      // 생성: Guest User (guest_ prefix) 또는 인증된 본인
+      // 🔥 Guest User는 Cloud Functions에서 생성되므로 인증 없이도 생성 가능
+      allow create: if isGuest() || isUser(userId);
+
+      // 수정: 본인만 (단, role 변경 불가)
+      allow update: if isUser(userId)
+        && (!request.resource.data.keys().hasAny(['role'])
+            || request.resource.data.role == resource.data.get('role', 'user'));
+
+      // 삭제: 본인만
+      allow delete: if isUser(userId);
+
+      // 하위 컬렉션: inAppNotifications
+      match /inAppNotifications/{notificationId} {
+        allow read, write: if isUser(userId);
+      }
+
+      // 하위 컬렉션: notificationSettings
+      match /notificationSettings/{settingId} {
+        allow read, write: if isUser(userId);
+      }
+    }
+
+
+    // ============================================
+    // 2. vehicles - 차량 정보 (공개 데이터)
+    // ============================================
+    match /vehicles/{brandId} {
+      // 읽기: 모두 허용 (공개 데이터)
+      allow read: if true;
+
+      // 쓰기: Admin만 (데이터 관리)
+      allow write: if isAdmin();
+
+      // 하위 컬렉션: models
+      match /models/{modelId} {
+        allow read: if true;
+        allow write: if isAdmin();
+      }
+    }
+
+
+    // ============================================
+    // 3. userVehicles - 사용자 차량 정보
+    // ============================================
+    match /userVehicles/{vehicleId} {
+      // 읽기: 차량 소유자 또는 Admin
+      allow read: if isUser(resource.data.userId) || isAdmin();
+
+      // 생성: 본인만 (userId 일치 필수)
+      allow create: if isAuthenticated()
+        && request.resource.data.userId == request.auth.uid;
+
+      // 수정: 차량 소유자만 (userId 변경 불가)
+      allow update: if isUser(resource.data.userId)
+        && request.resource.data.userId == resource.data.userId;
+
+      // 삭제: 차량 소유자만
+      allow delete: if isUser(resource.data.userId);
+    }
+
+
+    // ============================================
+    // 4. diagnosisReservations - 진단 예약
+    // ============================================
+    match /diagnosisReservations/{reservationId} {
+      // 읽기: 예약한 본인 또는 Admin 또는 Mechanic
+      // ⭐ Guest User 포함: 인증된 사용자가 자신의 userId와 일치하는 예약을 읽을 수 있음
+      allow read: if (isAuthenticated() && resource.data.userId == request.auth.uid)
+        || isAdmin()
+        || isMechanic();
+
+      // 생성: ⭐ 누구나 가능 (웹 비회원 예약, Guest User)
+      // Cloud Functions를 통한 생성을 권장하지만, 직접 생성도 허용
+      allow create: if true;
+
+      // 수정: Admin 또는 Mechanic (정비사 할당, 상태 변경)
+      allow update: if isAdmin() || isMechanic();
+
+      // 삭제: 예약한 본인 또는 Admin
+      allow delete: if (isAuthenticated() && resource.data.userId == request.auth.uid)
+        || isAdmin();
+    }
+
+
+    // ============================================
+    // 5. vehicleDiagnosisReports - 진단 리포트
+    // ============================================
+    match /vehicleDiagnosisReports/{reportId} {
+      // 읽기: 리포트 소유자 또는 Admin/Mechanic
+      allow read: if isUser(resource.data.userId) || isAdminOrMechanic();
+
+      // 생성: Admin 또는 Mechanic (정비사가 리포트 작성)
+      allow create: if isAdminOrMechanic()
+        && request.resource.data.status in ['draft', 'pending_review'];
+
+      // 수정: Admin 또는 Mechanic
+      allow update: if isAdminOrMechanic();
+
+      // 삭제: Admin만 (Mechanic은 삭제 불가)
+      allow delete: if isAdmin();
+    }
+
+
+    // ============================================
+    // 6. settings - 앱 설정 (예약 시간대 등)
+    // ============================================
+    match /settings/{settingId} {
+      // 읽기: 모두 허용 (공개 설정)
+      allow read: if true;
+
+      // 쓰기: Admin만
+      allow write: if isAdmin();
+    }
+
+
+    // ============================================
+    // 7. payments - 결제 정보
+    // ============================================
+    match /payments/{paymentId} {
+      // 읽기: Admin/Mechanic (관리자 페이지에서 확인) 또는 결제한 본인
+      allow read: if isAdminOrMechanic()
+        || (isAuthenticated() && resource.data.userId == request.auth.uid);
+
+      // 생성: 누구나 가능 (Cloud Functions에서 생성, Guest 포함)
+      allow create: if true;
+
+      // 수정: Admin만 (환불 처리 등)
+      allow update: if isAdmin();
+
+      // 삭제: Admin만
+      allow delete: if isAdmin();
+    }
+
+
+    // ============================================
+    // 기타: 명시되지 않은 컬렉션은 모두 거부
+    // ============================================
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}

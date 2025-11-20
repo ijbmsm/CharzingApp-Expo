@@ -1,5 +1,5 @@
-import React from 'react';
-import { View, Text, TextInput, TouchableOpacity, StyleSheet } from 'react-native';
+import React, { useRef } from 'react';
+import { View, Text, TextInput, TouchableOpacity, StyleSheet, Keyboard } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { scale, verticalScale, moderateScale } from 'react-native-size-matters';
 import { DiagnosisDetail } from '../../adminWeb/index';
@@ -19,6 +19,8 @@ const DiagnosisDetailCard: React.FC<DiagnosisDetailCardProps> = ({
   onUpdateMeasuredValue,
   onUpdateInterpretation,
 }) => {
+  const interpretationRef = useRef<TextInput>(null);
+
   return (
     <View style={styles.itemContainer}>
       {/* 카테고리 & 측정값 한 줄로 */}
@@ -34,6 +36,9 @@ const DiagnosisDetailCard: React.FC<DiagnosisDetailCardProps> = ({
               placeholderTextColor="#9CA3AF"
               value={detail.measuredValue || ''}
               onChangeText={onUpdateMeasuredValue}
+              returnKeyType="next"
+              blurOnSubmit={false}
+              onSubmitEditing={() => interpretationRef.current?.focus()}
             />
           ) : (
             <View style={styles.readOnlyBox}>
@@ -47,12 +52,16 @@ const DiagnosisDetailCard: React.FC<DiagnosisDetailCardProps> = ({
 
       {/* 해석 입력 */}
       <TextInput
+        ref={interpretationRef}
         style={[styles.textInput, styles.textInputMultiline]}
         placeholder="해석"
         placeholderTextColor="#9CA3AF"
         value={detail.interpretation || ''}
         onChangeText={(text) => onUpdateInterpretation(index, text)}
         multiline
+        returnKeyType="done"
+        blurOnSubmit={true}
+        onSubmitEditing={Keyboard.dismiss}
       />
     </View>
   );

@@ -223,11 +223,11 @@ function App() {
           console.error('❌ Firebase 초기화 실패');
           // Firebase 초기화 실패 시에도 앱은 계속 동작하도록 함
         }
-        
+
         // 3. 서비스 초기화 (필요시)
         setLoadingMessage('서비스 준비 중...');
         await new Promise(resolve => setTimeout(resolve, 500)); // 최소 로딩 시간
-        
+
         // 4. 카카오 로그인 서비스 초기화
         setLoadingMessage('로그인 서비스 준비 중...');
         try {
@@ -237,7 +237,7 @@ function App() {
           console.warn('⚠️ 카카오 로그인 서비스 초기화 실패:', error);
         }
         
-        // 5. 앱 준비 완료
+        // 6. 앱 준비 완료
         setLoadingMessage('앱 시작 중...');
         await new Promise(resolve => setTimeout(resolve, 300));
         

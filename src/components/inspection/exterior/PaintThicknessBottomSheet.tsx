@@ -9,11 +9,13 @@ import {
   Platform,
   ScrollView,
   TextInput,
+  Keyboard,
 } from 'react-native';
-import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { PaintThicknessInspection } from '../../adminWeb/index';
-import MultipleImagePicker from './MultipleImagePicker';
+import { Ionicons } from '@expo/vector-icons';
+import { scale, verticalScale, moderateScale } from 'react-native-size-matters';
+import { PaintThicknessInspection } from '../../../services/firebaseService';
+import MultipleImagePicker from '../../MultipleImagePicker';
 
 interface PaintThicknessBottomSheetProps {
   visible: boolean;
@@ -22,7 +24,7 @@ interface PaintThicknessBottomSheetProps {
   initialData?: PaintThicknessInspection[];
 }
 
-// 외판 도막 두께 측정 부위
+// 외판 수리/교체 확인 및 도막 측정 부위
 const PAINT_LOCATIONS = [
   {
     key: 'hood',
@@ -31,106 +33,118 @@ const PAINT_LOCATIONS = [
     avoid: '모서리 2cm 이내, 본넷 끝단 라인, 엠블럼/몰딩/PPF 위'
   },
   {
-    key: 'roof',
-    label: '루프',
-    recommended: '① 중앙\n② 전면 쪽\n③ 후면 쪽\n④ 좌측\n⑤ 우측\n\n※ 전·후·좌·우는 가장자리에서 6~10cm 안쪽',
+    key: 'driver_front_fender',
+    label: '운전석 프론트펜더',
+    recommended: '① 휠 아치 위 5~8cm\n② 중앙 평면\n③ 헤드램프 쪽 8~12cm 뒤',
+    avoid: '휠 아치 바로 모서리, 실리콘/언더코팅 가까운 하단'
+  },
+  {
+    key: 'driver_front_door',
+    label: '운전석 앞도어',
+    recommended: '① 창문 아래 수평 라인 근처 (상부)\n② 손잡이 아래 평평한 면 (중부)\n③ 휠 방향 하단 8~12cm 위 (하부)',
+    avoid: '손잡이 바로 주위, 도어 라인 바로 위/아래, 웨더스트립 가까운 상단'
+  },
+  {
+    key: 'driver_side_sill_panel',
+    label: '운전석 사이드실패널',
+    recommended: '사이드실 중앙 평면부',
+    avoid: '가장자리, 하단부 언더코팅 부분'
+  },
+  {
+    key: 'driver_roof_panel',
+    label: '운전석 루프패널',
+    recommended: '① 중앙\n② 전면 쪽\n③ 후면 쪽\n\n※ 가장자리에서 6~10cm 안쪽',
     avoid: '선루프 유리 부분, 루프몰딩 바로 위, 루프랙 설치 자리'
   },
   {
-    key: 'trunk',
-    label: '트렁크/테일게이트',
+    key: 'driver_rear_door',
+    label: '운전석 뒷도어',
+    recommended: '① 창문 아래 수평 라인 근처 (상부)\n② 손잡이 아래 평평한 면 (중부)\n③ 휠 방향 하단 8~12cm 위 (하부)',
+    avoid: '손잡이 바로 주위, 도어 라인 바로 위/아래, 웨더스트립 가까운 상단'
+  },
+  {
+    key: 'driver_rear_fender',
+    label: '운전석 리어펜더',
+    recommended: '① C필러 옆 평면\n② 휠 아치 상단 6~10cm 위\n③ 테일램프 옆 평면',
+    avoid: '휠 아치 바로 모서리, 테일램프/유리 고무 몰딩 근처, 스폿 용접 자리'
+  },
+  {
+    key: 'driver_a_pillar',
+    label: '운전석 A필러',
+    recommended: '앞유리 옆 필러 중앙 평면부 1점',
+    avoid: '고무/도어 몰딩 위, 필러 엣지/곡면'
+  },
+  {
+    key: 'driver_b_pillar',
+    label: '운전석 B필러',
+    recommended: '앞/뒷문 사이 필러 중앙 평면부 1점',
+    avoid: '고무/도어 몰딩 위, 필러 엣지/곡면'
+  },
+  {
+    key: 'driver_c_pillar',
+    label: '운전석 C필러',
+    recommended: '뒤유리 옆 필러 중앙 평면부 1점',
+    avoid: '고무/도어 몰딩 위, 필러 엣지/곡면'
+  },
+  {
+    key: 'trunk_lid',
+    label: '트렁크 리드',
     recommended: '① 중앙\n② 좌측 상단\n③ 우측 상단\n④ 좌측 하단\n⑤ 우측 하단',
     avoid: '엣지 1~2cm, 엠블럼·스포일러 바로 아래, 테일램프 플라스틱 접합부'
   },
   {
-    key: 'front_fender_left',
-    label: '앞펜더 좌',
-    recommended: '① 휠 아치 위 5~8cm\n② 중앙 평면\n③ 헤드램프 쪽 8~12cm 뒤',
-    avoid: '휠 아치 바로 모서리, 실리콘/언더코팅 가까운 하단'
-  },
-  {
-    key: 'front_fender_right',
-    label: '앞펜더 우',
-    recommended: '① 휠 아치 위 5~8cm\n② 중앙 평면\n③ 헤드램프 쪽 8~12cm 뒤',
-    avoid: '휠 아치 바로 모서리, 실리콘/언더코팅 가까운 하단'
-  },
-  {
-    key: 'front_door_left',
-    label: '앞도어 좌',
-    recommended: '① 창문 아래 수평 라인 근처 (상부)\n② 손잡이 아래 평평한 면 (중부)\n③ 휠 방향 하단 8~12cm 위 (하부)',
-    avoid: '손잡이 바로 주위, 도어 라인 바로 위/아래, 웨더스트립 가까운 상단'
-  },
-  {
-    key: 'front_door_right',
-    label: '앞도어 우',
-    recommended: '① 창문 아래 수평 라인 근처 (상부)\n② 손잡이 아래 평평한 면 (중부)\n③ 휠 방향 하단 8~12cm 위 (하부)',
-    avoid: '손잡이 바로 주위, 도어 라인 바로 위/아래, 웨더스트립 가까운 상단'
-  },
-  {
-    key: 'rear_door_left',
-    label: '뒷도어 좌',
-    recommended: '① 창문 아래 수평 라인 근처 (상부)\n② 손잡이 아래 평평한 면 (중부)\n③ 휠 방향 하단 8~12cm 위 (하부)',
-    avoid: '손잡이 바로 주위, 도어 라인 바로 위/아래, 웨더스트립 가까운 상단'
-  },
-  {
-    key: 'rear_door_right',
-    label: '뒷도어 우',
-    recommended: '① 창문 아래 수평 라인 근처 (상부)\n② 손잡이 아래 평평한 면 (중부)\n③ 휠 방향 하단 8~12cm 위 (하부)',
-    avoid: '손잡이 바로 주위, 도어 라인 바로 위/아래, 웨더스트립 가까운 상단'
-  },
-  {
-    key: 'quarter_panel_left',
-    label: '쿼터패널 좌',
+    key: 'passenger_rear_fender',
+    label: '동승석 리어펜더',
     recommended: '① C필러 옆 평면\n② 휠 아치 상단 6~10cm 위\n③ 테일램프 옆 평면',
     avoid: '휠 아치 바로 모서리, 테일램프/유리 고무 몰딩 근처, 스폿 용접 자리'
   },
   {
-    key: 'quarter_panel_right',
-    label: '쿼터패널 우',
-    recommended: '① C필러 옆 평면\n② 휠 아치 상단 6~10cm 위\n③ 테일램프 옆 평면',
-    avoid: '휠 아치 바로 모서리, 테일램프/유리 고무 몰딩 근처, 스폿 용접 자리'
+    key: 'passenger_rear_door',
+    label: '동승석 뒷도어',
+    recommended: '① 창문 아래 수평 라인 근처 (상부)\n② 손잡이 아래 평평한 면 (중부)\n③ 휠 방향 하단 8~12cm 위 (하부)',
+    avoid: '손잡이 바로 주위, 도어 라인 바로 위/아래, 웨더스트립 가까운 상단'
   },
   {
-    key: 'a_pillar_left',
-    label: 'A필러 좌',
+    key: 'passenger_roof_panel',
+    label: '동승석 루프패널',
+    recommended: '① 중앙\n② 전면 쪽\n③ 후면 쪽\n\n※ 가장자리에서 6~10cm 안쪽',
+    avoid: '선루프 유리 부분, 루프몰딩 바로 위, 루프랙 설치 자리'
+  },
+  {
+    key: 'passenger_side_sill_panel',
+    label: '동승석 사이드실패널',
+    recommended: '사이드실 중앙 평면부',
+    avoid: '가장자리, 하단부 언더코팅 부분'
+  },
+  {
+    key: 'passenger_front_door',
+    label: '동승석 앞도어',
+    recommended: '① 창문 아래 수평 라인 근처 (상부)\n② 손잡이 아래 평평한 면 (중부)\n③ 휠 방향 하단 8~12cm 위 (하부)',
+    avoid: '손잡이 바로 주위, 도어 라인 바로 위/아래, 웨더스트립 가까운 상단'
+  },
+  {
+    key: 'passenger_a_pillar',
+    label: '동승석 A필러',
     recommended: '앞유리 옆 필러 중앙 평면부 1점',
     avoid: '고무/도어 몰딩 위, 필러 엣지/곡면'
   },
   {
-    key: 'a_pillar_right',
-    label: 'A필러 우',
-    recommended: '앞유리 옆 필러 중앙 평면부 1점',
-    avoid: '고무/도어 몰딩 위, 필러 엣지/곡면'
-  },
-  {
-    key: 'b_pillar_left',
-    label: 'B필러 좌',
+    key: 'passenger_b_pillar',
+    label: '동승석 B필러',
     recommended: '앞/뒷문 사이 필러 중앙 평면부 1점',
     avoid: '고무/도어 몰딩 위, 필러 엣지/곡면'
   },
   {
-    key: 'b_pillar_right',
-    label: 'B필러 우',
-    recommended: '앞/뒷문 사이 필러 중앙 평면부 1점',
-    avoid: '고무/도어 몰딩 위, 필러 엣지/곡면'
-  },
-  {
-    key: 'c_pillar_left',
-    label: 'C필러 좌',
+    key: 'passenger_c_pillar',
+    label: '동승석 C필러',
     recommended: '뒤유리 옆 필러 중앙 평면부 1점',
     avoid: '고무/도어 몰딩 위, 필러 엣지/곡면'
   },
   {
-    key: 'c_pillar_right',
-    label: 'C필러 우',
-    recommended: '뒤유리 옆 필러 중앙 평면부 1점',
-    avoid: '고무/도어 몰딩 위, 필러 엣지/곡면'
-  },
-  {
-    key: 'inner_joint',
-    label: '(선택) 보닛·도어 안쪽 접합부',
-    recommended: '사고 의심 시 내부 보강재 측정',
-    avoid: '고무/씰 부분, 접근 어려운 곡면'
+    key: 'passenger_front_fender',
+    label: '동승석 프론트펜더',
+    recommended: '① 휠 아치 위 5~8cm\n② 중앙 평면\n③ 헤드램프 쪽 8~12cm 뒤',
+    avoid: '휠 아치 바로 모서리, 실리콘/언더코팅 가까운 하단'
   },
 ];
 
@@ -227,6 +241,19 @@ const PaintThicknessBottomSheet: React.FC<PaintThicknessBottomSheetProps> = ({
     }));
   };
 
+  const handleImageEdited = (key: string, index: number, newUri: string) => {
+    setPaintData(prev => ({
+      ...prev,
+      [key]: {
+        ...prev[key],
+        thickness: prev[key]?.thickness || '',
+        status: prev[key]?.status,
+        imageUris: (prev[key]?.imageUris || []).map((uri, i) => i === index ? newUri : uri),
+        notes: prev[key]?.notes || '',
+      },
+    }));
+  };
+
   const handleNotesChange = (key: string, value: string) => {
     setPaintData(prev => ({
       ...prev,
@@ -277,20 +304,37 @@ const PaintThicknessBottomSheet: React.FC<PaintThicknessBottomSheetProps> = ({
       presentationStyle="pageSheet"
       onRequestClose={onClose}
     >
-      <View style={[styles.container, { paddingTop: insets.top }]}>
+      <View
+        style={[
+          styles.container,
+          {
+            paddingTop: Platform.OS === 'ios' ? 0 : insets.top,
+            paddingBottom: insets.bottom,
+            paddingLeft: insets.left,
+            paddingRight: insets.right,
+          },
+        ]}
+      >
         <KeyboardAvoidingView
           behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
           style={styles.keyboardView}
         >
           <View style={styles.header}>
-            <TouchableOpacity onPress={onClose} style={styles.closeButton}>
+            <TouchableOpacity onPress={onClose} activeOpacity={0.7}>
               <Ionicons name="close" size={28} color="#1F2937" />
             </TouchableOpacity>
-            <Text style={styles.headerTitle}>외판 도막 두께 측정</Text>
-            <View style={styles.placeholder} />
+            <Text style={styles.headerTitle}>외판 수리/교체 확인 및 도막 측정</Text>
+            <TouchableOpacity onPress={handleConfirm} activeOpacity={0.7}>
+              <Text style={styles.saveButton}>저장</Text>
+            </TouchableOpacity>
           </View>
 
-          <ScrollView style={styles.content}>
+          <ScrollView
+            style={styles.content}
+            contentContainerStyle={{ paddingBottom: 100 + insets.bottom }}
+            showsVerticalScrollIndicator={false}
+            keyboardShouldPersistTaps="handled"
+          >
             {PAINT_LOCATIONS.map((location) => {
               const data = paintData[location.key] || { thickness: '', status: undefined, imageUris: [], notes: '' };
 
@@ -363,6 +407,7 @@ const PaintThicknessBottomSheet: React.FC<PaintThicknessBottomSheetProps> = ({
                           imageUris={data.imageUris}
                           onImagesAdded={(newUris) => handleImagesAdded(location.key, newUris)}
                           onImageRemoved={(index) => handleImageRemoved(location.key, index)}
+                          onImageEdited={(index, newUri) => handleImageEdited(location.key, index, newUri)}
                           label="외판 사진"
                         />
                       </View>
@@ -391,6 +436,9 @@ const PaintThicknessBottomSheet: React.FC<PaintThicknessBottomSheetProps> = ({
                         onChangeText={(text) => handleNotesChange(location.key, text)}
                         multiline
                         textAlignVertical="top"
+                        returnKeyType="done"
+                        blurOnSubmit={true}
+                        onSubmitEditing={Keyboard.dismiss}
                       />
                     </>
                   )}
@@ -398,15 +446,6 @@ const PaintThicknessBottomSheet: React.FC<PaintThicknessBottomSheetProps> = ({
               );
             })}
           </ScrollView>
-
-          <View style={[styles.footer, { paddingBottom: insets.bottom }]}>
-            <TouchableOpacity
-              style={styles.confirmButton}
-              onPress={handleConfirm}
-            >
-              <Text style={styles.confirmButtonText}>확인</Text>
-            </TouchableOpacity>
-          </View>
         </KeyboardAvoidingView>
       </View>
 
@@ -464,27 +503,21 @@ const styles = StyleSheet.create({
   },
   header: {
     flexDirection: 'row',
-    alignItems: 'center',
     justifyContent: 'space-between',
-    paddingHorizontal: 16,
-    paddingVertical: 16,
-    backgroundColor: '#FFFFFF',
-    borderBottomWidth: 1,
-    borderBottomColor: '#E5E7EB',
-  },
-  closeButton: {
-    width: 40,
-    height: 40,
     alignItems: 'center',
-    justifyContent: 'center',
+    paddingHorizontal: scale(20),
+    paddingVertical: verticalScale(8),
+    backgroundColor: '#FFFFFF',
   },
   headerTitle: {
-    fontSize: 18,
-    fontWeight: '700',
-    color: '#1F2937',
+    fontSize: moderateScale(18),
+    fontWeight: '600',
+    color: '#6B7280',
   },
-  placeholder: {
-    width: 40,
+  saveButton: {
+    fontSize: moderateScale(16),
+    fontWeight: '600',
+    color: '#06B6D4',
   },
   content: {
     flex: 1,
@@ -579,24 +612,6 @@ const styles = StyleSheet.create({
   },
   notesInput: {
     minHeight: 60,
-  },
-  footer: {
-    padding: 16,
-    backgroundColor: '#FFFFFF',
-    borderTopWidth: 1,
-    borderTopColor: '#E5E7EB',
-  },
-  confirmButton: {
-    backgroundColor: '#06B6D4',
-    borderRadius: 12,
-    paddingVertical: 16,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  confirmButtonText: {
-    fontSize: 16,
-    fontWeight: '700',
-    color: '#FFFFFF',
   },
   // 측정 위치 설명 모달 스타일
   descriptionModalOverlay: {

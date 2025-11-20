@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback, useRef } from 'react';
+import React, { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import {
   View,
   Text,
@@ -20,8 +20,9 @@ import { RootState } from '../store';
 import firebaseService, { DiagnosisReservation } from '../services/firebaseService';
 import { handleFirebaseError } from '../services/errorHandler';
 import { RootStackParamList } from '../navigation/RootNavigator';
+import { draftStorage } from '../storage/mmkv';
 
-type Tab = 'pending' | 'my';
+type Tab = 'pending' | 'my' | 'drafts';
 
 /**
  * 정비사/관리자 전용 예약 관리 화면
@@ -38,9 +39,17 @@ const ReservationsManagementScreen: React.FC = () => {
   const [selectedTab, setSelectedTab] = useState<Tab>('pending');
   const [pendingReservations, setPendingReservations] = useState<DiagnosisReservation[]>([]);
   const [myReservations, setMyReservations] = useState<DiagnosisReservation[]>([]);
+  const [drafts, setDrafts] = useState<Array<{
+    userId: string;
+    userName: string;
+    userPhone: string;
+    savedAt: Date;
+    dataSize: number;
+  }>>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [selectedDateFilter, setSelectedDateFilter] = useState<Date | null>(null);
   const [assigningReservationId, setAssigningReservationId] = useState<string | null>(null);
+  const [showAllReservations, setShowAllReservations] = useState(false);
 
   // 메모리 누수 방지
   const isMountedRef = useRef(true);
@@ -133,17 +142,45 @@ const ReservationsManagementScreen: React.FC = () => {
   const getFilteredReservations = useCallback(() => {
     const sourceReservations = selectedTab === 'pending' ? pendingReservations : myReservations;
 
-    if (!selectedDateFilter) {
-      // 필터가 없으면 모든 예약을 시간순으로 정렬
-      return sourceReservations.sort((a, b) => {
-        const dateA = toSafeDate(a.requestedDate);
-        const dateB = toSafeDate(b.requestedDate);
-        return dateA.getTime() - dateB.getTime();
+    // 1️⃣ "내 담당" 탭 + "전체 보기" OFF → 진행중인 예약만 표시
+    let filtered = sourceReservations;
+
+    if (selectedTab === 'my' && !showAllReservations) {
+      const now = new Date();
+      const oneDayAgo = new Date(now.getTime() - 24 * 60 * 60 * 1000);
+
+      filtered = sourceReservations.filter((reservation) => {
+        // 완료/취소된 예약 제외
+        if (reservation.status === 'completed' || reservation.status === 'cancelled') {
+          return false;
+        }
+
+        // 예약 시간이 24시간 이상 지난 것 제외
+        const resDate = toSafeDate(reservation.requestedDate);
+        if (resDate < oneDayAgo) {
+          return false;
+        }
+
+        return true;
       });
     }
 
-    // 선택된 날짜의 예약만 필터링
-    const filtered = sourceReservations.filter((reservation) => {
+    // 2️⃣ 날짜 필터가 없으면 모든 예약을 시간순으로 정렬
+    if (!selectedDateFilter) {
+      return filtered.sort((a, b) => {
+        const dateA = toSafeDate(a.requestedDate);
+        const dateB = toSafeDate(b.requestedDate);
+
+        // "전체 보기" ON → 최신순 (내림차순), OFF → 과거순 (오름차순)
+        if (selectedTab === 'my' && showAllReservations) {
+          return dateB.getTime() - dateA.getTime(); // 내림차순
+        }
+        return dateA.getTime() - dateB.getTime(); // 오름차순
+      });
+    }
+
+    // 3️⃣ 선택된 날짜의 예약만 필터링
+    const dateFiltered = filtered.filter((reservation) => {
       const resDate = toSafeDate(reservation.requestedDate);
 
       return (
@@ -153,15 +190,15 @@ const ReservationsManagementScreen: React.FC = () => {
       );
     });
 
-    // 시간순 정렬
-    return filtered.sort((a, b) => {
+    // 시간순 정렬 (날짜 필터 선택 시에는 항상 오름차순)
+    return dateFiltered.sort((a, b) => {
       const dateA = toSafeDate(a.requestedDate);
       const dateB = toSafeDate(b.requestedDate);
       const timeA = dateA.getHours() * 60 + dateA.getMinutes();
       const timeB = dateB.getHours() * 60 + dateB.getMinutes();
       return timeA - timeB;
     });
-  }, [selectedTab, pendingReservations, myReservations, selectedDateFilter, toSafeDate]);
+  }, [selectedTab, pendingReservations, myReservations, selectedDateFilter, showAllReservations, toSafeDate]);
 
   // 예약 할당 (정비사만)
   const handleAssignReservation = useCallback(
@@ -210,43 +247,56 @@ const ReservationsManagementScreen: React.FC = () => {
 
       return (
         <View style={styles.reservationCard}>
-          {/* 상단 헤더 */}
+          {/* 상단 헤더 - 이름만 */}
           <View style={styles.reservationHeader}>
-            <View style={styles.reservationHeaderLeft}>
-              <Text style={styles.reservationName}>
-                {reservation.userName || '이름 없음'}
-              </Text>
-              {isAssigned && (
-                <View style={[styles.statusBadge, isAssignedToMe && styles.statusBadgeMe]}>
-                  <Ionicons
-                    name={isAssignedToMe ? 'checkmark-circle' : 'person'}
-                    size={14}
-                    color={isAssignedToMe ? '#10B981' : '#6B7280'}
-                  />
-                  <Text style={[styles.statusBadgeText, isAssignedToMe && styles.statusBadgeTextMe]}>
-                    {isAssignedToMe ? '내가 담당' : `${reservation.assignedToName} 담당`}
-                  </Text>
-                </View>
-              )}
+            <Text style={styles.reservationName}>
+              {reservation.userName || '이름 없음'}
+            </Text>
+            {isAssigned && (
+              <View style={[styles.statusBadge, isAssignedToMe && styles.statusBadgeMe]}>
+                <Ionicons
+                  name={isAssignedToMe ? 'checkmark-circle' : 'person'}
+                  size={14}
+                  color={isAssignedToMe ? '#10B981' : '#6B7280'}
+                />
+                <Text style={[styles.statusBadgeText, isAssignedToMe && styles.statusBadgeTextMe]}>
+                  {isAssignedToMe ? '내가 담당' : `${reservation.assignedToName} 담당`}
+                </Text>
+              </View>
+            )}
+          </View>
+
+          {/* 날짜/시간 - 강조 */}
+          <View style={styles.dateTimeSection}>
+            <View style={styles.dateRow}>
+              <Ionicons name="calendar" size={18} color="#06B6D4" />
+              <Text style={styles.dateText}>{dateString}</Text>
             </View>
-            <Text style={styles.reservationPhone}>{reservation.userPhone}</Text>
+            <View style={styles.timeRow}>
+              <Ionicons name="time" size={18} color="#06B6D4" />
+              <Text style={styles.timeText}>{timeString}</Text>
+            </View>
           </View>
 
           {/* 예약 정보 */}
-          <View style={styles.reservationInfo}>
+          <View style={[styles.reservationInfo, { paddingRight: 0 }]}>
             <View style={styles.infoRow}>
-              <Ionicons name="calendar-outline" size={16} color="#6B7280" />
-              <Text style={styles.infoText}>{dateString} {timeString}</Text>
+              <Ionicons name="call-outline" size={16} color="#6B7280" />
+              <Text style={styles.infoText}>{reservation.userPhone}</Text>
             </View>
             <View style={styles.infoRow}>
               <Ionicons name="car-outline" size={16} color="#6B7280" />
               <Text style={styles.infoText}>
-                {reservation.vehicleBrand} {reservation.vehicleModel} ({reservation.vehicleYear})
+                {reservation.vehicleBrand} {reservation.vehicleModel}
               </Text>
             </View>
             <View style={styles.infoRow}>
+              <Ionicons name="calendar-outline" size={16} color="#6B7280" />
+              <Text style={styles.infoText}>{reservation.vehicleYear}</Text>
+            </View>
+            <View style={styles.infoRow}>
               <Ionicons name="location-outline" size={16} color="#6B7280" />
-              <Text style={styles.infoText} numberOfLines={1}>
+              <Text style={styles.infoText} numberOfLines={2}>
                 {reservation.address}
               </Text>
             </View>
@@ -306,34 +356,40 @@ const ReservationsManagementScreen: React.FC = () => {
           onPress={() => navigation.navigate('ReservationDetail', { reservation })}
           activeOpacity={0.7}
         >
-          {/* 상단 헤더 */}
+          {/* 상단 헤더 - 이름만 */}
           <View style={styles.reservationHeader}>
-            <View style={styles.reservationHeaderLeft}>
-              <Text style={styles.reservationName}>
-                {reservation.userName}
-              </Text>
+            <Text style={styles.reservationName}>
+              {reservation.userName}
+            </Text>
+          </View>
+
+          {/* 날짜/시간 - 강조 */}
+          <View style={styles.dateTimeSection}>
+            <View style={styles.dateRow}>
+              <Ionicons name="calendar" size={18} color="#06B6D4" />
+              <Text style={styles.dateText}>{dateString}</Text>
+            </View>
+            <View style={styles.timeRow}>
+              <Ionicons name="time" size={18} color="#06B6D4" />
+              <Text style={styles.timeText}>{timeString}</Text>
             </View>
           </View>
 
           {/* 예약 정보 */}
-          <View style={styles.reservationInfo}>
-            <View style={styles.infoRow}>
-              <Ionicons name="person-outline" size={16} color="#6B7280" />
-              <Text style={styles.infoText}>예약자: {reservation.userName}</Text>
-            </View>
+          <View style={[styles.reservationInfo, { paddingRight: 0 }]}>
             <View style={styles.infoRow}>
               <Ionicons name="call-outline" size={16} color="#6B7280" />
               <Text style={styles.infoText}>{reservation.userPhone}</Text>
             </View>
             <View style={styles.infoRow}>
-              <Ionicons name="calendar-outline" size={16} color="#6B7280" />
-              <Text style={styles.infoText}>{dateString} {timeString}</Text>
-            </View>
-            <View style={styles.infoRow}>
               <Ionicons name="car-outline" size={16} color="#6B7280" />
               <Text style={styles.infoText}>
-                {reservation.vehicleBrand} {reservation.vehicleModel} ({reservation.vehicleYear})
+                {reservation.vehicleBrand} {reservation.vehicleModel}
               </Text>
+            </View>
+            <View style={styles.infoRow}>
+              <Ionicons name="calendar-outline" size={16} color="#6B7280" />
+              <Text style={styles.infoText}>{reservation.vehicleYear}</Text>
             </View>
             <View style={styles.infoRow}>
               <Ionicons name="location-outline" size={16} color="#6B7280" />
@@ -343,24 +399,27 @@ const ReservationsManagementScreen: React.FC = () => {
             </View>
           </View>
 
+          {/* 하단: 상태 + 담당자 */}
+          <View style={styles.cardFooter}>
+            {/* 좌측: 상태 뱃지 */}
+            <View style={[styles.statusBadgeFooter, { backgroundColor: `${statusColors[reservation.status]}20` }]}>
+              <Text style={[styles.statusBadgeText, { color: statusColors[reservation.status] }]}>
+                {statusLabels[reservation.status]}
+              </Text>
+            </View>
+
+            {/* 우측: 담당자 정보 */}
+            {reservation.assignedToName && (
+              <View style={styles.assigneeInfoFooter}>
+                <Ionicons name="people-outline" size={14} color="#6B7280" />
+                <Text style={styles.assigneeInfoText}>{reservation.assignedToName}</Text>
+              </View>
+            )}
+          </View>
+
           {/* 우측 상단: 화살표 */}
           <View style={styles.arrowContainerTop}>
             <Ionicons name="chevron-forward" size={20} color="#9CA3AF" />
-          </View>
-
-          {/* 우측 상단 아래: 담당자 정보 */}
-          {reservation.assignedToName && (
-            <View style={styles.assigneeInfoContainer}>
-              <Ionicons name="people-outline" size={14} color="#6B7280" />
-              <Text style={styles.assigneeInfoText}>{reservation.assignedToName}</Text>
-            </View>
-          )}
-
-          {/* 우측 하단: 상태 뱃지 */}
-          <View style={[styles.statusBadgeBottom, { backgroundColor: `${statusColors[reservation.status]}20` }]}>
-            <Text style={[styles.statusBadgeText, { color: statusColors[reservation.status] }]}>
-              {statusLabels[reservation.status]}
-            </Text>
           </View>
         </TouchableOpacity>
       );
@@ -370,6 +429,33 @@ const ReservationsManagementScreen: React.FC = () => {
 
   const filteredReservations = getFilteredReservations();
   const hasReservations = pendingReservations.length > 0 || myReservations.length > 0;
+
+  // "내 담당" 탭 배지 카운트 (필터링 적용)
+  const myReservationsBadgeCount = useMemo(() => {
+    if (!showAllReservations) {
+      // "전체 보기" OFF → 진행중인 예약만 카운트
+      const now = new Date();
+      const oneDayAgo = new Date(now.getTime() - 24 * 60 * 60 * 1000);
+
+      return myReservations.filter((reservation) => {
+        // 완료/취소된 예약 제외
+        if (reservation.status === 'completed' || reservation.status === 'cancelled') {
+          return false;
+        }
+
+        // 예약 시간이 24시간 이상 지난 것 제외
+        const resDate = toSafeDate(reservation.requestedDate);
+        if (resDate < oneDayAgo) {
+          return false;
+        }
+
+        return true;
+      }).length;
+    }
+
+    // "전체 보기" ON → 전체 카운트
+    return myReservations.length;
+  }, [myReservations, showAllReservations, toSafeDate]);
 
   return (
     <View style={styles.container}>
@@ -408,10 +494,10 @@ const ReservationsManagementScreen: React.FC = () => {
           <Text style={[styles.tabText, selectedTab === 'my' && styles.tabTextActive]}>
             내 담당
           </Text>
-          {myReservations.length > 0 && (
+          {myReservationsBadgeCount > 0 && (
             <View style={[styles.tabBadge, selectedTab === 'my' && styles.tabBadgeActive]}>
               <Text style={[styles.tabBadgeText, selectedTab === 'my' && styles.tabBadgeTextActive]}>
-                {myReservations.length}
+                {myReservationsBadgeCount}
               </Text>
             </View>
           )}
@@ -423,12 +509,36 @@ const ReservationsManagementScreen: React.FC = () => {
         <View style={styles.dateFilterContainer}>
           <View style={styles.dateFilterHeader}>
             <Text style={styles.dateFilterLabel}>날짜:</Text>
-            <TouchableOpacity
-              style={styles.clearFilterButton}
-              onPress={() => setSelectedDateFilter(null)}
-            >
-              <Text style={styles.clearFilterText}>전체 보기</Text>
-            </TouchableOpacity>
+            <View style={styles.filterButtonsRow}>
+              {/* "내 담당" 탭일 때만 "전체 보기" 토글 표시 */}
+              {selectedTab === 'my' && (
+                <TouchableOpacity
+                  style={[
+                    styles.showAllToggleButton,
+                    showAllReservations && styles.showAllToggleButtonActive
+                  ]}
+                  onPress={() => setShowAllReservations(!showAllReservations)}
+                >
+                  <Ionicons
+                    name={showAllReservations ? 'eye-off-outline' : 'eye-outline'}
+                    size={14}
+                    color={showAllReservations ? '#FFFFFF' : '#06B6D4'}
+                  />
+                  <Text style={[
+                    styles.showAllToggleText,
+                    showAllReservations && styles.showAllToggleTextActive
+                  ]}>
+                    {showAllReservations ? '진행중만' : '전체 보기'}
+                  </Text>
+                </TouchableOpacity>
+              )}
+              <TouchableOpacity
+                style={styles.clearFilterButton}
+                onPress={() => setSelectedDateFilter(null)}
+              >
+                <Text style={styles.clearFilterText}>모든 날짜</Text>
+              </TouchableOpacity>
+            </View>
           </View>
           <ScrollView
             horizontal
@@ -475,6 +585,8 @@ const ReservationsManagementScreen: React.FC = () => {
                   ? '해당 날짜에 예약이 없습니다.'
                   : selectedTab === 'pending'
                   ? '대기 중인 예약이 없습니다.'
+                  : selectedTab === 'my' && !showAllReservations
+                  ? '진행중인 담당 예약이 없습니다.\n완료/취소/지난 예약을 보려면 "전체 보기"를 눌러주세요.'
                   : '담당 예약이 없습니다.'}
               </Text>
             </View>
@@ -579,6 +691,34 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     color: '#6B7280',
   },
+  filterButtonsRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: scale(8),
+  },
+  showAllToggleButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: verticalScale(4),
+    paddingHorizontal: scale(8),
+    backgroundColor: '#FFFFFF',
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: '#06B6D4',
+    gap: scale(4),
+  },
+  showAllToggleButtonActive: {
+    backgroundColor: '#06B6D4',
+    borderColor: '#06B6D4',
+  },
+  showAllToggleText: {
+    fontSize: moderateScale(11),
+    color: '#06B6D4',
+    fontWeight: '600',
+  },
+  showAllToggleTextActive: {
+    color: '#FFFFFF',
+  },
   clearFilterButton: {
     paddingVertical: verticalScale(2),
     paddingHorizontal: scale(6),
@@ -632,7 +772,6 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     alignItems: 'flex-start',
     marginBottom: verticalScale(12),
-    paddingRight: scale(40),
   },
   reservationHeaderLeft: {
     flex: 1,
@@ -648,6 +787,36 @@ const styles = StyleSheet.create({
   reservationPhone: {
     fontSize: moderateScale(14),
     color: '#6B7280',
+  },
+  dateTimeSection: {
+    backgroundColor: '#F0F9FF',
+    borderRadius: 8,
+    padding: scale(12),
+    marginBottom: verticalScale(12),
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    borderWidth: 1,
+    borderColor: '#BAE6FD',
+  },
+  dateRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: scale(6),
+  },
+  dateText: {
+    fontSize: moderateScale(15),
+    fontWeight: '700',
+    color: '#1F2937',
+  },
+  timeRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: scale(6),
+  },
+  timeText: {
+    fontSize: moderateScale(15),
+    fontWeight: '700',
+    color: '#1F2937',
   },
   statusBadge: {
     flexDirection: 'row',
@@ -706,10 +875,21 @@ const styles = StyleSheet.create({
     right: scale(16),
     top: scale(16),
   },
-  assigneeInfoContainer: {
-    position: 'absolute',
-    right: scale(16),
-    top: scale(46),
+  cardFooter: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginTop: verticalScale(12),
+    paddingTop: verticalScale(12),
+    borderTopWidth: 1,
+    borderTopColor: '#E5E7EB',
+  },
+  statusBadgeFooter: {
+    paddingHorizontal: scale(10),
+    paddingVertical: verticalScale(6),
+    borderRadius: 12,
+  },
+  assigneeInfoFooter: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: scale(4),
@@ -722,6 +902,19 @@ const styles = StyleSheet.create({
     fontSize: moderateScale(12),
     color: '#4B5563',
     fontWeight: '500',
+  },
+  // 아래 스타일들은 더 이상 사용하지 않음 (레거시)
+  assigneeInfoContainer: {
+    position: 'absolute',
+    right: scale(16),
+    top: scale(90),
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: scale(4),
+    backgroundColor: '#F3F4F6',
+    paddingHorizontal: scale(8),
+    paddingVertical: verticalScale(4),
+    borderRadius: 8,
   },
   statusBadgeBottom: {
     position: 'absolute',

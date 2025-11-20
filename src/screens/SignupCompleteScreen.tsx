@@ -117,6 +117,21 @@ export default function SignupCompleteScreen() {
           // 기존 사용자로 확인되면 바로 로그인 완료 처리
           console.log('✅ 기존 사용자 확인됨, 바로 로그인 처리');
 
+          // 🔥 Guest 계정 자동 연결 (전화번호 기반)
+          // 매번 로그인 시 체크 (이미 연결된 Guest는 자동으로 건너뜀)
+          try {
+            const linkedGuestCount = await firebaseService.linkGuestsByPhoneNumber(
+              currentUser.uid,
+              existingProfile.phoneNumber
+            );
+            if (linkedGuestCount > 0) {
+              console.log(`✅ Guest 연결 완료: ${linkedGuestCount}개`);
+            }
+          } catch (error) {
+            console.error('❌ Guest 연결 실패 (무시하고 진행):', error);
+            // Guest 연결 실패해도 로그인은 계속 진행
+          }
+
           // Firestore에서 조회한 프로필 데이터를 포함하여 Redux에 저장
           const completeUserData = {
             ...currentUser,
@@ -190,6 +205,19 @@ export default function SignupCompleteScreen() {
         agreedAt: new Date(),
       });
 
+      // 🔥 Guest 계정 자동 연결 (전화번호 기반)
+      let linkedGuestCount = 0;
+      try {
+        linkedGuestCount = await firebaseService.linkGuestsByPhoneNumber(
+          currentUser.uid,
+          cleanPhone
+        );
+        console.log(`✅ Guest 연결 완료: ${linkedGuestCount}개`);
+      } catch (error) {
+        console.error('❌ Guest 연결 실패 (무시하고 진행):', error);
+        // Guest 연결 실패해도 회원가입은 계속 진행
+      }
+
       // Redux 스토어에 완성된 사용자 정보 저장 (realName과 phoneNumber 포함)
       dispatch(setUser({
         ...currentUser,
@@ -204,9 +232,14 @@ export default function SignupCompleteScreen() {
         provider as 'kakao' | 'google' | 'apple'
       );
 
+      // 🔥 Guest 리포트 연결 여부에 따라 다른 메시지 표시
+      const welcomeMessage = linkedGuestCount > 0
+        ? `환영합니다! 차징 서비스를 이용해보세요.\n\n이전에 작성된 ${linkedGuestCount}건의 진단 리포트가 회원님의 계정에 연결되었습니다.`
+        : '환영합니다! 차징 서비스를 이용해보세요.';
+
       Alert.alert(
         '회원가입 완료',
-        '환영합니다! 차징 서비스를 이용해보세요.',
+        welcomeMessage,
         [
           {
             text: '확인',
@@ -224,7 +257,7 @@ export default function SignupCompleteScreen() {
       );
     } catch (error) {
       console.error('회원가입 완료 처리 실패:', error);
-      sentryLogger.logError(error as Error, '회원가입 완료 처리');
+      sentryLogger.logError('회원가입 완료 처리 실패', error as Error);
       Alert.alert('오류', '회원가입 완료 중 오류가 발생했습니다. 다시 시도해주세요.');
     } finally {
       setIsLoading(false);

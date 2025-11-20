@@ -129,6 +129,7 @@ export default function LoginScreen() {
               realName: userProfile?.realName || kakaoUser.displayName,
               phoneNumber: userProfile?.phoneNumber,
               displayName: userProfile?.displayName || kakaoUser.displayName,
+              role: userProfile?.role,
             };
             dispatch(setUser(completeUserData));
           } catch (error) {
@@ -228,6 +229,7 @@ export default function LoginScreen() {
               realName: userProfile?.realName || googleUser.displayName,
               phoneNumber: userProfile?.phoneNumber,
               displayName: userProfile?.displayName || googleUser.displayName,
+              role: userProfile?.role,
             };
             dispatch(setUser(completeUserData));
           } catch (error) {
@@ -316,6 +318,7 @@ export default function LoginScreen() {
               realName: userProfile?.realName || appleUser.displayName,
               phoneNumber: userProfile?.phoneNumber,
               displayName: userProfile?.displayName || appleUser.displayName,
+              role: userProfile?.role,
             };
             dispatch(setUser(completeUserData));
           } catch (error) {

@@ -4,7 +4,6 @@ import {
   Text,
   ScrollView,
   StyleSheet,
-  SafeAreaView,
   Alert,
   Animated,
   TouchableOpacity,
@@ -14,6 +13,7 @@ import {
   Dimensions,
   FlatList,
 } from "react-native";
+import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context";
 import Pdf from "react-native-pdf";
 import { NativeStackScreenProps } from "@react-navigation/native-stack";
 import { RootStackParamList } from "../navigation/RootNavigator";
@@ -57,7 +57,7 @@ const VehicleDiagnosisReportScreen: React.FC<Props> = ({
   );
   const [modalVisible, setModalVisible] = useState(false);
   const [modalContent, setModalContent] = useState<
-    "cells" | "images" | "additional" | "pdf" | "uploads" | "majorDevices" | null
+    "cells" | "images" | "additional" | "pdf" | "uploads" | "majorDevices" | "vehicleExterior" | "vehicleUndercarriage" | null
   >(null);
   const [imageViewerVisible, setImageViewerVisible] = useState(false);
   const [selectedImageData, setSelectedImageData] =
@@ -72,6 +72,7 @@ const VehicleDiagnosisReportScreen: React.FC<Props> = ({
   const [currentImageIndex, setCurrentImageIndex] = useState(0);
   const animatedValue = new Animated.Value(0);
   const isMountedRef = useRef(true);
+  const insets = useSafeAreaInsets();
 
   useEffect(() => {
     loadReport();
@@ -169,7 +170,7 @@ const VehicleDiagnosisReportScreen: React.FC<Props> = ({
   };
 
   const openModal = (
-    content: "cells" | "images" | "additional" | "pdf" | "uploads" | "majorDevices"
+    content: "cells" | "images" | "additional" | "pdf" | "uploads" | "majorDevices" | "vehicleExterior" | "vehicleUndercarriage"
   ) => {
     setModalContent(content);
     setModalVisible(true);
@@ -581,9 +582,9 @@ const VehicleDiagnosisReportScreen: React.FC<Props> = ({
 
             {/* 주요 장치 검사 카드 */}
             {report.majorDevicesInspection &&
-              (Object.keys(report.majorDevicesInspection.steering || {}).length > 0 ||
-                Object.keys(report.majorDevicesInspection.braking || {}).length > 0 ||
-                Object.keys(report.majorDevicesInspection.electrical || {}).length > 0) && (
+              (Object.keys(report.majorDevicesInspection.electrical || {}).length > 0 ||
+                Object.keys(report.majorDevicesInspection.steering || {}).length > 0 ||
+                Object.keys(report.majorDevicesInspection.braking || {}).length > 0) && (
                 <TouchableOpacity
                   style={styles.actionItem}
                   onPress={() => openModal("majorDevices")}
@@ -606,9 +607,79 @@ const VehicleDiagnosisReportScreen: React.FC<Props> = ({
                       convertToLineSeedFont(styles.actionSubtitle),
                     ]}
                   >
-                    {Object.keys(report.majorDevicesInspection.steering || {}).length +
-                      Object.keys(report.majorDevicesInspection.braking || {}).length +
-                      Object.keys(report.majorDevicesInspection.electrical || {}).length}개 항목
+                    {Object.keys(report.majorDevicesInspection.electrical || {}).length +
+                      Object.keys(report.majorDevicesInspection.steering || {}).length +
+                      Object.keys(report.majorDevicesInspection.braking || {}).length}개 항목
+                  </Text>
+                </TouchableOpacity>
+              )}
+
+            {/* 차량 외부 점검 카드 */}
+            {report.vehicleExteriorInspection &&
+              (Object.keys(report.vehicleExteriorInspection.vehicleExterior || {}).length > 0 ||
+                Object.keys(report.vehicleExteriorInspection.bodyPanel || {}).length > 0 ||
+                Object.keys(report.vehicleExteriorInspection.tiresAndWheels || {}).length > 0) && (
+                <TouchableOpacity
+                  style={styles.actionItem}
+                  onPress={() => openModal("vehicleExterior")}
+                  activeOpacity={0.7}
+                >
+                  <View style={styles.actionIconContainer}>
+                    <Ionicons name="car-sport" size={32} color="#6B7280" />
+                  </View>
+                  <Text
+                    style={[
+                      styles.actionTitle,
+                      convertToLineSeedFont(styles.actionTitle),
+                    ]}
+                  >
+                    차량 외부 점검
+                  </Text>
+                  <Text
+                    style={[
+                      styles.actionSubtitle,
+                      convertToLineSeedFont(styles.actionSubtitle),
+                    ]}
+                  >
+                    {(Object.keys(report.vehicleExteriorInspection.vehicleExterior || {}).length > 0 ? 1 : 0) +
+                      ((report.vehicleExteriorInspection.bodyPanel || []).length > 0 ? 1 : 0) +
+                      (Object.keys(report.vehicleExteriorInspection.tiresAndWheels || {}).length > 0 ? 1 : 0)}개 항목
+                  </Text>
+                </TouchableOpacity>
+              )}
+
+            {/* 차량 하부 점검 카드 */}
+            {report.vehicleUndercarriageInspection &&
+              (Object.keys(report.vehicleUndercarriageInspection.steering || {}).length > 0 ||
+                Object.keys(report.vehicleUndercarriageInspection.braking || {}).length > 0 ||
+                Object.keys(report.vehicleUndercarriageInspection.suspensionArms || {}).length > 0 ||
+                Object.keys(report.vehicleUndercarriageInspection.underBatteryPack || {}).length > 0) && (
+                <TouchableOpacity
+                  style={styles.actionItem}
+                  onPress={() => openModal("vehicleUndercarriage")}
+                  activeOpacity={0.7}
+                >
+                  <View style={styles.actionIconContainer}>
+                    <Ionicons name="git-network" size={32} color="#6B7280" />
+                  </View>
+                  <Text
+                    style={[
+                      styles.actionTitle,
+                      convertToLineSeedFont(styles.actionTitle),
+                    ]}
+                  >
+                    차량 하부 점검
+                  </Text>
+                  <Text
+                    style={[
+                      styles.actionSubtitle,
+                      convertToLineSeedFont(styles.actionSubtitle),
+                    ]}
+                  >
+                    {(Object.keys(report.vehicleUndercarriageInspection.steering || {}).length > 0 ? 1 : 0) +
+                      (Object.keys(report.vehicleUndercarriageInspection.braking || {}).length > 0 ? 1 : 0) +
+                      (Object.keys(report.vehicleUndercarriageInspection.suspensionArms || {}).length > 0 ? 1 : 0) +
+                      (Object.keys(report.vehicleUndercarriageInspection.underBatteryPack || {}).length > 0 ? 1 : 0)}개 항목
                   </Text>
                 </TouchableOpacity>
               )}
@@ -744,45 +815,39 @@ const VehicleDiagnosisReportScreen: React.FC<Props> = ({
           onRequestClose={closeModal}
           presentationStyle="fullScreen"
         >
-          <SafeAreaView style={styles.modalContainer}>
-            <View style={styles.modalContent}>
-              <View style={styles.modalHeader}>
-                <Text
-                  style={[
-                    styles.modalTitle,
-                    convertToLineSeedFont(styles.modalTitle),
-                  ]}
-                >
-                  {modalContent === "cells" && "배터리 셀 맵"}
-                  {modalContent === "majorDevices" && "주요 장치 검사"}
-                  {modalContent === "images" && "검사 이미지"}
-                  {modalContent === "additional" && "추가 검사 정보"}
-                  {modalContent === "pdf" && "PDF 리포트"}
-                  {modalContent === "uploads" && "사고이력"}
-                </Text>
-                <TouchableOpacity
-                  style={styles.modalCloseButton}
-                  onPress={closeModal}
-                >
-                  <Ionicons name="close" size={20} color="#6B7280" />
-                </TouchableOpacity>
-              </View>
-
-              <ScrollView
-                style={styles.modalScrollContent}
-                showsVerticalScrollIndicator={false}
+          <View style={[styles.modalContainer, { paddingTop: insets.top }]}>
+            <View style={styles.modalHeader}>
+              <Text
+                style={[
+                  styles.modalTitle,
+                  convertToLineSeedFont(styles.modalTitle),
+                ]}
               >
-                {modalContent === "cells" && report?.cellsData && (
-                  <View style={styles.modalSection}>
-                    <Text
-                      style={[
-                        styles.modalSectionTitle,
-                        convertToLineSeedFont(styles.modalSectionTitle),
-                      ]}
-                    >
-                      배터리 셀 상태 ({report.cellCount}개)
-                    </Text>
+                {modalContent === "cells" && `배터리 셀 상태 (${report?.cellCount || 0}개)`}
+                {modalContent === "majorDevices" && "주요 장치 검사"}
+                {modalContent === "vehicleExterior" && "차량 외부 점검"}
+                {modalContent === "vehicleUndercarriage" && "차량 하부 점검"}
+                {modalContent === "images" && "검사 이미지"}
+                {modalContent === "additional" && "추가 검사 정보"}
+                {modalContent === "pdf" && "PDF 리포트"}
+                {modalContent === "uploads" && "사고이력"}
+              </Text>
+              <TouchableOpacity
+                style={styles.modalCloseButton}
+                onPress={closeModal}
+              >
+                <Ionicons name="close" size={20} color="#6B7280" />
+              </TouchableOpacity>
+            </View>
 
+            <ScrollView
+              style={styles.modalScrollContent}
+              contentContainerStyle={{ paddingVertical: 16, paddingBottom: 24 }}
+              showsVerticalScrollIndicator={false}
+              nestedScrollEnabled={true}
+            >
+                {modalContent === "cells" && report?.cellsData && (
+                  <>
                     {/* 전압 통계 정보 */}
                     {(() => {
                       const voltages = report.cellsData
@@ -908,6 +973,48 @@ const VehicleDiagnosisReportScreen: React.FC<Props> = ({
                       }
                       return null;
                     })()}
+
+                    <View style={styles.cellLegend}>
+                      <View style={styles.legendItem}>
+                        <View
+                          style={[
+                            styles.legendColor,
+                            {
+                              backgroundColor: "#E0F7FA",
+                              borderColor: "#06B6D4",
+                            },
+                          ]}
+                        />
+                        <Text
+                          style={[
+                            styles.legendText,
+                            convertToLineSeedFont(styles.legendText),
+                          ]}
+                        >
+                          정상 셀
+                        </Text>
+                      </View>
+                      <View style={styles.legendItem}>
+                        <View
+                          style={[
+                            styles.legendColor,
+                            {
+                              backgroundColor: "#F8F9FA",
+                              borderColor: "#202632",
+                            },
+                          ]}
+                        />
+                        <Text
+                          style={[
+                            styles.legendText,
+                            convertToLineSeedFont(styles.legendText),
+                          ]}
+                        >
+                          불량 셀
+                        </Text>
+                      </View>
+                    </View>
+
                     <View style={styles.cellGrid}>
                       {report.cellsData.map((cell) => (
                         <View
@@ -952,48 +1059,7 @@ const VehicleDiagnosisReportScreen: React.FC<Props> = ({
                         </View>
                       ))}
                     </View>
-
-                    <View style={styles.cellLegend}>
-                      <View style={styles.legendItem}>
-                        <View
-                          style={[
-                            styles.legendColor,
-                            {
-                              backgroundColor: "#E0F7FA",
-                              borderColor: "#06B6D4",
-                            },
-                          ]}
-                        />
-                        <Text
-                          style={[
-                            styles.legendText,
-                            convertToLineSeedFont(styles.legendText),
-                          ]}
-                        >
-                          정상 셀
-                        </Text>
-                      </View>
-                      <View style={styles.legendItem}>
-                        <View
-                          style={[
-                            styles.legendColor,
-                            {
-                              backgroundColor: "#F8F9FA",
-                              borderColor: "#202632",
-                            },
-                          ]}
-                        />
-                        <Text
-                          style={[
-                            styles.legendText,
-                            convertToLineSeedFont(styles.legendText),
-                          ]}
-                        >
-                          불량 셀
-                        </Text>
-                      </View>
-                    </View>
-                  </View>
+                  </>
                 )}
 
                 {/* 주요 장치 검사 모달 내용 */}
@@ -1009,7 +1075,7 @@ const VehicleDiagnosisReportScreen: React.FC<Props> = ({
                               convertToLineSeedFont(styles.modalSectionTitle),
                             ]}
                           >
-                            조향
+                            조향 장치
                           </Text>
                           {Object.entries(report.majorDevicesInspection.steering).map(
                             ([key, item]) =>
@@ -1023,12 +1089,17 @@ const VehicleDiagnosisReportScreen: React.FC<Props> = ({
                                   >
                                     {item.name}
                                   </Text>
-                                  {item.imageUri && (
-                                    <Image
-                                      source={{ uri: item.imageUri }}
-                                      style={styles.majorDeviceItemImage}
-                                      resizeMode="cover"
-                                    />
+                                  {item.imageUris && item.imageUris.length > 0 && (
+                                    <View style={{ gap: 8 }}>
+                                      {item.imageUris.map((uri, idx) => (
+                                        <Image
+                                          key={idx}
+                                          source={{ uri }}
+                                          style={styles.majorDeviceItemImage}
+                                          resizeMode="cover"
+                                        />
+                                      ))}
+                                    </View>
                                   )}
                                   <View style={styles.majorDeviceItemStatus}>
                                     <View
@@ -1097,7 +1168,7 @@ const VehicleDiagnosisReportScreen: React.FC<Props> = ({
                               convertToLineSeedFont(styles.modalSectionTitle),
                             ]}
                           >
-                            제동
+                            제동 장치
                           </Text>
                           {Object.entries(report.majorDevicesInspection.braking).map(
                             ([key, item]) =>
@@ -1111,12 +1182,17 @@ const VehicleDiagnosisReportScreen: React.FC<Props> = ({
                                   >
                                     {item.name}
                                   </Text>
-                                  {item.imageUri && (
-                                    <Image
-                                      source={{ uri: item.imageUri }}
-                                      style={styles.majorDeviceItemImage}
-                                      resizeMode="cover"
-                                    />
+                                  {item.imageUris && item.imageUris.length > 0 && (
+                                    <View style={{ gap: 8 }}>
+                                      {item.imageUris.map((uri, idx) => (
+                                        <Image
+                                          key={idx}
+                                          source={{ uri }}
+                                          style={styles.majorDeviceItemImage}
+                                          resizeMode="cover"
+                                        />
+                                      ))}
+                                    </View>
                                   )}
                                   <View style={styles.majorDeviceItemStatus}>
                                     <View
@@ -1185,7 +1261,7 @@ const VehicleDiagnosisReportScreen: React.FC<Props> = ({
                               convertToLineSeedFont(styles.modalSectionTitle),
                             ]}
                           >
-                            전기
+                            전기 장치
                           </Text>
                           {Object.entries(report.majorDevicesInspection.electrical).map(
                             ([key, item]) =>
@@ -1199,12 +1275,17 @@ const VehicleDiagnosisReportScreen: React.FC<Props> = ({
                                   >
                                     {item.name}
                                   </Text>
-                                  {item.imageUri && (
-                                    <Image
-                                      source={{ uri: item.imageUri }}
-                                      style={styles.majorDeviceItemImage}
-                                      resizeMode="cover"
-                                    />
+                                  {item.imageUris && item.imageUris.length > 0 && (
+                                    <View style={{ gap: 8 }}>
+                                      {item.imageUris.map((uri, idx) => (
+                                        <Image
+                                          key={idx}
+                                          source={{ uri }}
+                                          style={styles.majorDeviceItemImage}
+                                          resizeMode="cover"
+                                        />
+                                      ))}
+                                    </View>
                                   )}
                                   <View style={styles.majorDeviceItemStatus}>
                                     <View
@@ -1264,6 +1345,536 @@ const VehicleDiagnosisReportScreen: React.FC<Props> = ({
                       )}
                   </View>
                 )}
+
+                {/* 차량 외부 점검 모달 내용 */}
+                {modalContent === "vehicleExterior" && report?.vehicleExteriorInspection && (
+                  <View style={styles.modalSection}>
+                    {/* 차량 외관 사진 */}
+                    {report.vehicleExteriorInspection.vehicleExterior &&
+                      Object.keys(report.vehicleExteriorInspection.vehicleExterior).length > 0 && (
+                        <View style={{ marginBottom: 24 }}>
+                          <Text
+                            style={[
+                              styles.modalSectionTitle,
+                              convertToLineSeedFont(styles.modalSectionTitle),
+                            ]}
+                          >
+                            차량 외관 사진
+                          </Text>
+                          <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 12 }}>
+                            {Object.entries(report.vehicleExteriorInspection.vehicleExterior).map(
+                              ([position, imageUri]) =>
+                                imageUri && (
+                                  <View key={position} style={{ width: "48%" }}>
+                                    <Text
+                                      style={[
+                                        styles.majorDeviceItemName,
+                                        convertToLineSeedFont(styles.majorDeviceItemName),
+                                        { marginBottom: 8 },
+                                      ]}
+                                    >
+                                      {position === "front"
+                                        ? "전면"
+                                        : position === "leftSide"
+                                        ? "좌측"
+                                        : position === "rear"
+                                        ? "후면"
+                                        : "우측"}
+                                    </Text>
+                                    <Image
+                                      source={{ uri: imageUri }}
+                                      style={{ width: "100%", aspectRatio: 4 / 3, borderRadius: 8 }}
+                                      resizeMode="cover"
+                                    />
+                                  </View>
+                                )
+                            )}
+                          </View>
+                        </View>
+                      )}
+
+                    {/* 외판 수리/교체 확인 및 도막 측정 */}
+                    {report.vehicleExteriorInspection.bodyPanel &&
+                      report.vehicleExteriorInspection.bodyPanel.length > 0 && (
+                        <View style={{ marginBottom: 24 }}>
+                          <Text
+                            style={[
+                              styles.modalSectionTitle,
+                              convertToLineSeedFont(styles.modalSectionTitle),
+                            ]}
+                          >
+                            외판 수리/교체 확인 및 도막 측정
+                          </Text>
+                          {report.vehicleExteriorInspection.bodyPanel.map((item, index) => (
+                            <View key={index} style={styles.majorDeviceItem}>
+                              <Text
+                                style={[
+                                  styles.majorDeviceItemName,
+                                  convertToLineSeedFont(styles.majorDeviceItemName),
+                                ]}
+                              >
+                                {item.location}
+                              </Text>
+
+                              {/* 상태 표시 */}
+                              {item.status && (
+                                <View style={styles.majorDeviceItemStatus}>
+                                  <View
+                                    style={[
+                                      styles.majorDeviceStatusBadge,
+                                      item.status === "good"
+                                        ? styles.majorDeviceStatusGood
+                                        : styles.majorDeviceStatusProblem,
+                                    ]}
+                                  >
+                                    <Ionicons
+                                      name={
+                                        item.status === "good"
+                                          ? "checkmark-circle"
+                                          : "alert-circle"
+                                      }
+                                      size={16}
+                                      color={item.status === "good" ? "#10B981" : "#EF4444"}
+                                    />
+                                    <Text
+                                      style={[
+                                        styles.majorDeviceStatusText,
+                                        item.status === "good"
+                                          ? styles.majorDeviceStatusTextGood
+                                          : styles.majorDeviceStatusTextProblem,
+                                        convertToLineSeedFont(styles.majorDeviceStatusText),
+                                      ]}
+                                    >
+                                      {item.status === "good" ? "양호" : "문제 있음"}
+                                    </Text>
+                                  </View>
+                                </View>
+                              )}
+
+                              {/* 도막 두께 */}
+                              {item.thickness !== undefined && (
+                                <Text
+                                  style={[
+                                    styles.majorDeviceIssueText,
+                                    convertToLineSeedFont(styles.majorDeviceIssueText),
+                                    { marginTop: 8 },
+                                  ]}
+                                >
+                                  도막 두께: {item.thickness}μm
+                                </Text>
+                              )}
+
+                              {/* 이미지 */}
+                              {item.imageUris && item.imageUris.length > 0 && (
+                                <View style={{ marginTop: 12, flexDirection: "row", flexWrap: "wrap", gap: 8 }}>
+                                  {item.imageUris.map((uri, imgIndex) => (
+                                    <Image
+                                      key={imgIndex}
+                                      source={{ uri }}
+                                      style={{ width: 100, height: 100, borderRadius: 8 }}
+                                      resizeMode="cover"
+                                    />
+                                  ))}
+                                </View>
+                              )}
+
+                              {/* 특이사항 */}
+                              {item.notes && (
+                                <View style={styles.majorDeviceIssueContainer}>
+                                  <Text
+                                    style={[
+                                      styles.majorDeviceIssueText,
+                                      convertToLineSeedFont(styles.majorDeviceIssueText),
+                                    ]}
+                                  >
+                                    특이사항: {item.notes}
+                                  </Text>
+                                </View>
+                              )}
+                            </View>
+                          ))}
+                        </View>
+                      )}
+
+                    {/* 타이어 및 휠 검사 */}
+                    {report.vehicleExteriorInspection.tiresAndWheels &&
+                      Object.keys(report.vehicleExteriorInspection.tiresAndWheels).length > 0 && (
+                        <View style={{ marginBottom: 24 }}>
+                          <Text
+                            style={[
+                              styles.modalSectionTitle,
+                              convertToLineSeedFont(styles.modalSectionTitle),
+                            ]}
+                          >
+                            타이어 및 휠 검사
+                          </Text>
+                          {Object.entries(report.vehicleExteriorInspection.tiresAndWheels).map(
+                            ([key, item]) =>
+                              item &&
+                              (item.treadDepth !== undefined || item.wheelStatus !== undefined) && (
+                                <View key={key} style={styles.majorDeviceItem}>
+                                  <Text
+                                    style={[
+                                      styles.majorDeviceItemName,
+                                      convertToLineSeedFont(styles.majorDeviceItemName),
+                                    ]}
+                                  >
+                                    {key === "driverFront"
+                                      ? "운전석 앞 타이어"
+                                      : key === "driverRear"
+                                      ? "운전석 뒤 타이어"
+                                      : key === "passengerRear"
+                                      ? "조수석 뒤 타이어"
+                                      : "조수석 앞 타이어"}
+                                  </Text>
+                                  {item.treadDepth !== undefined && (
+                                    <Text
+                                      style={[
+                                        styles.majorDeviceIssueText,
+                                        convertToLineSeedFont(styles.majorDeviceIssueText),
+                                        { marginTop: 8 },
+                                      ]}
+                                    >
+                                      트레드 깊이: {item.treadDepth}mm
+                                    </Text>
+                                  )}
+                                  {item.wheelStatus && (
+                                    <>
+                                      <View style={styles.majorDeviceItemStatus}>
+                                        <View
+                                          style={[
+                                            styles.majorDeviceStatusBadge,
+                                            item.wheelStatus === "good"
+                                              ? styles.majorDeviceStatusGood
+                                              : styles.majorDeviceStatusProblem,
+                                          ]}
+                                        >
+                                          <Ionicons
+                                            name={
+                                              item.wheelStatus === "good"
+                                                ? "checkmark-circle"
+                                                : "alert-circle"
+                                            }
+                                            size={16}
+                                            color={item.wheelStatus === "good" ? "#10B981" : "#EF4444"}
+                                          />
+                                          <Text
+                                            style={[
+                                              styles.majorDeviceStatusText,
+                                              item.wheelStatus === "good"
+                                                ? styles.majorDeviceStatusTextGood
+                                                : styles.majorDeviceStatusTextProblem,
+                                              convertToLineSeedFont(styles.majorDeviceStatusText),
+                                            ]}
+                                          >
+                                            휠: {item.wheelStatus === "good" ? "양호" : "문제 있음"}
+                                          </Text>
+                                        </View>
+                                      </View>
+                                      {item.wheelStatus === "problem" &&
+                                        item.wheelIssueDescription && (
+                                          <View style={styles.majorDeviceIssueContainer}>
+                                            <Text
+                                              style={[
+                                                styles.majorDeviceIssueText,
+                                                convertToLineSeedFont(
+                                                  styles.majorDeviceIssueText
+                                                ),
+                                              ]}
+                                            >
+                                              {item.wheelIssueDescription}
+                                            </Text>
+                                          </View>
+                                        )}
+                                    </>
+                                  )}
+                                </View>
+                              )
+                          )}
+                        </View>
+                      )}
+                  </View>
+                )}
+
+                {/* 차량 하부 점검 모달 내용 */}
+                {modalContent === "vehicleUndercarriage" &&
+                  report?.vehicleUndercarriageInspection && (
+                    <View style={styles.modalSection}>
+                      {/* 조향 (Steering) */}
+                      {report.vehicleUndercarriageInspection.steering &&
+                        Object.keys(report.vehicleUndercarriageInspection.steering).length > 0 && (
+                          <View style={{ marginBottom: 24 }}>
+                            <Text
+                              style={[
+                                styles.modalSectionTitle,
+                                convertToLineSeedFont(styles.modalSectionTitle),
+                              ]}
+                            >
+                              조향
+                            </Text>
+                            {Object.entries(report.vehicleUndercarriageInspection.steering).map(
+                              ([key, item]) =>
+                                item && (
+                                  <View key={key} style={styles.majorDeviceItem}>
+                                    <Text
+                                      style={[
+                                        styles.majorDeviceItemName,
+                                        convertToLineSeedFont(styles.majorDeviceItemName),
+                                      ]}
+                                    >
+                                      {item.name}
+                                    </Text>
+                                    {item.imageUris && item.imageUris.length > 0 && (
+                                      <View style={{ gap: 8 }}>
+                                        {item.imageUris.map((uri, idx) => (
+                                          <Image
+                                            key={idx}
+                                            source={{ uri }}
+                                            style={styles.majorDeviceItemImage}
+                                            resizeMode="cover"
+                                          />
+                                        ))}
+                                      </View>
+                                    )}
+                                    <View style={styles.majorDeviceItemStatus}>
+                                      <View
+                                        style={[
+                                          styles.majorDeviceStatusBadge,
+                                          item.status === "good"
+                                            ? styles.majorDeviceStatusGood
+                                            : styles.majorDeviceStatusProblem,
+                                        ]}
+                                      >
+                                        <Ionicons
+                                          name={
+                                            item.status === "good"
+                                              ? "checkmark-circle"
+                                              : "alert-circle"
+                                          }
+                                          size={16}
+                                          color={item.status === "good" ? "#10B981" : "#EF4444"}
+                                        />
+                                        <Text
+                                          style={[
+                                            styles.majorDeviceStatusText,
+                                            item.status === "good"
+                                              ? styles.majorDeviceStatusTextGood
+                                              : styles.majorDeviceStatusTextProblem,
+                                            convertToLineSeedFont(styles.majorDeviceStatusText),
+                                          ]}
+                                        >
+                                          {item.status === "good" ? "양호" : "문제 있음"}
+                                        </Text>
+                                      </View>
+                                    </View>
+                                    {item.status === "problem" && item.issueDescription && (
+                                      <View style={styles.majorDeviceIssueContainer}>
+                                        <Text
+                                          style={[
+                                            styles.majorDeviceIssueLabel,
+                                            convertToLineSeedFont(styles.majorDeviceIssueLabel),
+                                          ]}
+                                        >
+                                          문제 내용:
+                                        </Text>
+                                        <Text
+                                          style={[
+                                            styles.majorDeviceIssueText,
+                                            convertToLineSeedFont(styles.majorDeviceIssueText),
+                                          ]}
+                                        >
+                                          {item.issueDescription}
+                                        </Text>
+                                      </View>
+                                    )}
+                                  </View>
+                                )
+                            )}
+                          </View>
+                        )}
+
+                      {/* 제동 (Braking) */}
+                      {report.vehicleUndercarriageInspection.braking &&
+                        Object.keys(report.vehicleUndercarriageInspection.braking).length > 0 && (
+                          <View style={{ marginBottom: 24 }}>
+                            <Text
+                              style={[
+                                styles.modalSectionTitle,
+                                convertToLineSeedFont(styles.modalSectionTitle),
+                              ]}
+                            >
+                              제동
+                            </Text>
+                            {Object.entries(report.vehicleUndercarriageInspection.braking).map(
+                              ([key, item]) =>
+                                item && (
+                                  <View key={key} style={styles.majorDeviceItem}>
+                                    <Text
+                                      style={[
+                                        styles.majorDeviceItemName,
+                                        convertToLineSeedFont(styles.majorDeviceItemName),
+                                      ]}
+                                    >
+                                      {item.name}
+                                    </Text>
+                                    {item.imageUris && item.imageUris.length > 0 && (
+                                      <View style={{ gap: 8 }}>
+                                        {item.imageUris.map((uri, idx) => (
+                                          <Image
+                                            key={idx}
+                                            source={{ uri }}
+                                            style={styles.majorDeviceItemImage}
+                                            resizeMode="cover"
+                                          />
+                                        ))}
+                                      </View>
+                                    )}
+                                    <View style={styles.majorDeviceItemStatus}>
+                                      <View
+                                        style={[
+                                          styles.majorDeviceStatusBadge,
+                                          item.status === "good"
+                                            ? styles.majorDeviceStatusGood
+                                            : styles.majorDeviceStatusProblem,
+                                        ]}
+                                      >
+                                        <Ionicons
+                                          name={
+                                            item.status === "good"
+                                              ? "checkmark-circle"
+                                              : "alert-circle"
+                                          }
+                                          size={16}
+                                          color={item.status === "good" ? "#10B981" : "#EF4444"}
+                                        />
+                                        <Text
+                                          style={[
+                                            styles.majorDeviceStatusText,
+                                            item.status === "good"
+                                              ? styles.majorDeviceStatusTextGood
+                                              : styles.majorDeviceStatusTextProblem,
+                                            convertToLineSeedFont(styles.majorDeviceStatusText),
+                                          ]}
+                                        >
+                                          {item.status === "good" ? "양호" : "문제 있음"}
+                                        </Text>
+                                      </View>
+                                    </View>
+                                    {item.status === "problem" && item.issueDescription && (
+                                      <View style={styles.majorDeviceIssueContainer}>
+                                        <Text
+                                          style={[
+                                            styles.majorDeviceIssueLabel,
+                                            convertToLineSeedFont(styles.majorDeviceIssueLabel),
+                                          ]}
+                                        >
+                                          문제 내용:
+                                        </Text>
+                                        <Text
+                                          style={[
+                                            styles.majorDeviceIssueText,
+                                            convertToLineSeedFont(styles.majorDeviceIssueText),
+                                          ]}
+                                        >
+                                          {item.issueDescription}
+                                        </Text>
+                                      </View>
+                                    )}
+                                  </View>
+                                )
+                            )}
+                          </View>
+                        )}
+
+                      {/* 서스펜션 암 사진 */}
+                      {report.vehicleUndercarriageInspection.suspensionArms &&
+                        Object.keys(report.vehicleUndercarriageInspection.suspensionArms).length > 0 && (
+                          <View style={{ marginBottom: 24 }}>
+                            <Text
+                              style={[
+                                styles.modalSectionTitle,
+                                convertToLineSeedFont(styles.modalSectionTitle),
+                              ]}
+                            >
+                              서스펜션 암 검사
+                            </Text>
+                            <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 12 }}>
+                              {Object.entries(report.vehicleUndercarriageInspection.suspensionArms).map(
+                                ([position, imageUri]) =>
+                                  imageUri && (
+                                    <View key={position} style={{ width: "48%" }}>
+                                      <Text
+                                        style={[
+                                          styles.majorDeviceItemName,
+                                          convertToLineSeedFont(styles.majorDeviceItemName),
+                                          { marginBottom: 8 },
+                                        ]}
+                                      >
+                                        {position === "driverFrontWheel"
+                                          ? "운전석 앞 휠"
+                                          : position === "driverRearWheel"
+                                          ? "운전석 뒤 휠"
+                                          : position === "passengerRearWheel"
+                                          ? "조수석 뒤 휠"
+                                          : "조수석 앞 휠"}
+                                      </Text>
+                                      <Image
+                                        source={{ uri: imageUri }}
+                                        style={{ width: "100%", aspectRatio: 4 / 3, borderRadius: 8 }}
+                                        resizeMode="cover"
+                                      />
+                                    </View>
+                                  )
+                              )}
+                            </View>
+                          </View>
+                        )}
+
+                      {/* 하부 배터리 팩 사진 */}
+                      {report.vehicleUndercarriageInspection.underBatteryPack &&
+                        Object.keys(report.vehicleUndercarriageInspection.underBatteryPack).length > 0 && (
+                          <View style={{ marginBottom: 24 }}>
+                            <Text
+                              style={[
+                                styles.modalSectionTitle,
+                                convertToLineSeedFont(styles.modalSectionTitle),
+                              ]}
+                            >
+                              하부 배터리 팩 사진
+                            </Text>
+                            <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 12 }}>
+                              {Object.entries(report.vehicleUndercarriageInspection.underBatteryPack).map(
+                                ([position, imageUri]) =>
+                                  imageUri && (
+                                    <View key={position} style={{ width: "48%" }}>
+                                      <Text
+                                        style={[
+                                          styles.majorDeviceItemName,
+                                          convertToLineSeedFont(styles.majorDeviceItemName),
+                                          { marginBottom: 8 },
+                                        ]}
+                                      >
+                                        {position === "front"
+                                          ? "전면"
+                                          : position === "leftSide"
+                                          ? "좌측"
+                                          : position === "rear"
+                                          ? "후면"
+                                          : "우측"}
+                                      </Text>
+                                      <Image
+                                        source={{ uri: imageUri }}
+                                        style={{ width: "100%", aspectRatio: 4 / 3, borderRadius: 8 }}
+                                        resizeMode="cover"
+                                      />
+                                    </View>
+                                  )
+                              )}
+                            </View>
+                          </View>
+                        )}
+                    </View>
+                  )}
 
                 {modalContent === "images" &&
                   report?.comprehensiveInspection?.inspectionImages && (
@@ -1613,12 +2224,11 @@ const VehicleDiagnosisReportScreen: React.FC<Props> = ({
                   </View>
                 )}
               </ScrollView>
-            </View>
 
             {/* 전체화면 이미지 뷰어 - 모달 내부 오버레이 */}
             {imageViewerVisible && selectedImageData && (
               <View style={styles.fullScreenImageViewerOverlay}>
-                <SafeAreaView style={styles.fullScreenImageViewerContainer}>
+                <View style={[styles.fullScreenImageViewerContainer, { paddingTop: insets.top }]}>
                   <View style={styles.fullScreenImageViewerHeader}>
                     <TouchableOpacity
                       style={styles.fullScreenImageViewerCloseButton}
@@ -1635,10 +2245,10 @@ const VehicleDiagnosisReportScreen: React.FC<Props> = ({
                       resizeMode="contain"
                     />
                   </View>
-                </SafeAreaView>
+                </View>
               </View>
             )}
-          </SafeAreaView>
+          </View>
         </Modal>
       </SafeAreaView>
     </LinearGradient>
@@ -1655,7 +2265,6 @@ const styles = StyleSheet.create({
   content: {
     flex: 1,
     paddingHorizontal: 20,
-    paddingBottom: 20,
   },
   errorContainer: {
     flex: 1,
@@ -1686,7 +2295,6 @@ const styles = StyleSheet.create({
   vehicleHeader: {
     flexDirection: "row",
     alignItems: "center",
-    marginBottom: 24,
   },
   vehicleIconContainer: {
     width: 56,
@@ -2127,8 +2735,8 @@ const styles = StyleSheet.create({
     marginVertical: 16,
   },
   cellItem: {
-    width: 64,
-    height: 56,
+    width: 58,
+    height: 50,
     borderRadius: 8,
     borderWidth: 2,
     justifyContent: "center",
@@ -2178,9 +2786,7 @@ const styles = StyleSheet.create({
     justifyContent: "center",
   },
   modalScrollContent: {
-    flex: 1,
     paddingHorizontal: 20,
-    paddingVertical: 16,
   },
   modalSection: {
     backgroundColor: "#FFFFFF",

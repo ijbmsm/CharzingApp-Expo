@@ -1,5 +1,5 @@
-import React, { useState } from 'react';
-import { View, Image, TextInput, TouchableOpacity, StyleSheet } from 'react-native';
+import React, { useState, useRef } from 'react';
+import { View, Image, TextInput, TouchableOpacity, StyleSheet, Keyboard } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { scale, verticalScale, moderateScale } from 'react-native-size-matters';
 import { InspectionImageItem } from '../../adminWeb/index';
@@ -21,6 +21,7 @@ const InspectionImageCard: React.FC<InspectionImageCardProps> = ({
   onImageEdit,
 }) => {
   const [imageViewerVisible, setImageViewerVisible] = useState(false);
+  const severityRef = useRef<TextInput>(null);
 
   const handleImagePress = () => {
     setImageViewerVisible(true);
@@ -60,13 +61,19 @@ const InspectionImageCard: React.FC<InspectionImageCardProps> = ({
           placeholderTextColor="#9CA3AF"
           value={image.category || ''}
           onChangeText={(text) => onUpdateCategory(image.id, text)}
+          returnKeyType="next"
+          blurOnSubmit={false}
+          onSubmitEditing={() => severityRef.current?.focus()}
         />
         <TextInput
+          ref={severityRef}
           style={styles.metaInput}
           placeholder="상태"
           placeholderTextColor="#9CA3AF"
           value={image.severity || ''}
           onChangeText={(text) => onUpdateSeverity(image.id, text)}
+          returnKeyType="done"
+          onSubmitEditing={Keyboard.dismiss}
         />
       </View>
 

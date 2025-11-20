@@ -5,13 +5,13 @@ import {
   StyleSheet,
   Modal,
   TouchableOpacity,
-  SafeAreaView,
   KeyboardAvoidingView,
   Platform,
   ScrollView,
   Image,
   Alert,
 } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import * as ImagePicker from 'expo-image-picker';
 import { VehiclePhotoInspection } from '../../adminWeb/index';
@@ -30,6 +30,7 @@ const VehiclePhotoBottomSheet: React.FC<VehiclePhotoBottomSheetProps> = ({
   onConfirm,
   initialData,
 }) => {
+  const insets = useSafeAreaInsets();
   const [photoData, setPhotoData] = useState<VehiclePhotoInspection>({
     overallPhotos: {
       front: undefined,
@@ -220,7 +221,17 @@ const VehiclePhotoBottomSheet: React.FC<VehiclePhotoBottomSheetProps> = ({
       presentationStyle="pageSheet"
       onRequestClose={onClose}
     >
-      <SafeAreaView style={styles.container}>
+      <View
+        style={[
+          styles.container,
+          {
+            paddingTop: Platform.OS === 'ios' ? 0 : insets.top,
+            paddingBottom: insets.bottom,
+            paddingLeft: insets.left,
+            paddingRight: insets.right,
+          },
+        ]}
+      >
         <KeyboardAvoidingView
           behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
           style={styles.keyboardView}
@@ -231,7 +242,9 @@ const VehiclePhotoBottomSheet: React.FC<VehiclePhotoBottomSheetProps> = ({
               <Ionicons name="close" size={28} color="#1F2937" />
             </TouchableOpacity>
             <Text style={styles.headerTitle}>전체 사진 촬영</Text>
-            <View style={styles.placeholder} />
+            <TouchableOpacity onPress={handleConfirm} activeOpacity={0.7}>
+              <Text style={styles.saveButton}>저장</Text>
+            </TouchableOpacity>
           </View>
 
           {/* 콘텐츠 */}
@@ -271,18 +284,9 @@ const VehiclePhotoBottomSheet: React.FC<VehiclePhotoBottomSheetProps> = ({
               {renderPhotoItem('undercarriageBattery', 'rear', '뒤')}
               {renderPhotoItem('undercarriageBattery', 'rightSide', '우측(동승석)')}
             </View>
-            {/* 버튼 영역 */}
-            <View style={styles.buttonContainer}>
-              <TouchableOpacity style={styles.cancelButton} onPress={onClose}>
-                <Text style={styles.cancelButtonText}>취소</Text>
-              </TouchableOpacity>
-              <TouchableOpacity style={styles.confirmButton} onPress={handleConfirm}>
-                <Text style={styles.confirmButtonText}>확인</Text>
-              </TouchableOpacity>
-            </View>
           </ScrollView>
         </KeyboardAvoidingView>
-      </SafeAreaView>
+      </View>
 
       {/* Full Screen Image Viewer */}
       <FullScreenImageViewer
@@ -308,10 +312,8 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'space-between',
     paddingHorizontal: 16,
-    paddingVertical: 16,
+    paddingVertical: 8,
     backgroundColor: '#FFFFFF',
-    borderBottomWidth: 1,
-    borderBottomColor: '#E5E7EB',
   },
   closeButton: {
     width: 40,
@@ -320,12 +322,14 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   headerTitle: {
-    fontSize: 18,
-    fontWeight: '700',
-    color: '#1F2937',
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#6B7280',
   },
-  placeholder: {
-    width: 40,
+  saveButton: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#06B6D4',
   },
   content: {
     flex: 1,
@@ -398,41 +402,6 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: '#6B7280',
     marginTop: 8,
-  },
-  buttonContainer: {
-    flexDirection: 'row',
-    padding: 16,
-    paddingBottom: 24,
-    gap: 12,
-    backgroundColor: '#FFFFFF',
-    marginHorizontal: -16,
-    marginTop: 20,
-  },
-  cancelButton: {
-    flex: 1,
-    paddingVertical: 14,
-    borderRadius: 12,
-    borderWidth: 1,
-    borderColor: '#D1D5DB',
-    backgroundColor: '#FFFFFF',
-    alignItems: 'center',
-  },
-  cancelButtonText: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: '#374151',
-  },
-  confirmButton: {
-    flex: 1,
-    paddingVertical: 14,
-    borderRadius: 12,
-    backgroundColor: '#06B6D4',
-    alignItems: 'center',
-  },
-  confirmButtonText: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: '#FFFFFF',
   },
 });
 

@@ -5,12 +5,13 @@ import {
   StyleSheet,
   Modal,
   TouchableOpacity,
-  SafeAreaView,
   KeyboardAvoidingView,
   Platform,
   ScrollView,
   TextInput,
+  Keyboard,
 } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { TireTreadInspection } from '../../adminWeb/index';
 import MultipleImagePicker from './MultipleImagePicker';
@@ -46,6 +47,7 @@ const TireTreadBottomSheet: React.FC<TireTreadBottomSheetProps> = ({
   onConfirm,
   initialData = [],
 }) => {
+  const insets = useSafeAreaInsets();
   const [tireData, setTireData] = useState<Record<TirePosition, {
     treadDepth: string;
     notes: string;
@@ -135,6 +137,16 @@ const TireTreadBottomSheet: React.FC<TireTreadBottomSheetProps> = ({
     }));
   };
 
+  const handleImageEdited = (position: TirePosition, index: number, newUri: string) => {
+    setTireData(prev => ({
+      ...prev,
+      [position]: {
+        ...prev[position],
+        imageUris: prev[position].imageUris.map((uri, i) => i === index ? newUri : uri),
+      },
+    }));
+  };
+
   const handleConfirm = () => {
     const result: TireTreadInspection[] = TIRE_POSITIONS
       .filter(pos => tireData[pos.key].treadDepth)
@@ -173,7 +185,17 @@ const TireTreadBottomSheet: React.FC<TireTreadBottomSheetProps> = ({
       presentationStyle="pageSheet"
       onRequestClose={onClose}
     >
-      <SafeAreaView style={styles.container}>
+      <View
+        style={[
+          styles.container,
+          {
+            paddingTop: Platform.OS === 'ios' ? 0 : insets.top,
+            paddingBottom: insets.bottom,
+            paddingLeft: insets.left,
+            paddingRight: insets.right,
+          },
+        ]}
+      >
         <KeyboardAvoidingView
           behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
           style={styles.keyboardView}
@@ -186,7 +208,12 @@ const TireTreadBottomSheet: React.FC<TireTreadBottomSheetProps> = ({
             <View style={styles.placeholder} />
           </View>
 
-          <ScrollView style={styles.content}>
+          <ScrollView
+            style={styles.content}
+            contentContainerStyle={{ paddingBottom: 100 + insets.bottom }}
+            showsVerticalScrollIndicator={false}
+            keyboardShouldPersistTaps="handled"
+          >
             {/* 안내 문구 */}
             <View style={styles.infoNote}>
               <Text style={styles.infoNoteText}>※ 운전석에 앉은 사람 기준</Text>
@@ -213,6 +240,8 @@ const TireTreadBottomSheet: React.FC<TireTreadBottomSheetProps> = ({
                       value={data.treadDepth}
                       onChangeText={(text) => handleTreadDepthChange(position.key, text)}
                       keyboardType="decimal-pad"
+                      returnKeyType="done"
+                      onSubmitEditing={Keyboard.dismiss}
                     />
                     <Text style={styles.unit}>mm</Text>
                   </View>
@@ -241,6 +270,7 @@ const TireTreadBottomSheet: React.FC<TireTreadBottomSheetProps> = ({
                       imageUris={data.imageUris}
                       onImagesAdded={(newUris) => handleImagesAdded(position.key, newUris)}
                       onImageRemoved={(index) => handleImageRemoved(position.key, index)}
+                      onImageEdited={(index, newUri) => handleImageEdited(position.key, index, newUri)}
                       label="타이어 사진"
                     />
                   </View>
@@ -255,22 +285,25 @@ const TireTreadBottomSheet: React.FC<TireTreadBottomSheetProps> = ({
                     onChangeText={(text) => handleNotesChange(position.key, text)}
                     multiline
                     textAlignVertical="top"
+                    returnKeyType="done"
+                    blurOnSubmit={true}
+                    onSubmitEditing={Keyboard.dismiss}
                   />
                 </View>
               );
             })}
           </ScrollView>
 
-          <View style={styles.footer}>
+          <View style={[styles.footer, { paddingBottom: 8 + insets.bottom }]}>
             <TouchableOpacity
               style={styles.confirmButton}
               onPress={handleConfirm}
             >
-              <Text style={styles.confirmButtonText}>확인</Text>
+              <Text style={styles.confirmButtonText}>저장</Text>
             </TouchableOpacity>
           </View>
         </KeyboardAvoidingView>
-      </SafeAreaView>
+      </View>
     </Modal>
   );
 };
@@ -288,10 +321,8 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'space-between',
     paddingHorizontal: 16,
-    paddingVertical: 16,
+    paddingVertical: 8,
     backgroundColor: '#FFFFFF',
-    borderBottomWidth: 1,
-    borderBottomColor: '#E5E7EB',
   },
   closeButton: {
     width: 40,
@@ -300,9 +331,9 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   headerTitle: {
-    fontSize: 18,
-    fontWeight: '700',
-    color: '#1F2937',
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#6B7280',
   },
   placeholder: {
     width: 40,
@@ -385,7 +416,13 @@ const styles = StyleSheet.create({
     borderColor: '#E5E7EB',
   },
   footer: {
-    padding: 16,
+    position: 'absolute',
+    bottom: 0,
+    left: 0,
+    right: 0,
+    paddingHorizontal: 16,
+    paddingTop: 16,
+    paddingBottom: 8,
     backgroundColor: '#FFFFFF',
     borderTopWidth: 1,
     borderTopColor: '#E5E7EB',

@@ -1,8 +1,17 @@
-import React, { useState } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, Image, Alert, ScrollView } from 'react-native';
-import { Ionicons } from '@expo/vector-icons';
-import * as ImagePicker from 'expo-image-picker';
-import FullScreenImageViewer from './FullScreenImageViewer';
+import React, { useState } from "react";
+import {
+  View,
+  Text,
+  StyleSheet,
+  TouchableOpacity,
+  Image,
+  Alert,
+  ScrollView,
+} from "react-native";
+import { Ionicons } from "@expo/vector-icons";
+import * as ImagePicker from "expo-image-picker";
+import FullScreenImageViewer from "./FullScreenImageViewer";
+import * as Linking from "expo-linking";
 
 interface MultipleImagePickerProps {
   imageUris: string[];
@@ -23,7 +32,9 @@ const MultipleImagePicker: React.FC<MultipleImagePickerProps> = ({
 }) => {
   const [imageViewerVisible, setImageViewerVisible] = useState(false);
   const [selectedImageUri, setSelectedImageUri] = useState<string | null>(null);
-  const [selectedImageIndex, setSelectedImageIndex] = useState<number | null>(null);
+  const [selectedImageIndex, setSelectedImageIndex] = useState<number | null>(
+    null
+  );
 
   const openImageViewer = (uri: string, index: number) => {
     setSelectedImageUri(uri);
@@ -44,7 +55,7 @@ const MultipleImagePicker: React.FC<MultipleImagePickerProps> = ({
   };
   const handleAddImage = () => {
     if (imageUris.length >= maxImages) {
-      Alert.alert('알림', `최대 ${maxImages}장까지 추가할 수 있습니다.`);
+      Alert.alert("알림", `최대 ${maxImages}장까지 추가할 수 있습니다.`);
       return;
     }
 
@@ -55,21 +66,39 @@ const MultipleImagePicker: React.FC<MultipleImagePickerProps> = ({
         {
           text: "갤러리에서 선택",
           onPress: async () => {
+            const gallery =
+              await ImagePicker.requestMediaLibraryPermissionsAsync();
+            if (gallery.status != "granted") {
+              Alert.alert(
+                "갤러리 권한 필요",
+                "사진 선택을 위해 갤러리 접근 권한이 필요합니다.",
+                [
+                  { text: "취소", style: "cancel" },
+                  {
+                    text: "설정으로 이동",
+                    onPress: () => Linking.openSettings(),
+                  },
+                ]
+              );
+            }
             try {
               const result = await ImagePicker.launchImageLibraryAsync({
-                mediaTypes: ['images'],
+                mediaTypes: ["images", "videos"],
                 allowsMultipleSelection: true,
                 quality: 0.8,
                 allowsEditing: false,
               });
 
-              if (!result.canceled && result.assets && result.assets.length > 0) {
-                const newUris = result.assets.map(asset => asset.uri);
+              if (!result.canceled && result.assets) {
+                const newUris = result.assets.map((a) => a.uri);
                 const remainingSlots = maxImages - imageUris.length;
                 const urisToAdd = newUris.slice(0, remainingSlots);
 
                 if (newUris.length > remainingSlots) {
-                  Alert.alert('알림', `최대 ${maxImages}장까지 추가할 수 있어 ${remainingSlots}장만 추가되었습니다.`);
+                  Alert.alert(
+                    "알림",
+                    `최대 ${maxImages}장까지 추가 가능합니다. ${remainingSlots}장만 추가되었습니다.`
+                  );
                 }
 
                 onImagesAdded(urisToAdd);
@@ -83,14 +112,28 @@ const MultipleImagePicker: React.FC<MultipleImagePickerProps> = ({
         {
           text: "사진 촬영",
           onPress: async () => {
+            const camera = await ImagePicker.requestCameraPermissionsAsync();
+            if (camera.status != "granted") {
+              Alert.alert(
+                "카메라 권한이 필요합니다",
+                "사진 촬영을 위해 카메라 권한이 필요합니다",
+                [
+                  { text: "취소", style: "cancel" },
+                  {
+                    text: "설정으로 이동",
+                    onPress: () => Linking.openSettings(),
+                  },
+                ]
+              );
+            }
             try {
               const result = await ImagePicker.launchCameraAsync({
-                mediaTypes: ['images'],
+                mediaTypes: ["images"],
                 quality: 0.8,
                 allowsEditing: false,
               });
 
-              if (!result.canceled && result.assets && result.assets.length > 0 && result.assets[0]) {
+              if (!result.canceled && result.assets && result.assets[0]) {
                 onImagesAdded([result.assets[0].uri]);
               }
             } catch (error) {
@@ -132,11 +175,7 @@ const MultipleImagePicker: React.FC<MultipleImagePickerProps> = ({
             activeOpacity={0.9}
             style={styles.imageTouchable}
           >
-            <Image
-              source={{ uri }}
-              style={styles.image}
-              resizeMode="cover"
-            />
+            <Image source={{ uri }} style={styles.image} resizeMode="cover" />
           </TouchableOpacity>
           <TouchableOpacity
             style={styles.removeButton}
@@ -171,44 +210,39 @@ const styles = StyleSheet.create({
     height: 90,
     borderRadius: 8,
     borderWidth: 2,
-    borderColor: '#E5E7EB',
-    borderStyle: 'dashed',
-    backgroundColor: '#F9FAFB',
-    justifyContent: 'center',
-    alignItems: 'center',
+    borderColor: "#E5E7EB",
+    borderStyle: "dashed",
+    backgroundColor: "#F9FAFB",
+    justifyContent: "center",
+    alignItems: "center",
   },
   addButtonText: {
     marginTop: 6,
     fontSize: 13,
-    color: '#9CA3AF',
-    fontWeight: '500',
+    color: "#9CA3AF",
+    fontWeight: "500",
   },
   imageItem: {
     width: 90,
     height: 90,
     borderRadius: 8,
-    overflow: 'hidden',
-    position: 'relative',
+    overflow: "hidden",
+    position: "relative",
   },
   imageTouchable: {
-    width: '100%',
-    height: '100%',
+    width: "100%",
+    height: "100%",
   },
   image: {
-    width: '100%',
-    height: '100%',
+    width: "100%",
+    height: "100%",
   },
   removeButton: {
-    position: 'absolute',
+    position: "absolute",
     top: 6,
     right: 6,
-    backgroundColor: 'rgba(255, 255, 255, 0.9)',
+    backgroundColor: "rgba(255, 255, 255, 0.9)",
     borderRadius: 10,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.2,
-    shadowRadius: 2,
-    elevation: 2,
   },
 });
 

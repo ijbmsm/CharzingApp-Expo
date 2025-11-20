@@ -28,7 +28,7 @@ import BatteryInfoScreen from '../screens/BatteryInfoScreen';
 // 새로운 예약 플로우 화면들
 import ReservationScreen from '../screens/ReservationScreen';
 import DiagnosticTabScreen from '../screens/DiagnosticTabScreen';
-import VehicleInspectionScreen from '../screens/VehicleInspectionScreen';
+import VehicleInspectionScreen from '../screens/VehicleInspection';
 import ReservationApprovalScreen from '../screens/ReservationApprovalScreen';
 import ReservationsManagementScreen from '../screens/ReservationsManagementScreen';
 
@@ -109,7 +109,19 @@ export type RootStackParamList = {
   // Admin 전용 화면들
   ReservationApproval: undefined;
   ReservationsManagement: undefined;
-  VehicleInspection: undefined;
+  VehicleInspection: {
+    reservation?: {
+      id: string;
+      userId?: string;
+      userName?: string;
+      userPhone?: string;
+      vehicleBrand?: string;
+      vehicleModel?: string;
+      vehicleYear?: string;
+      requestedDate: Date | Timestamp | string | FieldValue;
+      status: 'pending' | 'confirmed' | 'in_progress' | 'completed' | 'cancelled';
+    };
+  } | undefined;
   AdminReservationList: undefined;
 };
 

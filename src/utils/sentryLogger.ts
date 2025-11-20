@@ -343,22 +343,45 @@ class SentryLogger {
   }
 
   /**
-   * 에러 로그 (non-fatal)
+   * 일반 로그 (정보성)
    */
-  logError(error: Error, context?: string): void {
+  log(message: string, data?: Record<string, any>): void {
     if (this.isDevelopment) {
-      console.error('❌ [DEV] Sentry 에러:', { error, context });
+      console.log(`📝 [DEV] ${message}`, data || '');
       return;
     }
 
     try {
-      if (context) {
-        Sentry.addBreadcrumb({
-          message: `❌ 에러 발생 - Context: ${context}`,
-          level: 'error',
-        });
-      }
-      Sentry.captureException(error);
+      Sentry.addBreadcrumb({
+        message,
+        level: 'info',
+        data,
+      });
+    } catch (error) {
+      console.warn('⚠️ Sentry 로그 실패:', error);
+    }
+  }
+
+  /**
+   * 에러 로그 (non-fatal)
+   */
+  logError(message: string, error: Error, data?: Record<string, any>): void {
+    if (this.isDevelopment) {
+      console.error(`❌ [DEV] ${message}`, { error, ...data });
+      return;
+    }
+
+    try {
+      Sentry.addBreadcrumb({
+        message: `❌ ${message}`,
+        level: 'error',
+        data: { ...data, errorMessage: error.message, errorStack: error.stack },
+      });
+      Sentry.captureException(error, {
+        contexts: {
+          custom: data || {},
+        },
+      });
     } catch (err) {
       console.warn('⚠️ Sentry 에러 로그 실패:', err);
     }
@@ -470,6 +493,406 @@ class SentryLogger {
     }
 
     throw new Error('Sentry 테스트 크래시');
+  }
+
+  // ========================================
+  // 🔥 100% 로깅 시스템 (5가지 카테고리)
+  // ========================================
+
+  /**
+   * 1️⃣ Flow Tracing - 기능 단위 플로우 추적
+   * 성공 로그는 Breadcrumb만 사용 (captureException은 실패 시만)
+   */
+
+  // Draft 관련 Flow
+  logDraftSaveStart(userId: string, dataSize: number): void {
+    if (this.isDevelopment) {
+      console.log('📝 [DEV] Draft 저장 시작', { userId, dataSize });
+      return;
+    }
+    Sentry.addBreadcrumb({
+      category: 'draft',
+      level: 'info',
+      message: 'Draft save started',
+      data: { userId, dataSize },
+    });
+  }
+
+  logDraftSaveSuccess(userId: string, dataSize: number, duration: number): void {
+    if (this.isDevelopment) {
+      console.log('✅ [DEV] Draft 저장 완료', { userId, dataSize, duration });
+      return;
+    }
+    Sentry.addBreadcrumb({
+      category: 'draft',
+      level: 'info',
+      message: 'Draft saved successfully',
+      data: { userId, dataSize, duration },
+    });
+  }
+
+  logDraftLoadStart(userId: string): void {
+    if (this.isDevelopment) {
+      console.log('📝 [DEV] Draft 불러오기 시작', { userId });
+      return;
+    }
+    Sentry.addBreadcrumb({
+      category: 'draft',
+      level: 'info',
+      message: 'Draft load started',
+      data: { userId },
+    });
+  }
+
+  logDraftLoadSuccess(userId: string, dataSize: number, savedAt: string): void {
+    if (this.isDevelopment) {
+      console.log('✅ [DEV] Draft 불러오기 완료', { userId, dataSize, savedAt });
+      return;
+    }
+    Sentry.addBreadcrumb({
+      category: 'draft',
+      level: 'info',
+      message: 'Draft loaded successfully',
+      data: { userId, dataSize, savedAt },
+    });
+  }
+
+  logDraftAutoResume(userId: string, elapsedSeconds: number): void {
+    if (this.isDevelopment) {
+      console.log('⚡ [DEV] 빠른 재진입 - 자동 이어쓰기', { userId, elapsedSeconds });
+      return;
+    }
+    Sentry.addBreadcrumb({
+      category: 'draft',
+      level: 'info',
+      message: 'Draft auto-resumed (quick re-entry)',
+      data: { userId, elapsedSeconds },
+    });
+  }
+
+  logDraftPopupShown(userId: string, elapsedSeconds: number): void {
+    if (this.isDevelopment) {
+      console.log('🕐 [DEV] 오래 후 재진입 - 팝업 표시', { userId, elapsedSeconds });
+      return;
+    }
+    Sentry.addBreadcrumb({
+      category: 'draft',
+      level: 'info',
+      message: 'Draft popup shown (delayed re-entry)',
+      data: { userId, elapsedSeconds },
+    });
+  }
+
+  logDraftDeleted(userId: string, reason: 'user_choice' | 'submission_success' | 'expired'): void {
+    if (this.isDevelopment) {
+      console.log('🗑️ [DEV] Draft 삭제', { userId, reason });
+      return;
+    }
+    Sentry.addBreadcrumb({
+      category: 'draft',
+      level: 'info',
+      message: `Draft deleted (${reason})`,
+      data: { userId, reason },
+    });
+  }
+
+  /**
+   * 2️⃣ 이미지 업로드 상세 로그
+   */
+
+  logImagePickStart(userId: string, source: 'camera' | 'gallery', category: string): void {
+    if (this.isDevelopment) {
+      console.log('📷 [DEV] 이미지 선택 시작', { userId, source, category });
+      return;
+    }
+    Sentry.addBreadcrumb({
+      category: 'image',
+      level: 'info',
+      message: `Image pick started (${source})`,
+      data: { userId, source, category },
+    });
+  }
+
+  logImagePickSuccess(userId: string, count: number, source: 'camera' | 'gallery', category: string): void {
+    if (this.isDevelopment) {
+      console.log('✅ [DEV] 이미지 선택 완료', { userId, count, source, category });
+      return;
+    }
+    Sentry.addBreadcrumb({
+      category: 'image',
+      level: 'info',
+      message: `Image picked successfully (${count} images)`,
+      data: { userId, count, source, category },
+    });
+  }
+
+  logImageUploadStart(userId: string, count: number, category: string): void {
+    if (this.isDevelopment) {
+      console.log('📤 [DEV] 이미지 업로드 시작', { userId, count, category });
+      return;
+    }
+    Sentry.addBreadcrumb({
+      category: 'image',
+      level: 'info',
+      message: `Image upload started (${count} images)`,
+      data: { userId, count, category },
+    });
+  }
+
+  logImageUploadProgress(userId: string, current: number, total: number, category: string): void {
+    if (this.isDevelopment) {
+      console.log('📊 [DEV] 이미지 업로드 진행', { userId, current, total, category });
+      return;
+    }
+    Sentry.addBreadcrumb({
+      category: 'image',
+      level: 'info',
+      message: `Image upload progress (${current}/${total})`,
+      data: { userId, current, total, category },
+    });
+  }
+
+  logImageUploadSuccess(userId: string, count: number, category: string, duration: number): void {
+    if (this.isDevelopment) {
+      console.log('✅ [DEV] 이미지 업로드 완료', { userId, count, category, duration });
+      return;
+    }
+    Sentry.addBreadcrumb({
+      category: 'image',
+      level: 'info',
+      message: `Image uploaded successfully (${count} images)`,
+      data: { userId, count, category, duration },
+    });
+  }
+
+  logImageUploadError(userId: string, error: Error, category: string, imageIndex?: number): void {
+    if (this.isDevelopment) {
+      console.error('❌ [DEV] 이미지 업로드 실패', { userId, error, category, imageIndex });
+      return;
+    }
+    Sentry.addBreadcrumb({
+      category: 'image',
+      level: 'error',
+      message: `Image upload failed`,
+      data: { userId, category, imageIndex, errorMessage: error.message },
+    });
+    Sentry.captureException(error, {
+      tags: { category, image_index: imageIndex?.toString() || 'unknown' },
+    });
+  }
+
+  /**
+   * 3️⃣ UI Interactions - 사용자 액션 로그
+   */
+
+  logButtonClick(userId: string, buttonName: string, screenName: string): void {
+    if (this.isDevelopment) {
+      console.log('👆 [DEV] 버튼 클릭', { userId, buttonName, screenName });
+      return;
+    }
+    Sentry.addBreadcrumb({
+      category: 'ui',
+      level: 'info',
+      message: `Button clicked: ${buttonName}`,
+      data: { userId, buttonName, screenName },
+    });
+  }
+
+  logModalOpen(userId: string, modalName: string, trigger: string): void {
+    if (this.isDevelopment) {
+      console.log('🔓 [DEV] 모달 열림', { userId, modalName, trigger });
+      return;
+    }
+    Sentry.addBreadcrumb({
+      category: 'ui',
+      level: 'info',
+      message: `Modal opened: ${modalName}`,
+      data: { userId, modalName, trigger },
+    });
+  }
+
+  logModalClose(userId: string, modalName: string, action: string): void {
+    if (this.isDevelopment) {
+      console.log('🔒 [DEV] 모달 닫힘', { userId, modalName, action });
+      return;
+    }
+    Sentry.addBreadcrumb({
+      category: 'ui',
+      level: 'info',
+      message: `Modal closed: ${modalName}`,
+      data: { userId, modalName, action },
+    });
+  }
+
+  logAccordionToggle(userId: string, sectionName: string, isExpanded: boolean): void {
+    if (this.isDevelopment) {
+      console.log('📂 [DEV] 아코디언 토글', { userId, sectionName, isExpanded });
+      return;
+    }
+    Sentry.addBreadcrumb({
+      category: 'ui',
+      level: 'info',
+      message: `Accordion ${isExpanded ? 'expanded' : 'collapsed'}: ${sectionName}`,
+      data: { userId, sectionName, isExpanded },
+    });
+  }
+
+  logScreenView(userId: string, screenName: string, params?: Record<string, any>): void {
+    if (this.isDevelopment) {
+      console.log('📱 [DEV] 화면 진입', { userId, screenName, params });
+      return;
+    }
+    Sentry.addBreadcrumb({
+      category: 'navigation',
+      level: 'info',
+      message: `Screen view: ${screenName}`,
+      data: { userId, screenName, ...params },
+    });
+  }
+
+  logFormFieldChange(userId: string, fieldName: string, screenName: string): void {
+    if (this.isDevelopment) {
+      console.log('✏️ [DEV] 폼 필드 변경', { userId, fieldName, screenName });
+      return;
+    }
+    Sentry.addBreadcrumb({
+      category: 'ui',
+      level: 'info',
+      message: `Form field changed: ${fieldName}`,
+      data: { userId, fieldName, screenName },
+    });
+  }
+
+  /**
+   * 4️⃣ Draft 구조 변화 감시
+   */
+
+  logDraftStructureChange(userId: string, section: string, changeType: 'add' | 'update' | 'delete', fieldCount: number): void {
+    if (this.isDevelopment) {
+      console.log('🔄 [DEV] Draft 구조 변경', { userId, section, changeType, fieldCount });
+      return;
+    }
+    Sentry.addBreadcrumb({
+      category: 'draft',
+      level: 'info',
+      message: `Draft structure changed (${section}: ${changeType})`,
+      data: { userId, section, changeType, fieldCount },
+    });
+  }
+
+  logDraftValidation(userId: string, isValid: boolean, errors?: string[]): void {
+    if (this.isDevelopment) {
+      console.log('✔️ [DEV] Draft 검증', { userId, isValid, errors });
+      return;
+    }
+    Sentry.addBreadcrumb({
+      category: 'draft',
+      level: isValid ? 'info' : 'warning',
+      message: `Draft validation ${isValid ? 'passed' : 'failed'}`,
+      data: { userId, isValid, errors },
+    });
+  }
+
+  logDraftImageCount(userId: string, totalImages: number, sections: Record<string, number>): void {
+    if (this.isDevelopment) {
+      console.log('🖼️ [DEV] Draft 이미지 수', { userId, totalImages, sections });
+      return;
+    }
+    Sentry.addBreadcrumb({
+      category: 'draft',
+      level: 'info',
+      message: `Draft contains ${totalImages} images`,
+      data: { userId, totalImages, sections },
+    });
+  }
+
+  /**
+   * 5️⃣ 디바이스/네트워크 환경
+   */
+
+  logDeviceInfo(platform: string, osVersion: string, appVersion: string, isSimulator: boolean): void {
+    if (this.isDevelopment) {
+      console.log('📱 [DEV] 디바이스 정보', { platform, osVersion, appVersion, isSimulator });
+      return;
+    }
+    Sentry.addBreadcrumb({
+      category: 'device',
+      level: 'info',
+      message: 'Device info captured',
+      data: { platform, osVersion, appVersion, isSimulator },
+    });
+    Sentry.setTag('platform', platform);
+    Sentry.setTag('os_version', osVersion);
+    Sentry.setTag('app_version', appVersion);
+    Sentry.setTag('is_simulator', isSimulator.toString());
+  }
+
+  logNetworkStatus(isConnected: boolean, type?: string): void {
+    if (this.isDevelopment) {
+      console.log('🌐 [DEV] 네트워크 상태', { isConnected, type });
+      return;
+    }
+    Sentry.addBreadcrumb({
+      category: 'network',
+      level: isConnected ? 'info' : 'warning',
+      message: `Network ${isConnected ? 'connected' : 'disconnected'}`,
+      data: { isConnected, type },
+    });
+  }
+
+  logAPICallStart(endpoint: string, method: string): void {
+    if (this.isDevelopment) {
+      console.log('🌐 [DEV] API 호출 시작', { endpoint, method });
+      return;
+    }
+    Sentry.addBreadcrumb({
+      category: 'network',
+      level: 'info',
+      message: `API call started: ${method} ${endpoint}`,
+      data: { endpoint, method },
+    });
+  }
+
+  logAPICallSuccess(endpoint: string, method: string, duration: number, statusCode: number): void {
+    if (this.isDevelopment) {
+      console.log('✅ [DEV] API 호출 성공', { endpoint, method, duration, statusCode });
+      return;
+    }
+    Sentry.addBreadcrumb({
+      category: 'network',
+      level: 'info',
+      message: `API call success: ${method} ${endpoint}`,
+      data: { endpoint, method, duration, statusCode },
+    });
+  }
+
+  logAPICallError(endpoint: string, method: string, error: Error, statusCode?: number): void {
+    if (this.isDevelopment) {
+      console.error('❌ [DEV] API 호출 실패', { endpoint, method, error, statusCode });
+      return;
+    }
+    Sentry.addBreadcrumb({
+      category: 'network',
+      level: 'error',
+      message: `API call failed: ${method} ${endpoint}`,
+      data: { endpoint, method, statusCode, errorMessage: error.message },
+    });
+    Sentry.captureException(error, {
+      tags: { endpoint, method, status_code: statusCode?.toString() || 'unknown' },
+    });
+  }
+
+  logStorageSize(userId: string, draftSize: number, imageSize: number): void {
+    if (this.isDevelopment) {
+      console.log('💾 [DEV] 저장소 크기', { userId, draftSize, imageSize });
+      return;
+    }
+    Sentry.addBreadcrumb({
+      category: 'performance',
+      level: 'info',
+      message: 'Storage size captured',
+      data: { userId, draftSize, imageSize, totalSize: draftSize + imageSize },
+    });
   }
 }
 

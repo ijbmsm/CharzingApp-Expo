@@ -5,9 +5,9 @@ import {
   ScrollView,
   StyleSheet,
   TouchableOpacity,
-  SafeAreaView,
   Alert,
 } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import {NativeStackScreenProps} from '@react-navigation/native-stack';
 import {RootStackParamList} from '../navigation/RootNavigator';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
@@ -134,10 +134,11 @@ const DiagnosisReportListScreen: React.FC<Props> = ({navigation}) => {
 
   return (
     <SafeAreaView style={styles.container}>
-      <Header 
-        title="진단 리포트 목록" 
-        showBackButton={true} 
+      <Header
+        title="진단 리포트 목록"
+        showBackButton={true}
         showLogo={false}
+        showNotification={true}
         onBackPress={() => navigation.goBack()}
       />
       
@@ -166,7 +167,7 @@ const DiagnosisReportListScreen: React.FC<Props> = ({navigation}) => {
                     </View>
                     <View style={styles.statItem}>
                       <Text style={styles.statNumber}>
-                        {vehicleReports.filter(r => r.status === 'approved' || r.status === 'published').length}
+                        {vehicleReports.filter(r => r.status === 'published').length}
                       </Text>
                       <Text style={styles.statLabel}>완료</Text>
                     </View>

@@ -1,0 +1,139 @@
+rules_version = '2';
+
+service firebase.storage {
+  match /b/{bucket}/o {
+
+    // ============================================
+    // 헬퍼 함수
+    // ============================================
+
+    // 인증된 사용자인지 확인
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+
+    // 특정 사용자인지 확인
+    function isUser(userId) {
+      return isAuthenticated() && request.auth.uid == userId;
+    }
+
+    // 사용자 role 조회 (없으면 'user'로 간주)
+    function getUserRole() {
+      return isAuthenticated()
+        ? firestore.get(/databases/(default)/documents/users/$(request.auth.uid)).data.get('role', 'user')
+        : null;
+    }
+
+    // Admin 권한 확인
+    function isAdmin() {
+      return getUserRole() == 'admin';
+    }
+
+    // 이미지 파일인지 확인 (10MB 제한)
+    function isValidImage() {
+      return request.resource.size < 10 * 1024 * 1024
+        && request.resource.contentType.matches('image/.*');
+    }
+
+    // PDF 파일인지 확인 (20MB 제한)
+    function isValidPDF() {
+      return request.resource.size < 20 * 1024 * 1024
+        && request.resource.contentType == 'application/pdf';
+    }
+
+
+    // ============================================
+    // 1. vehicle-images - 차량 이미지 (공개)
+    // ============================================
+    match /vehicle-images/{allPaths=**} {
+      // 읽기: 모두 허용 (공개 이미지)
+      allow read: if true;
+
+      // 쓰기: Admin만 (차량 데이터 관리)
+      allow write: if isAdmin() && isValidImage();
+    }
+
+
+    // ============================================
+    // 2. vehicleInspections - 차량 검사 이미지
+    // ============================================
+    match /vehicleInspections/{userId}/{fileName} {
+      // 읽기: 모든 인증 사용자 (보안 필요 없는 정보)
+      allow read: if isAuthenticated();
+
+      // 쓰기: 업로드한 본인 또는 Admin만
+      allow write: if (isUser(userId) || isAdmin()) && isValidImage();
+
+      // 삭제: 업로드한 본인 또는 Admin
+      allow delete: if isUser(userId) || isAdmin();
+    }
+
+
+    // ============================================
+    // 3. reports - 리포트 이미지/PDF (reportId 기반)
+    // ============================================
+    match /reports/{reportId}/{fileName} {
+      // 읽기: 모든 인증 사용자 (보안 필요 없는 정보)
+      allow read: if isAuthenticated();
+
+      // 쓰기: Admin만
+      allow write: if isAdmin() && (isValidPDF() || isValidImage());
+
+      // 삭제: Admin만
+      allow delete: if isAdmin();
+    }
+
+
+    // ============================================
+    // 4. diagnosis-reports - 진단 리포트 PDF (레거시)
+    // ============================================
+    match /diagnosis-reports/{reportId}/{fileName} {
+      // 읽기: 모든 인증 사용자 (보안 필요 없는 정보)
+      allow read: if isAuthenticated();
+
+      // 쓰기: Admin만
+      allow write: if isAdmin() && (isValidPDF() || isValidImage());
+
+      // 삭제: Admin만
+      allow delete: if isAdmin();
+    }
+
+
+    // ============================================
+    // 5. inspection-images - 검사 이미지 (레거시)
+    // ============================================
+    match /inspection-images/{userId}/{fileName} {
+      // 읽기: 모든 인증 사용자
+      allow read: if isAuthenticated();
+
+      // 쓰기: 업로드한 본인 또는 Admin만
+      allow write: if (isUser(userId) || isAdmin()) && isValidImage();
+
+      // 삭제: 업로드한 본인 또는 Admin
+      allow delete: if isUser(userId) || isAdmin();
+    }
+
+
+    // ============================================
+    // 6. user-uploads - 사용자 업로드 (예약 시 차량 사진 등)
+    // ============================================
+    match /user-uploads/{userId}/{fileName} {
+      // 읽기: 업로드한 본인 또는 Admin
+      allow read: if isUser(userId) || isAdmin();
+
+      // 쓰기: 업로드한 본인만
+      allow write: if isUser(userId) && isValidImage();
+
+      // 삭제: 업로드한 본인 또는 Admin
+      allow delete: if isUser(userId) || isAdmin();
+    }
+
+
+    // ============================================
+    // 기타: 명시되지 않은 경로는 모두 거부
+    // ============================================
+    match /{allPaths=**} {
+      allow read, write: if false;
+    }
+  }
+}

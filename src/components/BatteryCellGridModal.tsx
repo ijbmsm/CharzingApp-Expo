@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   View,
   Text,
@@ -8,10 +8,14 @@ import {
   TextInput,
   StyleSheet,
   Dimensions,
+  KeyboardAvoidingView,
+  Platform,
+  Keyboard,
 } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { scale, verticalScale, moderateScale } from 'react-native-size-matters';
-import { BatteryCell } from '../../adminWeb/index';
+import { BatteryCell } from '../services/firebaseService';
 import BatteryCellDetailModal from './BatteryCellDetailModal';
 
 interface BatteryCellGridModalProps {
@@ -37,12 +41,19 @@ const BatteryCellGridModal: React.FC<BatteryCellGridModalProps> = ({
   onCellsUpdate,
   onDefaultVoltageChange,
 }) => {
-  const screenHeight = Dimensions.get('window').height;
-  const screenWidth = Dimensions.get('window').width;
+  const insets = useSafeAreaInsets();
 
   // Detail Modal State
   const [selectedCellForEdit, setSelectedCellForEdit] = useState<BatteryCell | null>(null);
   const [isCellDetailModalVisible, setIsCellDetailModalVisible] = useState(false);
+
+  // Local state for default voltage input (입력 중 상태 유지)
+  const [localDefaultVoltage, setLocalDefaultVoltage] = useState('');
+
+  // Sync local state with prop
+  useEffect(() => {
+    setLocalDefaultVoltage(defaultVoltage === 0 ? '' : defaultVoltage.toString());
+  }, [defaultVoltage]);
 
   const handleCellPress = (cell: BatteryCell) => {
     setSelectedCellForEdit(cell);
@@ -95,47 +106,99 @@ const BatteryCellGridModal: React.FC<BatteryCellGridModalProps> = ({
     setSelectedCellForEdit(updatedCell);
   };
 
+  // 모든 셀에 기본 전압 적용
+  const handleApplyToAllCells = () => {
+    if (!localDefaultVoltage || cells.length === 0) return;
+
+    const voltage = parseFloat(localDefaultVoltage);
+    if (isNaN(voltage)) return;
+
+    const updatedCells = cells.map(cell => ({
+      ...cell,
+      voltage: voltage,
+    }));
+    onCellsUpdate(updatedCells);
+  };
+
   return (
     <Modal
       visible={visible}
       animationType="slide"
-      transparent={true}
+      presentationStyle="pageSheet"
       onRequestClose={onClose}
     >
-      <View style={styles.modalOverlay}>
-        <View style={[styles.modalContainer, { height: screenHeight * 0.92 }]}>
-          {/* Handle Bar */}
-          <View style={styles.handleBarContainer}>
-            <View style={styles.handleBar} />
-          </View>
-
+      <View
+        style={[
+          styles.container,
+          {
+            paddingTop: Platform.OS === 'ios' ? 0 : insets.top,
+            paddingBottom: insets.bottom,
+            paddingLeft: insets.left,
+            paddingRight: insets.right,
+          },
+        ]}
+      >
+        <KeyboardAvoidingView
+          behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+          style={styles.keyboardView}
+        >
           {/* Header */}
           <View style={styles.header}>
-            <Text style={styles.title}>배터리 셀 관리</Text>
             <TouchableOpacity onPress={onClose} activeOpacity={0.7}>
               <Ionicons name="close" size={28} color="#1F2937" />
             </TouchableOpacity>
+            <Text style={styles.title}>배터리 셀 관리</Text>
+            <View style={{ width: 28 }} />
           </View>
 
           {/* Default Voltage Setting */}
           <View style={styles.defaultVoltageContainer}>
             <Text style={styles.defaultVoltageLabel}>기본 전압 (V)</Text>
-            <TextInput
-              style={styles.defaultVoltageInput}
-              value={defaultVoltage === 0 ? '' : defaultVoltage.toString()}
-              onChangeText={onDefaultVoltageChange}
-              keyboardType="default"
-              placeholder="3.7"
-              placeholderTextColor="#9CA3AF"
-            />
-            <Text style={styles.defaultVoltageHint}>* 모든 셀에 적용됩니다</Text>
+            <View style={styles.defaultVoltageRow}>
+              <TextInput
+                style={[styles.defaultVoltageInput, { flex: 1 }]}
+                value={localDefaultVoltage}
+                onChangeText={(text) => {
+                  // 숫자와 소수점만 허용
+                  const filtered = text.replace(/[^0-9.]/g, '');
+
+                  // 소수점이 여러 개면 첫 번째만 유지
+                  const parts = filtered.split('.');
+                  const validText = parts.length > 2 ? `${parts[0]}.${parts.slice(1).join('')}` : filtered;
+
+                  setLocalDefaultVoltage(validText);
+                }}
+                onBlur={() => {
+                  // blur 시 부모에게 전달
+                  onDefaultVoltageChange(localDefaultVoltage);
+                }}
+                keyboardType="decimal-pad"
+                placeholder="3.7"
+                placeholderTextColor="#9CA3AF"
+                returnKeyType="done"
+                onSubmitEditing={Keyboard.dismiss}
+              />
+              <TouchableOpacity
+                style={styles.applyButton}
+                onPress={handleApplyToAllCells}
+                activeOpacity={0.7}
+              >
+                <Ionicons name="checkmark-done" size={20} color="#FFFFFF" />
+                <Text style={styles.applyButtonText}>모든 셀에 적용</Text>
+              </TouchableOpacity>
+            </View>
+            <Text style={styles.defaultVoltageHint}>* 버튼을 눌러 모든 셀에 적용하세요</Text>
           </View>
 
           {/* Cell Grid */}
           <ScrollView
             style={styles.cellGridScroll}
-            contentContainerStyle={styles.cellGridContent}
+            contentContainerStyle={[
+              styles.cellGridContent,
+              { paddingBottom: 160 + insets.bottom } // Summary 높이 + 여유
+            ]}
             showsVerticalScrollIndicator={true}
+            keyboardShouldPersistTaps="handled"
           >
             {cells.length > 0 ? (
               <View style={styles.cellGrid}>
@@ -147,7 +210,7 @@ const BatteryCellGridModal: React.FC<BatteryCellGridModalProps> = ({
                     activeOpacity={0.7}
                   >
                     <Text style={[styles.cellNumber, cell.isDefective && styles.cellNumberDefective]}>
-                      {cell.cellNumber}
+                      {cell.id}
                     </Text>
                     <Text style={[styles.cellVoltage, cell.isDefective && styles.cellVoltageDefective]}>
                       {cell.voltage ? `${typeof cell.voltage === 'number' ? cell.voltage.toFixed(2) : parseFloat(cell.voltage || '0').toFixed(2)}V` : '0.00V'}
@@ -169,8 +232,8 @@ const BatteryCellGridModal: React.FC<BatteryCellGridModalProps> = ({
             )}
           </ScrollView>
 
-          {/* Summary */}
-          <View style={styles.summaryContainer}>
+          {/* Summary - Absolute 고정 */}
+          <View style={[styles.summaryContainer, { paddingBottom: insets.bottom }]}>
             <View style={styles.summaryRow}>
               <Text style={styles.summaryLabel}>총 셀 개수:</Text>
               <Text style={styles.summaryValue}>{cells.length}개</Text>
@@ -188,57 +251,41 @@ const BatteryCellGridModal: React.FC<BatteryCellGridModalProps> = ({
               <Text style={styles.summaryValue}>{minCellVoltage.toFixed(2)}V</Text>
             </View>
           </View>
-        </View>
-
-        {/* Battery Cell Detail Modal */}
-        <BatteryCellDetailModal
-          visible={isCellDetailModalVisible}
-          cell={selectedCellForEdit}
-          onClose={handleCloseCellDetailModal}
-          onToggleDefective={handleToggleCellDefective}
-          onUpdateVoltage={handleUpdateCellVoltage}
-        />
+        </KeyboardAvoidingView>
       </View>
+
+      {/* Battery Cell Detail Modal */}
+      <BatteryCellDetailModal
+        visible={isCellDetailModalVisible}
+        cell={selectedCellForEdit}
+        onClose={handleCloseCellDetailModal}
+        onToggleDefective={handleToggleCellDefective}
+        onUpdateVoltage={handleUpdateCellVoltage}
+      />
     </Modal>
   );
 };
 
 const styles = StyleSheet.create({
-  modalOverlay: {
+  container: {
     flex: 1,
-    backgroundColor: 'rgba(0, 0, 0, 0.6)',
-    justifyContent: 'flex-end',
+    backgroundColor: '#F9FAFB',
   },
-  modalContainer: {
-    backgroundColor: '#FFFFFF',
-    borderTopLeftRadius: 24,
-    borderTopRightRadius: 24,
-    paddingBottom: verticalScale(20),
-  },
-  handleBarContainer: {
-    paddingTop: verticalScale(8),
-    paddingBottom: verticalScale(4),
-    alignItems: 'center',
-  },
-  handleBar: {
-    width: 40,
-    height: 5,
-    backgroundColor: '#D1D5DB',
-    borderRadius: 3,
+  keyboardView: {
+    flex: 1,
   },
   header: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
     paddingHorizontal: scale(20),
-    paddingVertical: verticalScale(12),
-    borderBottomWidth: 1,
-    borderBottomColor: '#E5E7EB',
+    paddingVertical: verticalScale(8),
+    backgroundColor: '#FFFFFF',
   },
   title: {
-    fontSize: moderateScale(20),
-    fontWeight: '700',
-    color: '#1F2937',
+    fontSize: moderateScale(18),
+    fontWeight: '600',
+    color: '#6B7280',
   },
   defaultVoltageContainer: {
     paddingHorizontal: scale(20),
@@ -253,6 +300,11 @@ const styles = StyleSheet.create({
     color: '#374151',
     marginBottom: verticalScale(8),
   },
+  defaultVoltageRow: {
+    flexDirection: 'row',
+    gap: scale(8),
+    alignItems: 'center',
+  },
   defaultVoltageInput: {
     backgroundColor: '#FFFFFF',
     borderRadius: 8,
@@ -262,6 +314,20 @@ const styles = StyleSheet.create({
     paddingVertical: verticalScale(10),
     fontSize: moderateScale(16),
     color: '#1F2937',
+  },
+  applyButton: {
+    backgroundColor: '#06B6D4',
+    borderRadius: 8,
+    paddingHorizontal: scale(12),
+    paddingVertical: verticalScale(10),
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: scale(6),
+  },
+  applyButtonText: {
+    fontSize: moderateScale(13),
+    fontWeight: '600',
+    color: '#FFFFFF',
   },
   defaultVoltageHint: {
     fontSize: moderateScale(12),
@@ -345,9 +411,13 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   summaryContainer: {
+    position: 'absolute',
+    bottom: 0,
+    left: 0,
+    right: 0,
     paddingHorizontal: scale(20),
-    paddingVertical: verticalScale(12),
-    backgroundColor: '#F9FAFB',
+    paddingVertical: verticalScale(16),
+    backgroundColor: '#FFFFFF',
     borderTopWidth: 1,
     borderTopColor: '#E5E7EB',
     gap: verticalScale(8),

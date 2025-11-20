@@ -1614,14 +1614,6 @@ const styles = StyleSheet.create({
     backgroundColor: "#FFFFFF",
     borderRadius: 12,
     padding: 20,
-    shadowColor: "#000",
-    shadowOffset: {
-      width: 0,
-      height: 2,
-    },
-    shadowOpacity: 0.1,
-    shadowRadius: 3.84,
-    elevation: 5,
     marginHorizontal: 16,
     marginBottom: 0,
     minHeight: 150, // 최소 높이 설정
@@ -1954,14 +1946,6 @@ const styles = StyleSheet.create({
     marginHorizontal: scale(16),
     marginTop: verticalScale(12),
     padding: moderateScale(13),
-    shadowColor: "#000",
-    shadowOffset: {
-      width: 0,
-      height: 2,
-    },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 3,
   },
   statusHeader: {
     flexDirection: "row",
@@ -2004,14 +1988,6 @@ const styles = StyleSheet.create({
     borderRadius: 12,
     paddingVertical: 16,
     alignItems: "center",
-    shadowColor: "#06B6D4",
-    shadowOffset: {
-      width: 0,
-      height: 4,
-    },
-    shadowOpacity: 0.3,
-    shadowRadius: 8,
-    elevation: 6,
   },
   diagnosisButtonText: convertToLineSeedFont({
     fontSize: moderateScale(14, 1),
@@ -2024,14 +2000,6 @@ const styles = StyleSheet.create({
     marginHorizontal: 16,
     marginTop: 16,
     padding: 20,
-    shadowColor: "#000",
-    shadowOffset: {
-      width: 0,
-      height: 2,
-    },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 3,
   },
   promotionContent: {
     flexDirection: "row",
@@ -2071,14 +2039,6 @@ const styles = StyleSheet.create({
     paddingVertical: verticalScale(12),
     paddingHorizontal: scale(6),
     marginRight: scale(6),
-    shadowColor: "#000",
-    shadowOffset: {
-      width: 0,
-      height: 2,
-    },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 3,
     width: (Dimensions.get("window").width - scale(48)) / 3, // 반응형 계산
   },
   actionIconContainer: {

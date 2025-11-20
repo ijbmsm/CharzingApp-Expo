@@ -7,8 +7,9 @@ import {
   TouchableOpacity,
   FlatList,
   ScrollView,
-  SafeAreaView,
+  Platform,
 } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { useSelector, useDispatch } from 'react-redux';
 import { RootState } from '../store';
@@ -26,6 +27,7 @@ const NotificationModal: React.FC<NotificationModalProps> = ({
   visible,
   onClose,
 }) => {
+  const insets = useSafeAreaInsets();
   const dispatch = useDispatch();
   const { notifications, unreadCount } = useSelector((state: RootState) => state.notification);
   const { user } = useSelector((state: RootState) => state.auth);
@@ -168,7 +170,17 @@ const NotificationModal: React.FC<NotificationModalProps> = ({
       presentationStyle="pageSheet"
       onRequestClose={onClose}
     >
-      <SafeAreaView style={styles.container}>
+      <View
+        style={[
+          styles.container,
+          {
+            paddingTop: Platform.OS === 'ios' ? 0 : insets.top,
+            paddingBottom: insets.bottom,
+            paddingLeft: insets.left,
+            paddingRight: insets.right,
+          },
+        ]}
+      >
         <View style={styles.header}>
           <Text style={styles.headerTitle}>알림</Text>
           <View style={styles.headerActions}>
@@ -203,7 +215,7 @@ const NotificationModal: React.FC<NotificationModalProps> = ({
             contentContainerStyle={styles.listContainer}
           />
         )}
-      </SafeAreaView>
+      </View>
     </Modal>
   );
 };

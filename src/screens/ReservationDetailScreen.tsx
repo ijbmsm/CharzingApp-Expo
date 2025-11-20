@@ -103,35 +103,71 @@ const ReservationDetailScreen: React.FC = () => {
     });
   };
 
-  const handleCancelReservation = () => {
-    const permission = getModifyPermission();
-    
-    if (!permission.canCancel) {
-      Alert.alert('취소 불가', permission.reason || '예약을 취소할 수 없습니다.');
+  const handleStartDiagnosis = () => {
+    // 완료/취소된 예약은 진단 불가
+    if (currentReservation.status === 'completed' || currentReservation.status === 'cancelled') {
+      Alert.alert('알림', '완료 또는 취소된 예약은 진단할 수 없습니다.');
+      return;
+    }
+
+    // VehicleInspection 화면으로 예약 정보를 전달하여 즉시 진단 시작
+    navigation.navigate('VehicleInspection', {
+      reservation: {
+        id: currentReservation.id,
+        userId: currentReservation.userId,
+        userName: currentReservation.userName,
+        userPhone: currentReservation.userPhone,
+        vehicleBrand: currentReservation.vehicleBrand,
+        vehicleModel: currentReservation.vehicleModel,
+        vehicleYear: currentReservation.vehicleYear,
+        requestedDate: currentReservation.requestedDate,
+        status: currentReservation.status,
+      },
+    });
+  };
+
+  const handleUnassignReservation = () => {
+    // 담당자가 없는 예약은 해제 불가
+    if (!currentReservation.assignedTo) {
+      Alert.alert('알림', '담당자가 없는 예약입니다.');
+      return;
+    }
+
+    // 완료/취소된 예약은 담당 해제 불가
+    if (currentReservation.status === 'completed' || currentReservation.status === 'cancelled') {
+      Alert.alert('알림', '완료 또는 취소된 예약은 담당 해제할 수 없습니다.');
       return;
     }
 
     Alert.alert(
-      '예약 취소',
-      '정말로 예약을 취소하시겠습니까?',
+      '담당 취소',
+      '이 예약의 담당을 취소하시겠습니까?\n예약은 다시 대기 상태로 돌아갑니다.',
       [
         { text: '아니오', style: 'cancel' },
-        { 
-          text: '예, 취소합니다', 
+        {
+          text: '예, 취소합니다',
           style: 'destructive',
           onPress: async () => {
             try {
               setIsLoading(true);
-              await firebaseService.cancelDiagnosisReservation(currentReservation.id, '사용자 취소');
-              
+              await firebaseService.unassignReservationFromMechanic(currentReservation.id);
+
               // 현재 화면의 예약 상태를 업데이트
-              setCurrentReservation(prev => ({ ...prev, status: 'cancelled' }));
+              setCurrentReservation(prev => ({
+                ...prev,
+                status: 'pending',
+                assignedTo: undefined,
+                assignedToName: undefined,
+                assignedAt: undefined,
+                confirmedBy: undefined,
+              }));
               setShouldResetOnBack(true);
-              
-              Alert.alert('알림', '예약이 취소되었습니다.');
+
+              Alert.alert('알림', '담당이 취소되었습니다. 예약이 대기 상태로 변경되었습니다.');
             } catch (error) {
-              console.error('예약 취소 실패:', error);
-              Alert.alert('오류', '예약 취소에 실패했습니다. 다시 시도해주세요.');
+              console.error('담당 취소 실패:', error);
+              const errorMessage = error instanceof Error ? error.message : '담당 취소에 실패했습니다.';
+              Alert.alert('오류', errorMessage);
             } finally {
               setIsLoading(false);
             }
@@ -345,41 +381,46 @@ const ReservationDetailScreen: React.FC = () => {
 
       </ScrollView>
 
-      {/* 하단 네비게이션 바 스타일 버튼 */}
-      {(() => {
-        const permission = getModifyPermission();
-        return (permission.canModify || permission.canCancel) && (
+      {/* 하단 액션 버튼 */}
+      {currentReservation.assignedTo &&
+        currentReservation.status !== 'completed' &&
+        currentReservation.status !== 'cancelled' && (
           <SafeAreaView style={styles.bottomSafeArea} edges={['bottom']}>
             <View style={styles.bottomActionBar}>
-              {permission.canModify && (
-                <TouchableOpacity
-                  style={[styles.bottomButton, styles.bottomModifyButton]}
-                  onPress={handleModifyReservation}
-                  activeOpacity={0.8}
-                >
-                  <Ionicons name="create-outline" size={24} color="#06B6D4" />
-                  <Text style={[styles.bottomButtonText, styles.bottomModifyText]}>
-                    예약 수정
-                  </Text>
-                </TouchableOpacity>
-              )}
-              
-              {permission.canCancel && (
-                <TouchableOpacity
-                  style={[styles.bottomButton, styles.bottomCancelButton]}
-                  onPress={handleCancelReservation}
-                  activeOpacity={0.8}
-                >
-                  <Ionicons name="close-outline" size={24} color="#6B7280" />
-                  <Text style={[styles.bottomButtonText, styles.bottomCancelText]}>
-                    예약 취소
-                  </Text>
-                </TouchableOpacity>
-              )}
+              {/* 좌측: 지금 진단 버튼 */}
+              <TouchableOpacity
+                style={[styles.bottomButton, styles.bottomDiagnosisButton]}
+                onPress={handleStartDiagnosis}
+                activeOpacity={0.8}
+                disabled={isLoading}
+              >
+                <Ionicons name="clipboard-outline" size={24} color="#06B6D4" />
+                <Text style={[styles.bottomButtonText, styles.bottomDiagnosisText]}>
+                  지금 진단
+                </Text>
+              </TouchableOpacity>
+
+              {/* 우측: 담당 취소 버튼 */}
+              <TouchableOpacity
+                style={[styles.bottomButton, styles.bottomUnassignButton]}
+                onPress={handleUnassignReservation}
+                activeOpacity={0.8}
+                disabled={isLoading}
+              >
+                {isLoading ? (
+                  <ActivityIndicator size="small" color="#EF4444" />
+                ) : (
+                  <>
+                    <Ionicons name="person-remove-outline" size={24} color="#EF4444" />
+                    <Text style={[styles.bottomButtonText, styles.bottomUnassignText]}>
+                      담당 취소
+                    </Text>
+                  </>
+                )}
+              </TouchableOpacity>
             </View>
           </SafeAreaView>
-        );
-      })()}
+        )}
 
     </SafeAreaView>
   );
@@ -731,6 +772,12 @@ const styles = StyleSheet.create({
   bottomCancelButton: {
     backgroundColor: 'transparent',
   },
+  bottomDiagnosisButton: {
+    backgroundColor: 'transparent',
+  },
+  bottomUnassignButton: {
+    backgroundColor: 'transparent',
+  },
   bottomButtonText: {
     fontSize: 12,
     fontWeight: '500',
@@ -740,6 +787,12 @@ const styles = StyleSheet.create({
   },
   bottomCancelText: {
     color: '#6B7280',
+  },
+  bottomDiagnosisText: {
+    color: '#06B6D4',
+  },
+  bottomUnassignText: {
+    color: '#EF4444',
   },
 });
 

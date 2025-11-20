@@ -882,31 +882,56 @@ export const createDiagnosisReservation = functions
           return;
         }
 
-        // 인증 토큰 검증
+        // 🔥 Guest User 로직: 토큰이 있으면 인증, 없으면 Guest 생성
         const token = req.headers.authorization?.replace('Bearer ', '');
-        if (!token) {
-          res.status(401).json({ success: false, error: '인증 토큰이 필요합니다.' });
-          return;
-        }
-
         let uid: string;
-        try {
-          const decodedToken = await admin.auth().verifyIdToken(token);
-          uid = decodedToken.uid;
-          console.log('✅ 인증 성공:', uid);
-          console.log('🔐 토큰 claims:', decodedToken);
-        } catch (authError) {
-          console.error('❌ 인증 실패:', authError);
-          res.status(401).json({ success: false, error: '유효하지 않은 인증 토큰입니다.' });
-          return;
+
+        if (token) {
+          // ✅ 인증된 사용자
+          try {
+            const decodedToken = await admin.auth().verifyIdToken(token);
+            uid = decodedToken.uid;
+            console.log('✅ 인증된 사용자:', uid);
+            console.log('🔐 토큰 claims:', decodedToken);
+          } catch (authError) {
+            console.error('❌ 인증 실패:', authError);
+            res.status(401).json({ success: false, error: '유효하지 않은 인증 토큰입니다.' });
+            return;
+          }
+        } else {
+          // ✅ Guest 사용자 - UUID 기반 Guest UID 생성
+          const { userName, userPhone } = req.body;
+
+          if (!userName || !userPhone) {
+            res.status(400).json({ success: false, error: 'Guest 사용자는 이름과 전화번호가 필요합니다.' });
+            return;
+          }
+
+          uid = `guest_${uuidv4()}`;
+          console.log('👤 Guest 사용자 생성:', uid);
+
+          // Guest user 문서 생성
+          await db.collection('users').doc(uid).set({
+            uid: uid,
+            displayName: userName,
+            phoneNumber: userPhone,
+            phoneNumberNormalized: userPhone.replace(/[^0-9]/g, ''), // 숫자만
+            isGuest: true,
+            provider: 'email',
+            isRegistrationComplete: false,
+            createdAt: admin.firestore.FieldValue.serverTimestamp(),
+            updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+          });
+
+          console.log('✅ Guest user 문서 생성 완료:', uid);
         }
 
-        const { 
-          address, 
-          detailAddress, 
-          latitude, 
-          longitude, 
-          requestedDate, 
+        const {
+          address,
+          detailAddress,
+          latitude,
+          longitude,
+          requestedDate,
           notes,
           serviceType,
           servicePrice,
@@ -1610,6 +1635,171 @@ export const sendReservationStatusNotification = functions
       Sentry.captureException(error, {
         tags: {
           function: 'sendReservationStatusNotification',
+          category: 'notification'
+        },
+        extra: {
+          errorMessage: error instanceof Error ? error.message : 'Unknown error',
+        }
+      });
+    }
+  });
+
+/**
+ * 진단 리포트 상태 변경 시 자동 푸시 알림 (published 상태로 변경 시)
+ */
+export const sendReportPublishedNotification = functions
+  .region('us-central1')
+  .firestore.document('vehicleDiagnosisReports/{reportId}')
+  .onUpdate(async (change, context) => {
+    try {
+      const beforeData = change.before.data();
+      const afterData = change.after.data();
+
+      // pending_review → published 변경 시에만 알림 전송
+      if (beforeData.status !== 'pending_review' || afterData.status !== 'published') {
+        return;
+      }
+
+      // Sentry: 함수 시작 추적
+      Sentry.addBreadcrumb({
+        category: 'notification',
+        message: `Report status changed: ${beforeData.status} → ${afterData.status}`,
+        level: 'info',
+      });
+
+      console.log(`리포트 상태 변경: ${beforeData.status} → ${afterData.status}`);
+
+      const userId = afterData.userId;
+      const reportId = context.params.reportId;
+      const vehicleBrand = afterData.vehicleBrand || '';
+      const vehicleName = afterData.vehicleName || '';
+
+      // 사용자 푸시 토큰 및 알림 설정 조회
+      const userDoc = await db.collection('users').doc(userId).get();
+
+      if (!userDoc.exists) {
+        console.log(`사용자 문서 없음: ${userId}`);
+        return;
+      }
+
+      const userData = userDoc.data();
+      const pushToken = userData?.pushToken;
+
+      // 알림 설정 확인
+      const notificationSettingsDoc = await db.collection('users').doc(userId).collection('notificationSettings').doc('settings').get();
+      const notificationSettings = notificationSettingsDoc.exists ? (notificationSettingsDoc.data() || {}) : { enabled: true, report: true }; // 기본값: 활성화
+
+      // 전체 알림 또는 리포트 알림이 비활성화된 경우 건너뛰기
+      if (notificationSettings.enabled === false || notificationSettings.report === false) {
+        console.log(`사용자 ${userId}는 리포트 알림이 비활성화됨, 자동 알림 전송 건너뛰기`);
+        return;
+      }
+
+      // 알림 메시지
+      const title = '진단 리포트 발행 완료';
+      const body = `${vehicleBrand} ${vehicleName} 진단 리포트가 발행되었습니다. 지금 확인해보세요!`;
+
+      // 1. 푸시 토큰이 있으면 푸시 알림 전송
+      if (pushToken) {
+        try {
+          const message = {
+            to: pushToken,
+            sound: 'default',
+            title,
+            body,
+            data: {
+              type: 'report_published',
+              reportId,
+              status: afterData.status,
+              category: 'report',
+            },
+          };
+
+          const response = await axios.post(
+            'https://exp.host/--/api/v2/push/send',
+            message,
+            {
+              headers: {
+                'Accept': 'application/json',
+                'Accept-encoding': 'gzip, deflate',
+                'Content-Type': 'application/json',
+              },
+            }
+          );
+
+          console.log(`자동 푸시 알림 전송 성공: ${userId}`);
+
+          // 푸시 알림 로그 저장
+          await db.collection('notificationLogs').add({
+            userId,
+            pushToken,
+            title,
+            body,
+            data: message.data,
+            response: response.data,
+            sentAt: admin.firestore.FieldValue.serverTimestamp(),
+            status: 'sent',
+            trigger: 'report_published',
+            reportId
+          });
+
+        } catch (pushErr) {
+          console.error(`자동 푸시 알림 전송 실패: ${userId}`, pushErr);
+        }
+      } else {
+        console.log(`사용자 ${userId}에게 푸시 토큰이 없음, 인앱 알림만 저장`);
+      }
+
+      // 2. 모든 사용자에게 인앱 알림 저장 (푸시 토큰 유무와 상관없이)
+      try {
+        const inAppNotification = {
+          title,
+          body,
+          category: 'report',
+          data: {
+            type: 'report_published',
+            reportId,
+            status: afterData.status,
+          },
+          isRead: false,
+          createdAt: admin.firestore.FieldValue.serverTimestamp(),
+          id: `notification_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+        };
+
+        // 사용자의 inAppNotifications 컬렉션에 저장
+        await db.collection('users').doc(userId).collection('inAppNotifications').add(inAppNotification);
+        console.log(`사용자 ${userId}에게 자동 인앱 알림 저장 완료 (리포트 발행)`);
+
+        // Sentry: 성공 로깅
+        Sentry.captureMessage('Report published notification sent successfully', {
+          level: 'info',
+          tags: {
+            function: 'sendReportPublishedNotification',
+            category: 'notification',
+            statusChange: `${beforeData.status} → ${afterData.status}`
+          },
+          contexts: {
+            report: {
+              id: reportId,
+              userId,
+              vehicleBrand,
+              vehicleName,
+              newStatus: afterData.status,
+            }
+          }
+        });
+
+      } catch (inAppError) {
+        console.error(`사용자 ${userId} 자동 인앱 알림 저장 실패:`, inAppError);
+      }
+
+    } catch (error) {
+      console.error('자동 푸시 알림 전송 실패:', error);
+
+      // Sentry: 에러 로깅
+      Sentry.captureException(error, {
+        tags: {
+          function: 'sendReportPublishedNotification',
           category: 'notification'
         },
         extra: {
@@ -2370,6 +2560,35 @@ export const confirmPaymentFunction = functions
       let reservationId = data.reservationId;
 
       if (data.reservationInfo) {
+        // 🔥 Guest User 로직: 토큰이 없으면 Guest UID 생성
+        let userId: string;
+
+        if (context.auth?.uid) {
+          // ✅ 인증된 사용자
+          userId = context.auth.uid;
+          console.log('✅ 인증된 사용자:', userId);
+        } else {
+          // ✅ Guest 사용자 - UUID 기반 Guest UID 생성
+          userId = `guest_${uuidv4()}`;
+          console.log('👤 Guest 사용자 생성:', userId);
+
+          // Guest user 문서 생성
+          await db.collection('users').doc(userId).set({
+            uid: userId,
+            displayName: data.customerInfo.name,
+            phoneNumber: data.customerInfo.phone,
+            phoneNumberNormalized: data.customerInfo.phone.replace(/[^0-9]/g, ''), // 숫자만
+            email: data.customerInfo.email || '',
+            isGuest: true,
+            provider: 'email',
+            isRegistrationComplete: false,
+            createdAt: FieldValue.serverTimestamp(),
+            updatedAt: FieldValue.serverTimestamp(),
+          });
+
+          console.log('✅ Guest user 문서 생성 완료:', userId);
+        }
+
         const reservationRef = db.collection('diagnosisReservations').doc();
 
         console.log('📅 받은 requestedDate:', data.reservationInfo.requestedDate);
@@ -2403,7 +2622,7 @@ export const confirmPaymentFunction = functions
           // 서비스 정보
           serviceType: data.reservationInfo.serviceType,
           servicePrice: tossResponse.totalAmount,
-          status: 'confirmed',
+          status: 'pending', // 🔥 웹 예약도 pending 상태로 시작 (정비사 할당 시 confirmed)
 
           // 고객 정보 (기존 구조: userName, userPhone, userEmail)
           userName: data.customerInfo.name,
@@ -2422,7 +2641,7 @@ export const confirmPaymentFunction = functions
           paymentCompletedAt: FieldValue.serverTimestamp(),
 
           // 사용자 및 소스
-          userId: context.auth?.uid || null,
+          userId: userId, // 🔥 Guest UID 또는 인증된 UID
           source: 'web',
 
           // 타임스탬프

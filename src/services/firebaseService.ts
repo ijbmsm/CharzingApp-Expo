@@ -1,27 +1,33 @@
+// 🔥 React Native polyfill for crypto.getRandomValues (uuid 사용을 위해 필수)
+import 'react-native-get-random-values';
+
 // Firebase 웹 SDK (Expo 호환)
-import { 
-  getFirestore, 
-  collection, 
-  doc, 
-  setDoc, 
-  getDoc, 
-  updateDoc, 
-  deleteDoc, 
-  query, 
-  where, 
-  limit, 
+import {
+  getFirestore,
+  collection,
+  doc,
+  setDoc,
+  getDoc,
+  updateDoc,
+  deleteDoc,
+  query,
+  where,
+  limit,
   getDocs,
   runTransaction,
+  writeBatch,
   serverTimestamp,
   Timestamp,
   FieldValue,
-  orderBy
+  orderBy,
+  deleteField
 } from 'firebase/firestore';
 import { getAuth, signOut, signInWithCustomToken } from 'firebase/auth';
 import { getStorage, ref, uploadBytes, getDownloadURL } from 'firebase/storage';
 // import { getFunctions, httpsCallable } from 'firebase/functions'; // Not supported in React Native
 import axios from 'axios';
 import Constants from 'expo-constants';
+import { v4 as uuidv4 } from 'uuid';
 import { getDb, getAuthInstance, getStorageInstance } from '../firebase/config';
 import logger from './logService';
 import devLog from '../utils/devLog';
@@ -214,6 +220,9 @@ export interface UserProfile {
   appleId?: string;
   googleId?: string;
   phoneNumber?: string;
+  phoneNumberNormalized?: string; // ✅ 검색 최적화용 (숫자만)
+  isGuest?: boolean;               // ✅ Guest user 구분
+  mergedInto?: string;             // ✅ Guest → 회원 연결 시 회원 UID
   address?: string;
   role?: 'user' | 'admin'; // 사용자 권한 (기본값: user)
   isRegistrationComplete: boolean;
@@ -372,28 +381,141 @@ export interface MajorDeviceItem {
   name: string; // 항목명
   status?: 'good' | 'problem'; // 상태 (양호/문제 있음)
   issueDescription?: string; // 문제 내용
-  imageUri?: string; // 이미지 URI
+  imageUris?: string[]; // 이미지 URI 배열 (MultipleImagePicker 사용)
 }
 
 // 주요 장치 검사 (조향, 제동, 전기)
 export interface MajorDevicesInspection {
+  steering?: {
+    powerSteeringOilLeak?: MajorDeviceItem; // 동력조향 작동 오일 누유
+    steeringGear?: MajorDeviceItem; // 스티어링 기어
+    steeringPump?: MajorDeviceItem; // 스티어링 펌프
+    tierodEndBallJoint?: MajorDeviceItem; // 타이로드엔드 및 볼 조인트
+  };
+  braking?: {
+    brakeOilLevel?: MajorDeviceItem; // 브레이크 오일 유량 상태
+    brakeOilLeak?: MajorDeviceItem; // 브레이크 오일 누유
+    boosterCondition?: MajorDeviceItem; // 배력장치 상태
+  };
+  electrical?: {
+    generatorOutput?: MajorDeviceItem; // 발전기 출력
+    startMotor?: MajorDeviceItem; // 시동 모터
+    wiperMotor?: MajorDeviceItem; // 와이퍼 모터 기능
+    blowerMotor?: MajorDeviceItem; // 실내송풍 모터
+    radiatorFanMotor?: MajorDeviceItem; // 라디에이터 팬 모터
+  };
+}
+
+// 차량 외부 점검 (Vehicle Exterior Inspection)
+export interface VehicleExteriorInspection {
+  // 차량 외부 촬영
+  vehicleExterior: {
+    front?: string; // 차량 앞
+    leftSide?: string; // 차량 좌측(운전석)
+    rear?: string; // 차량 뒤
+    rightSide?: string; // 차량 우측(동승석)
+  };
+
+  // 외판 수리/교체 확인 및 도막 측정 (PaintThicknessInspection 배열로 사용)
+  bodyPanel: PaintThicknessInspection[];
+
+  // 타이어 및 휠
+  tiresAndWheels: {
+    driverFront?: TireAndWheelItem; // 운전석 앞
+    driverRear?: TireAndWheelItem; // 운전석 뒤
+    passengerRear?: TireAndWheelItem; // 동승석 뒤
+    passengerFront?: TireAndWheelItem; // 동승석 앞
+  };
+}
+
+// 타이어 및 휠 항목
+export interface TireAndWheelItem {
+  treadDepth?: number; // 트레드 깊이 (mm)
+  wheelStatus?: 'good' | 'problem'; // 휠 상태
+  wheelIssueDescription?: string; // 휠 문제 내용
+  imageUris?: string[]; // 문제 사진
+}
+
+// 차량 하부 점검 (Vehicle Undercarriage Inspection)
+export interface VehicleUndercarriageInspection {
+  // 서스펜션 암 및 링크 구조물 촬영
+  suspensionArms: {
+    driverFrontWheel?: string; // 운전석 앞 바퀴
+    driverRearWheel?: string; // 운전석 뒤 바퀴
+    passengerRearWheel?: string; // 동승석 뒤 바퀴
+    passengerFrontWheel?: string; // 동승석 앞 바퀴
+  };
+
+  // 하부 배터리 팩 상태 촬영
+  underBatteryPack: {
+    front?: string; // 앞
+    leftSide?: string; // 좌측(운전석)
+    rear?: string; // 뒤
+    rightSide?: string; // 우측(동승석)
+  };
+
+  // 조향 장치 검사
   steering: {
     powerSteeringOilLeak?: MajorDeviceItem; // 동력조향 작동 오일 누유
     steeringGear?: MajorDeviceItem; // 스티어링 기어
     steeringPump?: MajorDeviceItem; // 스티어링 펌프
     tierodEndBallJoint?: MajorDeviceItem; // 타이로드엔드 및 볼 조인트
   };
+
+  // 제동 장치 검사
   braking: {
     brakeOilLevel?: MajorDeviceItem; // 브레이크 오일 유량 상태
     brakeOilLeak?: MajorDeviceItem; // 브레이크 오일 누유
     boosterCondition?: MajorDeviceItem; // 배력장치 상태
   };
-  electrical: {
-    generatorOutput?: MajorDeviceItem; // 발전기 출력
-    startMotor?: MajorDeviceItem; // 시동 모터
-    wiperMotor?: MajorDeviceItem; // 와이퍼 모터 기능
-    blowerMotor?: MajorDeviceItem; // 실내송풍 모터
-    radiatorFanMotor?: MajorDeviceItem; // 라디에이터 팬 모터
+}
+
+// 차량 실내 점검 (Vehicle Interior Inspection) - 신규
+export interface VehicleInteriorInspection {
+  // 내장재 상태
+  interior: {
+    driverSeat?: MajorDeviceItem; // 운전석
+    passengerSeat?: MajorDeviceItem; // 동승석
+    driverRearSeat?: MajorDeviceItem; // 운전석 뒷자리
+    passengerRearSeat?: MajorDeviceItem; // 동승석 뒷자리
+    ceiling?: MajorDeviceItem; // 천장
+    interiorSmell?: MajorDeviceItem; // 실내 냄새
+  };
+
+  // 에어컨 및 모터
+  airconMotor: {
+    airconStatus?: MajorDeviceItem; // 에어컨 작동 상태 및 냄새
+    wiperMotor?: MajorDeviceItem; // 와이퍼 모터
+    driverWindowMotor?: MajorDeviceItem; // 운전석 윈도우 모터
+    driverRearWindowMotor?: MajorDeviceItem; // 운전석 뒷자리 윈도우 모터
+    passengerRearWindowMotor?: MajorDeviceItem; // 동승석 뒷자리 윈도우 모터
+    passengerWindowMotor?: MajorDeviceItem; // 동승석 윈도우 모터
+  };
+
+  // 옵션 및 기능
+  options: {
+    optionMatch?: MajorDeviceItem; // 옵션 내역 일치 여부
+  };
+
+  // 등화장치
+  lighting: {
+    driverHeadlamp?: MajorDeviceItem; // 운전석 헤드램프/안개등
+    passengerHeadlamp?: MajorDeviceItem; // 동승석 헤드램프/안개등
+    driverTaillamp?: MajorDeviceItem; // 운전석 테일램프
+    passengerTaillamp?: MajorDeviceItem; // 동승석 테일램프
+    licensePlateLamp?: MajorDeviceItem; // 번호판등
+    interiorLamp?: MajorDeviceItem; // 실내등 앞/뒤
+    vanityMirrorLamp?: MajorDeviceItem; // 화장등
+  };
+
+  // 유리
+  glass: {
+    front?: MajorDeviceItem; // 전면
+    driverFront?: MajorDeviceItem; // 운전석 앞
+    driverRear?: MajorDeviceItem; // 운전석 뒤
+    rear?: MajorDeviceItem; // 후면
+    passengerRear?: MajorDeviceItem; // 동승석 뒤
+    passengerFront?: MajorDeviceItem; // 동승석 앞
   };
 }
 
@@ -526,11 +648,19 @@ export interface VehiclePhotoInspection {
 }
 
 // 종합 차량 검사 (새로운 구조)
+export interface OtherInspectionItem {
+  id: string;
+  category: string;
+  description: string;
+  imageUris: string[];
+}
+
 export interface ComprehensiveVehicleInspection {
   // 새로운 이미지 기반 검사 구조
   inspectionImages?: InspectionImageItem[]; // 검사 이미지
   additionalInfo?: AdditionalInspectionInfo[]; // 추가 검사 정보
   pdfReports?: PDFInspectionReport[]; // PDF 검사 리포트
+  otherInspection?: OtherInspectionItem[]; // 기타 검사 항목
 
   // 기존 검사 구조 (하위 호환성)
   paintThickness?: PaintThicknessInspection[];
@@ -567,6 +697,16 @@ export interface ComponentReplacementInspection {
   notes?: string;
 }
 
+// 상태 변경 이력 (감사 추적)
+export interface StatusChangeLog {
+  from: string; // 이전 상태
+  to: string; // 변경된 상태
+  changedBy: string; // 변경한 사람 UID (관리자)
+  changedByName?: string; // 변경한 사람 이름
+  changedAt: Date | FieldValue; // 변경 시간
+  reason?: string; // 변경 사유 (반려 시 필수)
+}
+
 export interface VehicleDiagnosisReport {
   id: string;
   reservationId?: string | null; // 예약과 연결 (선택사항)
@@ -575,18 +715,20 @@ export interface VehicleDiagnosisReport {
   // 사용자 정보 (점검시 기록)
   userName?: string; // 사용자 이름
   userPhone?: string; // 사용자 전화번호
+  userPhoneNormalized?: string; // ✅ 검색 최적화용 (숫자만)
+  isGuest?: boolean; // ✅ Guest user 리포트 여부
 
   // 차량 기본 정보
   vehicleBrand: string; // 차량 브랜드 (필수)
   vehicleName: string; // 차량명
   vehicleGrade?: string; // 등급/트림 (선택사항)
   vehicleYear: string; // 차량 년식
-  vehicleVinImageUri?: string; // 차대번호 사진 URI (선택사항)
+  vehicleVinImageUris?: string[]; // 차대번호 사진 URIs (복수)
   diagnosisDate: Date | FieldValue; // 진단 날짜
 
   // 차량 상태 정보
   mileage?: number; // 주행거리 (km)
-  dashboardImageUri?: string; // 계기판 사진 URI
+  dashboardImageUris?: string[]; // 계기판 사진 URIs (복수)
   dashboardStatus?: 'good' | 'problem'; // 계기판 상태 (양호/문제있음)
   dashboardIssueDescription?: string; // 계기판 문제 설명
   isVinVerified?: boolean; // 차대번호 동일성 확인
@@ -622,11 +764,32 @@ export interface VehicleDiagnosisReport {
   // 주요 장치 검사 (조향, 제동, 전기)
   majorDevicesInspection?: MajorDevicesInspection;
 
+  // 차량 외부 점검 (신규)
+  vehicleExteriorInspection?: VehicleExteriorInspection;
+
+  // 차량 하부 점검 (신규)
+  vehicleUndercarriageInspection?: VehicleUndercarriageInspection;
+
+  // 차량 실내 점검 (신규)
+  vehicleInteriorInspection?: VehicleInteriorInspection;
+
+  // 진단사 수행 확인 (신규)
+  diagnosticianConfirmation?: {
+    confirmed: boolean;
+    diagnosticianName: string;
+    signatureDataUrl: string;
+    confirmedAt: string;
+  };
+
   // 메타 정보
-  status: 'draft' | 'pending_review' | 'approved' | 'rejected' | 'published';
-  reviewComment?: string; // 검수 의견 (rejected 시 사유)
+  status: 'draft' | 'pending_review' | 'published' | 'rejected'; // ⭐ approved 제거
+  statusHistory?: StatusChangeLog[]; // ⭐ 상태 변경 이력 (감사 추적)
+  rejectionReason?: string; // ⭐ 반려 사유 (rejected 시)
+  reviewComment?: string; // 검수 의견 (rejected 시 사유) - 하위 호환
   reviewedBy?: string; // 검수자 UID (admin)
   reviewedAt?: Date | FieldValue; // 검수 일시
+  publishedBy?: string; // ⭐ 발행자 UID (admin)
+  publishedAt?: Date | FieldValue; // ⭐ 발행 일시
   createdAt: Date | FieldValue;
   updatedAt: Date | FieldValue;
 }
@@ -642,6 +805,14 @@ export interface ScheduleSettings {
     timeSlots: string[]; // ["09:00", "10:00"]
   }[];
 }
+
+/**
+ * 전화번호 정규화 (숫자만 추출)
+ * 예: "010-1234-5678" → "01012345678"
+ */
+export const normalizePhoneNumber = (phoneNumber: string): string => {
+  return phoneNumber.replace(/[^0-9]/g, '');
+};
 
 class FirebaseService {
   private readonly CLOUD_FUNCTION_URL: string;
@@ -817,7 +988,164 @@ class FirebaseService {
   async createOrUpdateUser(userProfile: Partial<UserProfile>): Promise<void> {
     return this.saveUserProfile(userProfile as any);
   }
-  
+
+  /**
+   * Guest user 생성 (UUID 기반)
+   * 수동 검사 시 비회원 사용자를 위한 임시 계정 생성
+   */
+  async createGuestUser(displayName: string, phoneNumber: string): Promise<{ uid: string; user: UserProfile }> {
+    try {
+      // 🔥 1. UUID 기반 guest UID 생성
+      const guestUid = `guest_${uuidv4()}`;
+      const cleanPhone = normalizePhoneNumber(phoneNumber);
+
+      devLog.log(`👤 Guest 계정 생성 시작: ${guestUid}`, { displayName, phoneNumber: cleanPhone });
+
+      // 🔥 2. Guest user 프로필 생성
+      const guestUserProfile: UserProfile = {
+        uid: guestUid,
+        displayName,
+        phoneNumber: cleanPhone,
+        phoneNumberNormalized: cleanPhone, // ✅ 검색 최적화용
+        email: '',                         // ✅ Cloud Functions와 동일 (빈 문자열)
+        isGuest: true,                     // ✅ Guest 구분 필드
+        provider: 'email',                 // ✅ Guest는 email provider로 표시
+        isRegistrationComplete: false,     // Guest는 미완료 상태
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      };
+
+      // 🔥 3. Firestore users 컬렉션에 저장
+      const userDocRef = doc(this.db, 'users', guestUid);
+      await setDoc(userDocRef, {
+        ...guestUserProfile,
+        createdAt: serverTimestamp(),
+        updatedAt: serverTimestamp(),
+      });
+
+      devLog.log(`✅ Guest 계정 생성 완료: ${guestUid}`);
+      logger.firebaseOperation('create_guest_user', 'users', true, undefined, guestUid);
+
+      return { uid: guestUid, user: guestUserProfile };
+    } catch (error) {
+      devLog.error('❌ Guest 계정 생성 실패:', error);
+      logger.firebaseOperation('create_guest_user', 'users', false, error);
+      throw error;
+    }
+  }
+
+  /**
+   * Guest user → 회원 연결 (리포트 데이터 이전)
+   * 회원가입 후 전화번호로 기존 guest를 찾아서 모든 데이터를 회원 계정으로 연결
+   */
+  async linkGuestToMember(guestUid: string, memberUid: string): Promise<void> {
+    try {
+      devLog.log(`🔗 Guest → 회원 연결 시작:`, { guestUid, memberUid });
+
+      // 🔥 1. Guest user 존재 확인
+      const guestRef = doc(this.db, 'users', guestUid);
+      const guestSnap = await getDoc(guestRef);
+
+      if (!guestSnap.exists()) {
+        throw new Error(`Guest user not found: ${guestUid}`);
+      }
+
+      const guestData = guestSnap.data();
+      if (!guestData.isGuest) {
+        throw new Error(`User is not a guest: ${guestUid}`);
+      }
+
+      // 🔥 2. Guest가 가진 모든 리포트 조회
+      const reportsQuery = query(
+        collection(this.db, 'vehicleDiagnosisReports'),
+        where('userId', '==', guestUid)
+      );
+      const reportsSnap = await getDocs(reportsQuery);
+
+      devLog.log(`📋 발견된 리포트: ${reportsSnap.size}개`);
+
+      // 🔥 3. Batch로 한 번에 업데이트
+      const batch = writeBatch(this.db);
+
+      // 3-1) 리포트 userId 변경
+      reportsSnap.forEach((reportDoc) => {
+        batch.update(reportDoc.ref, {
+          userId: memberUid,
+          isGuest: false, // 회원으로 전환
+          updatedAt: serverTimestamp(),
+        });
+      });
+
+      // 3-2) Guest user 문서에 mergedInto 기록
+      batch.update(guestRef, {
+        mergedInto: memberUid,
+        updatedAt: serverTimestamp(),
+      });
+
+      await batch.commit();
+
+      devLog.log(`✅ Guest → 회원 연결 완료: ${reportsSnap.size}개 리포트 이전`);
+      logger.firebaseOperation('link_guest_to_member', 'users', true, undefined, guestUid);
+    } catch (error) {
+      devLog.error('❌ Guest → 회원 연결 실패:', error);
+      logger.firebaseOperation('link_guest_to_member', 'users', false, error);
+      throw error;
+    }
+  }
+
+  /**
+   * 전화번호로 Guest 찾기 및 회원 연결 (자동 연결용)
+   * 회원가입 직후 전화번호로 기존 guest를 찾아서 자동으로 연결
+   */
+  async linkGuestsByPhoneNumber(memberUid: string, phoneNumber: string): Promise<number> {
+    try {
+      const normalized = normalizePhoneNumber(phoneNumber);
+      devLog.log(`🔍 전화번호로 Guest 찾기:`, { memberUid, phoneNumber: normalized });
+
+      // 🔥 1. 같은 전화번호의 모든 guest 찾기
+      const guestsQuery = query(
+        collection(this.db, 'users'),
+        where('phoneNumberNormalized', '==', normalized),
+        where('isGuest', '==', true)
+      );
+      const guestsSnap = await getDocs(guestsQuery);
+
+      devLog.log(`👥 발견된 Guest: ${guestsSnap.size}명`);
+
+      if (guestsSnap.empty) {
+        return 0;
+      }
+
+      // 🔥 2. 각 guest를 member에 연결 (이미 연결된 것은 건너뛰기)
+      let linkedCount = 0;
+      let skippedCount = 0;
+      for (const guestDoc of guestsSnap.docs) {
+        const guestData = guestDoc.data();
+
+        // ✅ 이미 다른 계정에 연결된 Guest는 건너뛰기
+        if (guestData.mergedInto) {
+          devLog.log(`⏭️ 이미 연결된 Guest 건너뛰기: ${guestDoc.id} → ${guestData.mergedInto}`);
+          skippedCount++;
+          continue;
+        }
+
+        try {
+          await this.linkGuestToMember(guestDoc.id, memberUid);
+          linkedCount++;
+        } catch (error) {
+          devLog.error(`❌ Guest 연결 실패: ${guestDoc.id}`, error);
+          // 하나 실패해도 계속 진행
+        }
+      }
+
+      devLog.log(`✅ 전화번호 기반 Guest 연결 완료: ${linkedCount}개 연결, ${skippedCount}개 건너뜀`);
+      return linkedCount;
+    } catch (error) {
+      devLog.error('❌ 전화번호 기반 Guest 연결 실패:', error);
+      throw error;
+    }
+  }
+
   async saveUserProfile(userProfile: Omit<UserProfile, 'createdAt' | 'updatedAt'>): Promise<void> {
     try {
       const now = serverTimestamp();
@@ -1664,6 +1992,58 @@ class FirebaseService {
   }
 
   /**
+   * 예약 담당 해제 (정비사 할당 취소)
+   * @description
+   * 정비사가 맡은 예약을 다시 대기 상태로 되돌립니다.
+   * - 상태를 'confirmed' → 'pending'으로 변경
+   * - 할당 정보 제거 (assignedTo, assignedToName, assignedAt, confirmedBy)
+   * - Transaction으로 동시성 제어
+   */
+  async unassignReservationFromMechanic(reservationId: string): Promise<void> {
+    try {
+      devLog.log('예약 담당 해제 시도:', { reservationId });
+
+      const reservationRef = doc(this.db, 'diagnosisReservations', reservationId);
+
+      // Transaction을 사용하여 동시성 문제 방지
+      await runTransaction(this.db, async (transaction) => {
+        const reservationDoc = await transaction.get(reservationRef);
+
+        if (!reservationDoc.exists()) {
+          throw new Error('예약을 찾을 수 없습니다.');
+        }
+
+        const reservationData = reservationDoc.data() as DiagnosisReservation;
+
+        // 할당되지 않은 예약인 경우
+        if (!reservationData.assignedTo) {
+          throw new Error('담당자가 없는 예약입니다.');
+        }
+
+        // 완료/취소된 예약은 담당 해제 불가
+        if (reservationData.status === 'completed' || reservationData.status === 'cancelled') {
+          throw new Error('완료 또는 취소된 예약은 담당 해제할 수 없습니다.');
+        }
+
+        // 할당 정보 제거 및 상태를 pending으로 변경
+        transaction.update(reservationRef, {
+          assignedTo: deleteField(),
+          assignedToName: deleteField(),
+          assignedAt: deleteField(),
+          confirmedBy: deleteField(),
+          status: 'pending',
+          updatedAt: serverTimestamp(),
+        });
+      });
+
+      devLog.log('✅ 예약 담당 해제 완료:', reservationId);
+    } catch (error) {
+      devLog.error('❌ 예약 담당 해제 실패:', error);
+      throw error;
+    }
+  }
+
+  /**
    * 정비사에게 할당된 예약 목록 조회
    * @param mechanicUid 정비사 UID
    * @param status 조회할 예약 상태 (선택사항)
@@ -2224,6 +2604,7 @@ class FirebaseService {
       const q = query(
         this.vehicleDiagnosisReportsRef,
         where('userId', '==', userId),
+        where('status', '==', 'published'),
         orderBy('createdAt', 'desc')
       );
       
@@ -2354,6 +2735,34 @@ class FirebaseService {
   }
 
   /**
+   * Base64 이미지를 Firebase Storage에 업로드
+   */
+  async uploadBase64Image(base64Data: string, reportId: string, imageName: string): Promise<string> {
+    try {
+      devLog.log(`✍️ Base64 이미지 업로드 시작: ${imageName}`);
+
+      // base64 데이터를 Blob으로 변환
+      const response = await fetch(base64Data);
+      const blob = await response.blob();
+
+      // Storage 경로 생성: reports/{reportId}/{imageName}.png
+      const storageRef = ref(this.storage, `reports/${reportId}/${imageName}.png`);
+
+      // 이미지 업로드
+      await uploadBytes(storageRef, blob);
+
+      // 다운로드 URL 가져오기
+      const downloadURL = await getDownloadURL(storageRef);
+
+      devLog.log(`✅ Base64 이미지 업로드 완료: ${imageName}`, downloadURL);
+      return downloadURL;
+    } catch (error) {
+      devLog.error(`❌ Base64 이미지 업로드 실패: ${imageName}`, error);
+      throw new Error(`${imageName} 이미지 업로드에 실패했습니다.`);
+    }
+  }
+
+  /**
    * 리포트 ID 생성 (이미지 업로드용)
    */
   generateReportId(): string {
@@ -2396,41 +2805,28 @@ class FirebaseService {
     try {
       // Firebase 초기화 완료 대기
       await this.waitForFirebaseReady();
-      
-      // 현재 사용자 확인 및 토큰 갱신
+
+      // 현재 사용자 확인
       const auth = getAuth();
       const currentUser = auth.currentUser;
-      
+
       if (!currentUser) {
         devLog.log('⚠️ 인증된 사용자가 없어 푸시 토큰 저장 건너뜀');
         return;
       }
-      
-      // ID 토큰 갱신 (Functions 호출 전 필수)
-      try {
-        await currentUser.getIdToken(true);
-        devLog.log('✅ 푸시 토큰 저장을 위한 ID Token 갱신 완료');
-      } catch (tokenError) {
-        devLog.log('⚠️ ID Token 갱신 실패, 기존 토큰으로 시도:', tokenError);
-      }
-      
-      const response = await axios.post(
-        `${this.CLOUD_FUNCTION_URL}/savePushToken`,
-        { pushToken },
-        {
-          headers: {
-            'Authorization': `Bearer ${await currentUser.getIdToken()}`,
-            'Content-Type': 'application/json',
-          },
-          timeout: 15000,
-        }
-      );
-      
-      if (response.data.success) {
-        devLog.log('✅ 사용자 푸시 토큰 저장 완료:', userId);
-      } else {
-        throw new Error(response.data.error || '푸시 토큰 저장 실패');
-      }
+
+      // Firestore에 직접 저장 (Functions 호출 대신)
+      const db = getDb();
+      const userRef = doc(db, 'users', userId);
+
+      devLog.log('📝 푸시 토큰 저장 시도:', { userId, pushToken: pushToken.substring(0, 20) + '...' });
+
+      await updateDoc(userRef, {
+        pushToken,
+        pushTokenUpdatedAt: serverTimestamp(),
+      });
+
+      devLog.log('✅ 사용자 푸시 토큰 저장 완료:', userId);
     } catch (error) {
       devLog.error('❌ 사용자 푸시 토큰 저장 실패:', error);
       // 에러를 throw하지 않고 로그만 남김 (앱 중단 방지)

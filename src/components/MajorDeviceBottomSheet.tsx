@@ -5,13 +5,14 @@ import {
   StyleSheet,
   Modal,
   TouchableOpacity,
-  SafeAreaView,
   KeyboardAvoidingView,
   Platform,
   ScrollView,
   Animated,
   TextInput,
+  Keyboard,
 } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import MultipleImagePicker from './MultipleImagePicker';
 
@@ -43,6 +44,8 @@ const MajorDeviceBottomSheet: React.FC<MajorDeviceBottomSheetProps> = ({
   onConfirm,
   initialData,
 }) => {
+  const insets = useSafeAreaInsets();
+
   // Initialize state with empty objects for each item
   const [data, setData] = useState<Record<string, ItemData>>(() => {
     const initialState: Record<string, ItemData> = {};
@@ -127,6 +130,17 @@ const MajorDeviceBottomSheet: React.FC<MajorDeviceBottomSheetProps> = ({
     setData((prev) => {
       const currentImages = prev[itemKey]?.imageUris || [];
       const updatedImages = currentImages.filter((_, index) => index !== imageIndex);
+      return {
+        ...prev,
+        [itemKey]: { ...prev[itemKey], imageUris: updatedImages },
+      };
+    });
+  };
+
+  const handleImageEdited = (itemKey: string, imageIndex: number, newUri: string) => {
+    setData((prev) => {
+      const currentImages = prev[itemKey]?.imageUris || [];
+      const updatedImages = currentImages.map((uri, index) => index === imageIndex ? newUri : uri);
       return {
         ...prev,
         [itemKey]: { ...prev[itemKey], imageUris: updatedImages },
@@ -236,6 +250,9 @@ const MajorDeviceBottomSheet: React.FC<MajorDeviceBottomSheetProps> = ({
           onChangeText={(text) => handleIssueChange(itemKey, text)}
           multiline
           textAlignVertical="top"
+          returnKeyType="done"
+          blurOnSubmit={true}
+          onSubmitEditing={Keyboard.dismiss}
         />
       </Animated.View>
     );
@@ -248,7 +265,17 @@ const MajorDeviceBottomSheet: React.FC<MajorDeviceBottomSheetProps> = ({
       presentationStyle="pageSheet"
       onRequestClose={onClose}
     >
-      <SafeAreaView style={styles.container}>
+      <View
+        style={[
+          styles.container,
+          {
+            paddingTop: Platform.OS === 'ios' ? 0 : insets.top,
+            paddingBottom: insets.bottom,
+            paddingLeft: insets.left,
+            paddingRight: insets.right,
+          },
+        ]}
+      >
         <KeyboardAvoidingView
           behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
           style={styles.keyboardView}
@@ -275,6 +302,7 @@ const MajorDeviceBottomSheet: React.FC<MajorDeviceBottomSheetProps> = ({
                     imageUris={itemData.imageUris || []}
                     onImagesAdded={(newUris) => handleImagesAdded(item.key, newUris)}
                     onImageRemoved={(index) => handleRemoveImage(item.key, index)}
+                    onImageEdited={(index, newUri) => handleImageEdited(item.key, index, newUri)}
                   />
 
                   {/* Status Selection */}
@@ -295,11 +323,11 @@ const MajorDeviceBottomSheet: React.FC<MajorDeviceBottomSheetProps> = ({
               style={styles.confirmButton}
               onPress={handleConfirm}
             >
-              <Text style={styles.confirmButtonText}>확인</Text>
+              <Text style={styles.confirmButtonText}>저장</Text>
             </TouchableOpacity>
           </View>
         </KeyboardAvoidingView>
-      </SafeAreaView>
+      </View>
     </Modal>
   );
 };
@@ -317,10 +345,8 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'space-between',
     paddingHorizontal: 16,
-    paddingVertical: 16,
+    paddingVertical: 8,
     backgroundColor: '#FFFFFF',
-    borderBottomWidth: 1,
-    borderBottomColor: '#E5E7EB',
   },
   closeButton: {
     width: 40,
@@ -329,9 +355,9 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   headerTitle: {
-    fontSize: 18,
-    fontWeight: '700',
-    color: '#1F2937',
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#6B7280',
   },
   placeholder: {
     width: 40,

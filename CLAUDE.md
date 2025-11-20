@@ -107,6 +107,636 @@ src/
 
 ---
 
+## 💾 임시저장 (AutoSave) 시스템 ⭐
+
+### 개요
+
+진단 리포트 작성 시 사용자 데이터를 자동으로 보호하는 **Google Docs/Notion 스타일** 임시저장 시스템.
+
+**핵심 원칙**:
+- ✅ **500ms Debounce**: 빠른 응답성
+- ✅ **저장 후 계속 표시**: isDirty 체크 없음 (업계 표준 패턴)
+- ✅ **빈 폼 필터링**: 의미 있는 데이터만 복구 팝업
+- ✅ **30초 규칙**: 빠른 재진입 시 자동 이어쓰기
+- ✅ **명시적 삭제**: 제출 성공 / "새로 작성" 선택 시만
+
+### 핵심 규칙 (4가지)
+
+#### 📌 1) Draft 저장 시점
+- ✅ **값 변경 시 자동저장** (500ms debounce)
+- ✅ 텍스트/이미지/체크박스 모두 저장
+- ❌ 저장 버튼 없음 (완전 자동)
+
+```typescript
+useAutoSave({
+  methods,
+  userId: selectedUser.uid,
+  delay: 500, // 500ms
+  enabled: !!selectedUser && inspectionMode === 'inspection',
+});
+```
+
+#### 📌 2) Draft 삭제 시점 (가장 중요!)
+
+**명시적 삭제만 허용 (사용자 의도 명확):**
+
+| 상황 | Draft 삭제? | 코드 위치 |
+|------|-------------|----------|
+| ✅ 제출 성공 시 | **삭제** | `handleSubmit()` 성공 후 |
+| ✅ "새로 작성" 선택 시 | **삭제** | Alert → "새로 작성" 버튼 |
+| ✅ 7일 자동 만료 | **삭제** | `imageStorage.cleanupOldImages()` |
+| ❌ 뒤로가기 | **유지** | Alert로 확인만 |
+| ❌ 앱 종료 | **유지** | - |
+| ❌ 작성 중단 | **유지** | - |
+
+```typescript
+// ✅ 삭제되는 경우 (2가지만)
+// 1. 제출 성공
+if (success) {
+  await draftStorage.clearDraft(selectedUser.uid);
+  await imageStorage.clearUserImages(selectedUser.uid);
+}
+
+// 2. "새로 작성" 선택
+Alert.alert('임시저장 복구', '...', [
+  {
+    text: '새로 작성',
+    onPress: async () => {
+      await draftStorage.clearDraft(user.uid); // 🔥 삭제
+      await imageStorage.clearUserImages(user.uid);
+      reset(undefined);
+    }
+  }
+]);
+```
+
+#### 📌 3) Draft 불러오기 시점
+
+- ✅ **화면 최초 진입 시 1회만 체크**
+- ✅ 예약 선택 → `handleSelectReservation()` 실행 시
+
+```typescript
+const handleSelectReservation = async (reservation) => {
+  const userDraft = await draftStorage.loadDraft(user.uid);
+
+  if (userDraft) {
+    Alert.alert('임시저장 복구', '이전에 작성하던 진단 리포트가 있습니다. 불러올까요?', [
+      { text: '새로 작성', onPress: () => { /* draft 삭제 */ } },
+      { text: '이어서 작성', onPress: () => reset(userDraft) }
+    ]);
+  } else {
+    setInspectionMode('inspection');
+  }
+};
+```
+
+#### 📌 4) 이어하기 팝업 띄우는 조건
+
+**3가지 조건 모두 충족 시 팝업:**
+1. ✅ Draft 값 존재
+2. ✅ Draft 내용이 비어있지 않음
+3. ✅ 화면 최초 진입 (이미 팝업 본 적 없음)
+
+```typescript
+if (!userDraft) return; // 조건 1
+if (Object.keys(userDraft).length === 0) return; // 조건 2
+// 조건 3은 handleSelectReservation 1회 실행으로 보장됨
+```
+
+---
+
+### 전체 동작 플로우 (유저 기준)
+
+```
+🟢 Case 1: 처음 들어옴
+예약 선택 → Draft 없음 → 새 폼 시작
+              ↓
+          자동저장 (500ms)
+
+🟡 Case 2: 작성 중 종료함 (앱 종료 / 뒤로가기)
+앱 재진입 → 예약 선택 → Draft 있음 → 팝업
+                                    ├─ 이어하기 → Draft 로드
+                                    └─ 새로 작성 → Draft 삭제
+
+🔵 Case 3: 제출 완료
+제출 → 서버 성공 → Draft 삭제 → 다음 진입 시 이어하기 없음
+
+🟣 Case 4: 화면 이탈 (뒤로가기)
+뒤로가기 → isDirty 체크 → Alert 확인 → Draft 유지
+                                    └─ 다음 진입 시 이어하기 뜸
+```
+
+---
+
+### UI/UX 구성
+
+#### 1. **타이틀 우측 상태 표시 (우아하고 미니멀)**
+
+```
+┌──────────────────────────────────────────┐
+│ ← 진단 리포트 작성               [●]    │
+└──────────────────────────────────────────┘
+```
+
+**아이콘만 표시 (텍스트 없음):**
+- **저장 중**: 연한 회색 스피너 (#CBD5E1)
+- **저장 완료**: 체크마크 2초간 표시 후 Fade-out
+- **평상시**: 빈 공간 (24px 너비 유지)
+
+```typescript
+<View style={styles.saveStatus}>
+  {isSaving ? (
+    <ActivityIndicator size="small" color="#CBD5E1" />
+  ) : showSavedCheck ? (
+    <Animated.View style={{ opacity: checkOpacity }}>
+      <Ionicons name="checkmark-circle" size={18} color="#CBD5E1" />
+    </Animated.View>
+  ) : (
+    <View style={{ width: 24 }} />
+  )}
+</View>
+```
+
+**Fade 애니메이션 (저장 완료 시):**
+```typescript
+onSave: (savedAt) => {
+  setShowSavedCheck(true);
+  Animated.sequence([
+    Animated.timing(checkOpacity, { toValue: 1, duration: 200, useNativeDriver: true }),
+    Animated.delay(1800),
+    Animated.timing(checkOpacity, { toValue: 0, duration: 300, useNativeDriver: true }),
+  ]).start(() => setShowSavedCheck(false));
+}
+```
+
+**특징:**
+- ✅ 눈에 거슬리지 않는 연한 회색
+- ✅ 부드러운 Fade in/out 애니메이션
+- ✅ 텍스트 없음 (깔끔한 디자인)
+- ✅ 2초 후 자동으로 사라짐
+
+#### 2. **뒤로가기 시 확인 Alert**
+
+```typescript
+const handleBackPress = () => {
+  if (methods.formState.isDirty) {
+    Alert.alert(
+      '작성 중인 내용이 있습니다',
+      '작성 중인 내용은 자동 저장되었습니다. 나가시겠습니까?',
+      [
+        { text: '계속 작성', style: 'cancel' },
+        { text: '나가기', style: 'destructive', onPress: handleBackToList }
+      ]
+    );
+  } else {
+    handleBackToList();
+  }
+};
+```
+
+---
+
+### 데이터 구조
+
+#### Draft Storage (MMKV / AsyncStorage)
+
+```typescript
+// Key: `inspection_draft_{userId}`
+{
+  data: InspectionFormData,  // RHF 폼 데이터
+  savedAt: "2025-11-18T12:30:00.000Z",
+  version: "1.0"
+}
+```
+
+#### Image Storage (FileSystem)
+
+```typescript
+// 경로: Paths.document/inspection_drafts/
+{
+  vehicleInfo: {
+    dashboardImageUris: [
+      "file://.../inspection_drafts/user123_dashboard_1731900000_0.jpg"
+    ],
+    vehicleVinImageUris: [...]
+  }
+}
+```
+
+**이미지 저장 규칙:**
+- Draft에 이미지 자체 저장 ❌
+- 이미지 URI만 저장 ✅
+- 실제 파일은 FileSystem에 복사
+- 제출 시 Firebase Storage에 업로드
+
+---
+
+### 타이밍 매트릭스 (완전 정리)
+
+| 상황 | Draft 삭제? | Draft 유지? | 팝업? | 비고 |
+|------|-------------|-------------|-------|------|
+| 최초 진입 | - | - | Draft 있으면 ✅ | 1회만 |
+| 이어하기 선택 | ❌ | ✅ | ❌ | RHF reset(draft) |
+| 새로작성 선택 | ✅ | ❌ | ❌ | Draft 삭제 |
+| 중간 자동저장 | ❌ | ✅ | ❌ | 500ms debounce |
+| 제출 성공 | ✅ | ❌ | ❌ | 서버 응답 후 |
+| 뒤로가기 | ❌ | ✅ | isDirty 시 ✅ | 확인용 |
+| 앱 종료/재실행 | ❌ | ✅ | Draft 있으면 ✅ | - |
+| 7일 경과 | ✅ | ❌ | ❌ | 자동 정리 |
+
+---
+
+### 핵심 원칙 (3가지)
+
+1. **안전 우선**: 실수로 데이터 잃는 것 방지
+2. **명시적 삭제**: 사용자 의도가 명확할 때만 삭제
+3. **투명성**: 상태를 항상 시각적으로 표시
+
+---
+
+### 관련 파일
+
+- `src/storage/mmkv.ts` - Draft 데이터 저장
+- `src/storage/imageStorage.ts` - 이미지 파일 저장
+- `src/hooks/useAutoSave.ts` - 자동저장 훅
+- `src/screens/VehicleInspection/index.tsx` - 진단 리포트 작성 화면
+- `src/screens/VehicleInspection/hooks/useInspectionForm.ts` - 폼 관리
+
+---
+
+## 🔧 AutoSave 개선 사항 (3가지 핵심 이슈)
+
+### 🔥 Problem 1: lastSaved 초기화 타이밍 불일치
+
+#### 문제 상황
+
+```
+사용자가 draft 작성 → 나가기 → 40분 후 재진입
+→ "이어서 작성" 팝업은 뜨는데
+→ UI에는 "저장됨 40분 전"이 아니라 "방금" 표시됨 (초기화 안됨)
+```
+
+**원인**: `lastSaved` state가 draft 불러올 때 `draft.savedAt`과 동기화되지 않음
+
+#### 현재 코드 (문제)
+
+```typescript
+// handleSelectReservation 또는 handleStartManualInspection
+const userDraft = await draftStorage.loadDraft(user.uid);
+if (userDraft && isDraftMeaningful(userDraft)) {
+  Alert.alert('임시저장 복구', '...', [
+    {
+      text: '이어서 작성',
+      onPress: () => {
+        reset(userDraft);  // Draft 데이터 복구
+        setInspectionMode('inspection');
+        // ❌ lastSaved가 초기화되지 않음!
+      }
+    }
+  ]);
+}
+```
+
+#### 해결 방법
+
+Draft를 불러올 때 `draft.savedAt` 타임스탬프를 `lastSaved`와 동기화:
+
+```typescript
+// ✅ 수정된 코드
+const userDraft = await draftStorage.loadDraft(user.uid);
+if (userDraft && isDraftMeaningful(userDraft)) {
+  Alert.alert('임시저장 복구', '...', [
+    {
+      text: '이어서 작성',
+      onPress: async () => {
+        reset(userDraft);
+
+        // 🔥 Draft의 savedAt 타임스탬프로 lastSaved 동기화
+        const draftTimestamp = await draftStorage.getDraftSavedTime(user.uid);
+        if (draftTimestamp) {
+          setLastSaved(draftTimestamp);
+        }
+
+        setInspectionMode('inspection');
+      }
+    }
+  ]);
+}
+```
+
+**예상 결과**:
+- Draft 작성 후 40분 뒤 재진입 → "저장됨 40분 전" 정확히 표시
+- 사용자가 실제 저장 시간을 정확히 인지 가능
+
+---
+
+### 🔥 Problem 2: 이미지만 있는 draft가 "의미 없음"으로 처리됨
+
+#### 문제 상황
+
+```
+사용자가 이미지만 촬영 (텍스트 입력 없음)
+→ 나가기 → 재진입
+→ isDraftMeaningful() = false
+→ Draft가 자동 삭제됨 (팝업 안뜸)
+→ 사용자: "내가 찍은 사진 다 어디갔어?!" 😡
+```
+
+**원인**: `isDraftMeaningful()`이 텍스트 필드만 체크하고 이미지는 체크 안함
+
+#### 현재 코드 (문제)
+
+```typescript
+const isDraftMeaningful = (draft: any): boolean => {
+  if (!draft) return false;
+
+  const vehicleInfo = draft.vehicleInfo || {};
+  const batteryInfo = draft.batteryInfo || {};
+
+  return !!(
+    vehicleInfo.vehicleBrand ||
+    vehicleInfo.vehicleName ||
+    vehicleInfo.mileage ||
+    vehicleInfo.carKeyCount ||
+    batteryInfo.sohPercentage ||
+    batteryInfo.cellCount
+    // ❌ 이미지 체크 없음!
+  );
+};
+```
+
+#### 해결 방법
+
+이미지 배열도 검사하도록 확장:
+
+```typescript
+// ✅ 수정된 코드
+const isDraftMeaningful = (draft: any): boolean => {
+  if (!draft) return false;
+
+  // 1️⃣ 기본 필드 체크
+  const vehicleInfo = draft.vehicleInfo || {};
+  const batteryInfo = draft.batteryInfo || {};
+  const hasBasicFields = !!(
+    vehicleInfo.vehicleBrand ||
+    vehicleInfo.vehicleName ||
+    vehicleInfo.mileage ||
+    vehicleInfo.carKeyCount ||
+    batteryInfo.sohPercentage ||
+    batteryInfo.cellCount
+  );
+
+  // 2️⃣ 이미지 체크 (재귀적으로 모든 섹션 검사)
+  const hasImages = (obj: any): boolean => {
+    if (!obj || typeof obj !== 'object') return false;
+
+    // imageUris, imageUri 필드 체크
+    if (Array.isArray(obj.imageUris) && obj.imageUris.length > 0) return true;
+    if (typeof obj.imageUri === 'string' && obj.imageUri.length > 0) return true;
+
+    // 중첩 객체 재귀 검사
+    return Object.values(obj).some(value => {
+      if (Array.isArray(value)) {
+        return value.some(item => hasImages(item));
+      }
+      if (typeof value === 'object' && value !== null) {
+        return hasImages(value);
+      }
+      return false;
+    });
+  };
+
+  const hasAnyImages = hasImages(draft);
+
+  // 3️⃣ 기본 필드 OR 이미지 중 하나라도 있으면 의미 있음
+  return hasBasicFields || hasAnyImages;
+};
+```
+
+**체크하는 이미지 필드**:
+- `vehicleInfo.dashboardImageUris` - 계기판 사진
+- `vehicleInfo.vehicleVinImageUris` - 차대번호 사진
+- `majorDevices.steering.*.imageUri` - 조향 장치 사진
+- `majorDevices.braking.*.imageUri` - 제동 장치 사진
+- `majorDevices.electrical.*.imageUri` - 전기 장치 사진
+- `vehicleExterior.paintThickness[].imageUris` - 도장 두께 사진
+- `vehicleExterior.tireTread[].imageUris` - 타이어 트레드 사진
+- (기타 모든 이미지 필드)
+
+**예상 결과**:
+- 이미지만 촬영한 draft도 "의미 있음"으로 판단
+- 사용자 데이터 손실 방지
+
+---
+
+### 🔥 Problem 3: 30초 규칙 - 빠른 재진입 시 자동 이어쓰기
+
+#### 문제 상황
+
+**현재 동작 (불편함)**:
+```
+사용자가 draft 작성 → 뒤로가기 → 5초 후 재진입
+→ "이어서 작성" 팝업 뜸
+→ 사용자: "방금 나갔다 들어왔는데 왜 물어봐?" 😑
+```
+
+**실제 앱들의 동작 (네이버, 쿠팡, 카카오비즈니스)**:
+```
+1️⃣ 빠른 재진입 (<30초):
+   → 팝업 없이 바로 이어쓰기 (자동 복구)
+
+2️⃣ 오래 후 재진입 (≥30초):
+   → "이어서 작성" 팝업 표시 (선택권 제공)
+```
+
+**이유**:
+- 빠른 재진입: 실수로 나간 것 (사용자는 계속 작업 중)
+- 오래 후 재진입: 의도적으로 나간 것 (새로 작성 vs 이어쓰기 선택)
+
+#### 해결 방법
+
+`lastOpenedTimestamp` 추적하여 재진입 간격 계산:
+
+##### 1️⃣ mmkv.ts에 타임스탬프 추적 메서드 추가
+
+```typescript
+export const draftStorage = {
+  // ... 기존 메서드들 ...
+
+  /**
+   * 마지막 열람 시간 저장
+   */
+  saveLastOpened: async (userId: string): Promise<void> => {
+    try {
+      const key = `last_opened_${userId}`;
+      await storage.setItem(key, Date.now().toString());
+    } catch (error) {
+      console.error('❌ lastOpened 저장 실패:', error);
+    }
+  },
+
+  /**
+   * 마지막 열람 시간 조회
+   */
+  getLastOpened: async (userId: string): Promise<number | null> => {
+    try {
+      const key = `last_opened_${userId}`;
+      const value = await storage.getItem(key);
+      return value ? parseInt(value, 10) : null;
+    } catch (error) {
+      console.error('❌ lastOpened 조회 실패:', error);
+      return null;
+    }
+  },
+};
+```
+
+##### 2️⃣ VehicleInspection에서 30초 규칙 적용
+
+```typescript
+const handleSelectReservation = async (reservation: ReservationItem) => {
+  const user = {
+    uid: reservation.userId || '',
+    displayName: reservation.userName,
+    phoneNumber: reservation.userPhone,
+  };
+  setSelectedUser(user);
+
+  const userDraft = await draftStorage.loadDraft(user.uid);
+
+  if (userDraft && isDraftMeaningful(userDraft)) {
+    // 🔥 마지막 열람 시간 체크 (30초 규칙)
+    const lastOpened = await draftStorage.getLastOpened(user.uid);
+    const now = Date.now();
+    const elapsedSeconds = lastOpened ? (now - lastOpened) / 1000 : Infinity;
+
+    console.log(`📊 재진입 간격: ${elapsedSeconds.toFixed(1)}초`);
+
+    if (elapsedSeconds < 30) {
+      // ✅ Case 1: 빠른 재진입 (<30초) → 자동 이어쓰기
+      console.log('⚡ 빠른 재진입 - 자동 이어쓰기');
+      reset(userDraft);
+
+      const draftTimestamp = await draftStorage.getDraftSavedTime(user.uid);
+      if (draftTimestamp) {
+        setLastSaved(draftTimestamp);
+      }
+
+      setInspectionMode('inspection');
+      await draftStorage.saveLastOpened(user.uid); // 타임스탬프 갱신
+    } else {
+      // ✅ Case 2: 오래 후 재진입 (≥30초) → 팝업 표시
+      console.log('🕐 오래 후 재진입 - 팝업 표시');
+      Alert.alert(
+        '임시저장 복구',
+        '이전에 작성하던 진단 리포트가 있습니다. 불러올까요?',
+        [
+          {
+            text: '새로 작성',
+            onPress: async () => {
+              await draftStorage.clearDraft(user.uid);
+              await imageStorage.clearUserImages(user.uid);
+              reset(undefined);
+              setLastSaved(null);
+              setInspectionMode('inspection');
+              await draftStorage.saveLastOpened(user.uid);
+            },
+          },
+          {
+            text: '이어서 작성',
+            onPress: async () => {
+              reset(userDraft);
+
+              const draftTimestamp = await draftStorage.getDraftSavedTime(user.uid);
+              if (draftTimestamp) {
+                setLastSaved(draftTimestamp);
+              }
+
+              setInspectionMode('inspection');
+              await draftStorage.saveLastOpened(user.uid);
+            },
+          },
+        ]
+      );
+    }
+  } else {
+    // Draft 없거나 의미 없음 → 새 폼
+    if (userDraft) {
+      await draftStorage.clearDraft(user.uid);
+    }
+    setLastSaved(null);
+    setInspectionMode('inspection');
+    await draftStorage.saveLastOpened(user.uid);
+  }
+};
+```
+
+##### 3️⃣ 화면 나갈 때 타임스탬프 저장
+
+```typescript
+// useEffect로 cleanup 시 저장
+useEffect(() => {
+  return () => {
+    if (selectedUser?.uid) {
+      draftStorage.saveLastOpened(selectedUser.uid);
+    }
+  };
+}, [selectedUser]);
+```
+
+#### 30초 규칙 플로우 다이어그램
+
+```
+사용자 재진입 (Draft 존재)
+    ↓
+lastOpened 타임스탬프 조회
+    ↓
+경과 시간 계산
+    ↓
+    ├─ < 30초   → 자동 이어쓰기 (팝업 없음) ⚡
+    │              - reset(draft)
+    │              - setLastSaved(draft.savedAt)
+    │              - saveLastOpened(now)
+    │
+    └─ ≥ 30초   → 팝업 표시 🕐
+                   - "새로 작성" vs "이어서 작성"
+                   - 선택 후 saveLastOpened(now)
+```
+
+**예상 결과**:
+- 빠른 재진입: 매끄러운 UX (팝업 없음)
+- 오래 후 재진입: 명확한 선택권 제공
+- 네이버/쿠팡/카카오비즈니스와 동일한 UX 패턴
+
+---
+
+### 📊 개선 전후 비교
+
+| 상황 | 개선 전 | 개선 후 |
+|------|---------|---------|
+| **Draft 40분 전 작성 후 재진입** | "저장됨 방금" 표시 ❌ | "저장됨 40분 전" 정확히 표시 ✅ |
+| **이미지만 10장 촬영 후 재진입** | Draft 자동 삭제 ❌ | Draft 유지, 팝업 뜸 ✅ |
+| **5초 전 나갔다 재진입** | 팝업 뜸 (불편) ❌ | 자동 이어쓰기 (매끄러움) ✅ |
+| **2시간 전 나갔다 재진입** | 팝업 뜸 ✅ | 팝업 뜸 (동일) ✅ |
+
+---
+
+### 🛠️ 구현 우선순위
+
+1. **Problem 1 (최고 우선순위)**: lastSaved 동기화
+   - 가장 간단한 수정 (2줄 코드)
+   - 사용자 혼란 방지
+
+2. **Problem 2 (높은 우선순위)**: 이미지 체크 추가
+   - 데이터 손실 방지 (중요!)
+   - 중간 복잡도
+
+3. **Problem 3 (중간 우선순위)**: 30초 규칙
+   - UX 향상 (필수는 아님)
+   - 가장 복잡한 구현
+
+---
+
 ## 📱 주요 화면 상세
 
 ### 핵심 화면 (라인 수 순)
@@ -267,6 +897,91 @@ const defectiveCellCount = useMemo(() => {
 - 예약 할당/해제 (`assignReservationToMechanic`)
 - 상태 변경 (confirmed → in_progress → completed)
 - 진단 리포트 작성 화면으로 이동
+
+---
+
+## 👥 회원/비회원 통합 시스템
+
+### 핵심 원칙
+
+CharzingApp은 **회원과 비회원을 단일 시스템으로 통합 관리**하며, 비회원이 나중에 회원가입 시 자동으로 기존 데이터를 연결합니다.
+
+**3가지 핵심 원칙**:
+1. **식별자는 UID** (회원/비회원 모두 고유 ID 사용)
+2. **전화번호는 연결키** (검색 및 매칭용, 식별자 아님)
+3. **회원가입 시 자동 연결** (Firebase Functions 트리거)
+
+### 사용자 식별 체계
+
+#### 회원 (Registered User)
+```typescript
+{
+  uid: "abc123def456",           // Firebase Auth UID
+  userType: "registered",
+  email: "user@example.com",
+  phoneNumber: "01012345678",    // 선택
+  provider: "kakao" | "google" | "apple",
+  isRegistrationComplete: true
+}
+```
+
+#### 비회원 (Guest User)
+```typescript
+{
+  uid: "guest_2f9a3b1e-8f9c-4a8c-9fa2-123abc",  // guest_ + UUID
+  userType: "guest",
+  displayName: "김영희",
+  phoneNumber: "01012345678",    // 필수 (연결키)
+  active: true,                  // 매칭 후 false
+  mergedInto: null               // 매칭 후 실제 uid
+}
+```
+
+**생성 시점**: 정비사가 진단 리포트 작성 시 수동 입력
+
+### 자동 매칭 플로우
+
+```
+비회원 예약/리포트 작성
+    ↓
+전화번호 저장: "01012345678"
+    ↓
+사용자가 앱 설치 후 회원가입
+    ↓
+[Firebase Function 트리거]
+autoLinkGuestAccounts()
+    ↓
+전화번호로 guest 계정 검색
+    ↓
+발견 시 자동 데이터 이전:
+  - 예약 (diagnosisReservations)
+  - 리포트 (vehicleDiagnosisReports)
+  - 알림 (inAppNotifications)
+    ↓
+guest 계정 비활성화
+    ↓
+[완료] 사용자는 자동으로 모든 기록 접근
+```
+
+### 데이터 구조
+
+**진단 리포트**:
+```typescript
+{
+  userId: "guest_xxx" | "real_uid",
+  userName: "김영희",
+  userPhone: "01012345678",
+  isGuest: true,              // userId가 guest_로 시작하면 true
+  linkedFrom?: "guest_xxx"    // 매칭 후 원본 guest uid
+}
+```
+
+### 관련 파일
+
+- **설계 문서**: `/USER_SYSTEM_DESIGN.md` - 전체 시스템 설계 및 구현 가이드
+- **앱**: `src/screens/VehicleInspection/index.tsx` - 비회원 입력 로직
+- **서비스**: `src/services/firebaseService.ts` - `createGuestUser()` 메서드
+- **Functions**: `functions/src/index.ts` - `autoLinkGuestAccounts()` 트리거
 
 ---
 

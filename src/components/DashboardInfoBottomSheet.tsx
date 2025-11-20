@@ -5,13 +5,14 @@ import {
   StyleSheet,
   Modal,
   TouchableOpacity,
-  SafeAreaView,
   TextInput,
   KeyboardAvoidingView,
   Platform,
   ScrollView,
   Animated,
+  Keyboard,
 } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import MultipleImagePicker from './MultipleImagePicker';
 
@@ -39,6 +40,7 @@ const DashboardInfoBottomSheet: React.FC<DashboardInfoBottomSheetProps> = ({
   initialStatus,
   initialIssueDescription = '',
 }) => {
+  const insets = useSafeAreaInsets();
   const [mileage, setMileage] = useState(initialMileage);
   const [imageUris, setImageUris] = useState<string[]>(initialImageUris);
   const [status, setStatus] = useState<'good' | 'problem' | undefined>(initialStatus);
@@ -77,6 +79,10 @@ const DashboardInfoBottomSheet: React.FC<DashboardInfoBottomSheetProps> = ({
     setImageUris((prev) => prev.filter((_, i) => i !== index));
   };
 
+  const handleImageEdited = (index: number, newUri: string) => {
+    setImageUris((prev) => prev.map((uri, i) => i === index ? newUri : uri));
+  };
+
   const handleConfirm = () => {
     if (mileage.trim() && imageUris.length > 0 && status) {
       onConfirm(
@@ -98,7 +104,17 @@ const DashboardInfoBottomSheet: React.FC<DashboardInfoBottomSheetProps> = ({
       presentationStyle="pageSheet"
       onRequestClose={onClose}
     >
-      <SafeAreaView style={styles.container}>
+      <View
+        style={[
+          styles.container,
+          {
+            paddingTop: Platform.OS === 'ios' ? 0 : insets.top,
+            paddingBottom: insets.bottom,
+            paddingLeft: insets.left,
+            paddingRight: insets.right,
+          },
+        ]}
+      >
         <KeyboardAvoidingView
           behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
           style={styles.keyboardView}
@@ -106,14 +122,19 @@ const DashboardInfoBottomSheet: React.FC<DashboardInfoBottomSheetProps> = ({
           {/* Header */}
           <View style={styles.header}>
             <TouchableOpacity onPress={onClose} style={styles.closeButton}>
-              <Ionicons name="close" size={28} color="#1F2937" />
+              <Ionicons name="close" size={24} color="#1F2937" />
             </TouchableOpacity>
             <Text style={styles.headerTitle}>계기판 정보</Text>
             <View style={styles.placeholder} />
           </View>
 
           {/* Content */}
-          <ScrollView style={styles.content}>
+          <ScrollView
+            style={styles.content}
+            contentContainerStyle={{ paddingBottom: 100 + insets.bottom }}
+            showsVerticalScrollIndicator={false}
+            keyboardShouldPersistTaps="handled"
+          >
             {/* 주행거리 */}
             <View style={styles.inputGroup}>
               <Text style={styles.inputLabel}>주행거리 (km) *</Text>
@@ -124,6 +145,8 @@ const DashboardInfoBottomSheet: React.FC<DashboardInfoBottomSheetProps> = ({
                 value={mileage}
                 onChangeText={setMileage}
                 keyboardType="numeric"
+                returnKeyType="done"
+                onSubmitEditing={Keyboard.dismiss}
               />
             </View>
 
@@ -134,6 +157,7 @@ const DashboardInfoBottomSheet: React.FC<DashboardInfoBottomSheetProps> = ({
                 imageUris={imageUris}
                 onImagesAdded={handleImagesAdded}
                 onImageRemoved={handleImageRemoved}
+                onImageEdited={handleImageEdited}
                 label="계기판 사진"
               />
             </View>
@@ -216,6 +240,9 @@ const DashboardInfoBottomSheet: React.FC<DashboardInfoBottomSheetProps> = ({
                     onChangeText={setIssueDescription}
                     multiline
                     textAlignVertical="top"
+                    returnKeyType="done"
+                    blurOnSubmit={true}
+                    onSubmitEditing={Keyboard.dismiss}
                   />
                 </Animated.View>
               )}
@@ -223,7 +250,7 @@ const DashboardInfoBottomSheet: React.FC<DashboardInfoBottomSheetProps> = ({
           </ScrollView>
 
           {/* Footer */}
-          <View style={styles.footer}>
+          <View style={[styles.footer, { paddingBottom: 8 + insets.bottom }]}>
             <TouchableOpacity
               style={[
                 styles.confirmButton,
@@ -232,11 +259,11 @@ const DashboardInfoBottomSheet: React.FC<DashboardInfoBottomSheetProps> = ({
               onPress={handleConfirm}
               disabled={!isComplete}
             >
-              <Text style={styles.confirmButtonText}>확인</Text>
+              <Text style={styles.confirmButtonText}>저장</Text>
             </TouchableOpacity>
           </View>
         </KeyboardAvoidingView>
-      </SafeAreaView>
+      </View>
     </Modal>
   );
 };
@@ -254,10 +281,8 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'space-between',
     paddingHorizontal: 16,
-    paddingVertical: 16,
+    paddingVertical: 8,
     backgroundColor: '#FFFFFF',
-    borderBottomWidth: 1,
-    borderBottomColor: '#E5E7EB',
   },
   closeButton: {
     width: 40,
@@ -266,9 +291,9 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   headerTitle: {
-    fontSize: 18,
-    fontWeight: '700',
-    color: '#1F2937',
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#6B7280',
   },
   placeholder: {
     width: 40,
@@ -328,7 +353,13 @@ const styles = StyleSheet.create({
     overflow: 'hidden',
   },
   footer: {
-    padding: 16,
+    position: 'absolute',
+    bottom: 0,
+    left: 0,
+    right: 0,
+    paddingHorizontal: 16,
+    paddingTop: 16,
+    paddingBottom: 8,
     backgroundColor: '#FFFFFF',
     borderTopWidth: 1,
     borderTopColor: '#E5E7EB',

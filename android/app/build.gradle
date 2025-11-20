@@ -92,8 +92,8 @@ android {
         applicationId 'com.charzingapp'
         minSdkVersion rootProject.ext.minSdkVersion
         targetSdkVersion rootProject.ext.targetSdkVersion
-        versionCode 2
-        versionName "1.1.1"
+        versionCode 27
+        versionName "1.1.2"
 
         buildConfigField "String", "REACT_NATIVE_RELEASE_LEVEL", "\"${findProperty('reactNativeReleaseLevel') ?: 'stable'}\""
     }
@@ -104,6 +104,12 @@ android {
             keyAlias 'androiddebugkey'
             keyPassword 'android'
         }
+        release {
+            storeFile file('@sungminyou__CharzingApp-Expo-keystore.bak.jks')
+            storePassword '7494399732c782c04c3f6ebe2b44ee42'
+            keyAlias 'e0839c04447105cba42a64d61a76d387'
+            keyPassword '7271944acac4c4a894ffb6fcf76e6d8d'
+        }
     }
     buildTypes {
         debug {
@@ -112,7 +118,7 @@ android {
         release {
             // Caution! In production, you need to generate your own keystore file.
             // see https://reactnative.dev/docs/signed-apk-android.
-            signingConfig signingConfigs.debug
+            signingConfig signingConfigs.release
             def enableShrinkResources = findProperty('android.enableShrinkResourcesInReleaseBuilds') ?: 'false'
             shrinkResources enableShrinkResources.toBoolean()
             minifyEnabled enableMinifyInReleaseBuilds
