@@ -1915,6 +1915,21 @@ export const onReportStatusChange = functions.firestore
 - `BrakingBottomSheet.tsx` - 제동 장치 검사 (3개 항목)
 - `ElectricalBottomSheet.tsx` - 전기 장치 검사 (5개 항목)
 
+6. **UUID 에러 수정** ⭐ **신규 (2025-11-20)**
+   - Guest 계정 생성 시 `crypto.getRandomValues()` 에러 해결
+   - `react-native-get-random-values` polyfill 추가
+   - firebaseService.ts에 import 추가
+
+7. **Bottom Sheet UI 표준화** ⭐ **신규 (2025-11-20)**
+   - 7개 Bottom Sheet 컴포넌트 헤더 디자인 통일
+   - 저장 버튼을 헤더 우측에 배치 (기존: 하단 버튼)
+   - 일관된 사용자 경험 제공
+
+8. **이미지 업로드 로직 개선** ⭐ **신규 (2025-11-20)**
+   - `file://` 경로 catch-all 처리 추가
+   - 모든 로컬 이미지 자동 Firebase Storage 업로드
+   - charzing-admin 이미지 404 에러 해결
+
 ### 알려진 이슈 🐛
 
 1. **차량 이미지 404 오류** (부분 해결)
@@ -1926,6 +1941,68 @@ export const onReportStatusChange = functions.firestore
    - 현대/기아: `capacity` (number)
    - 아우디: `capacity` (string)
    - 해결: 타입 안전 헬퍼 함수 사용 중
+
+---
+
+## 🚧 진행 중인 작업 (2025-11-20)
+
+### 진단서 제출 플로우 개선
+
+**현재 문제점:**
+- 진단서 제출 후 예약과 리포트가 연결되지 않음 (`reservationId: null`)
+- 예약 상태가 업데이트되지 않아 "내 담당"에 계속 표시됨
+- 정비사 추적 불가 (mechanicId 없음)
+- 관리자 승인/반려 후 처리 로직 없음
+
+**개선 계획:**
+
+1. **데이터 구조 확장**
+   ```typescript
+   // DiagnosisReservation
+   interface DiagnosisReservation {
+     reportId?: string | null;      // 제출된 리포트 ID
+     status:
+       | 'pending'
+       | 'confirmed'
+       | 'in_progress'
+       | 'pending_review'    // ⭐ 신규: 검수 대기
+       | 'completed'
+       | 'cancelled';
+   }
+
+   // VehicleDiagnosisReport
+   interface VehicleDiagnosisReport {
+     reservationId: string | null;  // 예약 연결
+     mechanicId: string;            // 정비사 ID
+     mechanicName?: string;         // 정비사 이름
+     submittedAt?: Timestamp;       // 제출 시간
+   }
+   ```
+
+2. **플로우 개선**
+   ```
+   정비사 진단서 제출
+       ↓
+   리포트 status: 'pending_review'
+   예약 status: 'pending_review'
+       ↓
+   "내 담당"에서 자동 숨김
+       ↓
+   관리자 웹에서 승인/반려
+       ↓
+   [승인] 예약 status: 'completed'
+   [반려] 예약 status: 'in_progress' (재작성)
+   ```
+
+**작업 목록:**
+- [ ] DiagnosisReservation 타입 확장 (reportId, pending_review 상태)
+- [ ] VehicleDiagnosisReport 타입 확장 (reservationId, mechanicId, submittedAt)
+- [ ] VehicleInspectionScreen - reservationId 저장 및 전달
+- [ ] useInspectionSubmit - reservationId/mechanicId 저장 로직
+- [ ] 제출 시 예약 상태 pending_review로 업데이트
+- [ ] ReservationsManagementScreen 필터링 수정
+- [ ] Firebase Functions - 승인/반려 시 예약 상태 자동 업데이트
+- [ ] "내 진단 기록" 화면 구현 (MyInspectionsScreen)
 
 ---
 
@@ -1963,6 +2040,6 @@ export const onReportStatusChange = functions.firestore
 
 ---
 
-**마지막 업데이트**: 2025년 11월 10일
+**마지막 업데이트**: 2025년 11월 20일
 **버전**: 1.1.1
 **작성**: Claude Code 분석 기반
