@@ -43,7 +43,6 @@ src/
 │   ├── InspectionImageCard.tsx     # 검사 이미지 카드 ⭐ 신규
 │   ├── SteeringBottomSheet.tsx     # 조향 장치 검사 (4개 항목) ⭐ 신규
 │   ├── BrakingBottomSheet.tsx      # 제동 장치 검사 (3개 항목) ⭐ 신규
-│   ├── ElectricalBottomSheet.tsx   # 전기 장치 검사 (5개 항목) ⭐ 신규
 │   ├── VehicleAccordionSelector.tsx # 차량 선택 아코디언
 │   ├── KakaoMapView.tsx            # 카카오 지도 WebView
 │   ├── Header.tsx                  # 공통 헤더
@@ -518,7 +517,6 @@ const isDraftMeaningful = (draft: any): boolean => {
 - `vehicleInfo.vehicleVinImageUris` - 차대번호 사진
 - `majorDevices.steering.*.imageUri` - 조향 장치 사진
 - `majorDevices.braking.*.imageUri` - 제동 장치 사진
-- `majorDevices.electrical.*.imageUri` - 전기 장치 사진
 - `vehicleExterior.paintThickness[].imageUris` - 도장 두께 사진
 - `vehicleExterior.tireTread[].imageUris` - 타이어 트레드 사진
 - (기타 모든 이미지 필드)
@@ -802,7 +800,7 @@ lastOpened 타임스탬프 조회
 
 #### 4. 주요 장치 검사 (`majorDevices`) ⭐ **신규 추가**
 
-**3개 InputButton 구조**:
+**2개 InputButton 구조**:
 - **조향 (Steering)** - SteeringBottomSheet
   - 동력조향 작동 오일 누유
   - 스티어링 기어
@@ -812,12 +810,6 @@ lastOpened 타임스탬프 조회
   - 브레이크 오일 유량 상태
   - 브레이크 오일 누유
   - 배력장치 상태
-- **전기 (Electrical)** - ElectricalBottomSheet
-  - 발전기 출력
-  - 시동 모터
-  - 와이퍼 모터 기능
-  - 실내송풍 모터
-  - 라디에이터 팬 모터
 
 **각 항목 구성**:
 - 이미지 업로드 (카메라 촬영 / 갤러리)
@@ -844,13 +836,6 @@ interface MajorDevicesInspection {
     brakeOilLevel?: MajorDeviceItem;
     brakeOilLeak?: MajorDeviceItem;
     boosterCondition?: MajorDeviceItem;
-  };
-  electrical: {
-    generatorOutput?: MajorDeviceItem;
-    startMotor?: MajorDeviceItem;
-    wiperMotor?: MajorDeviceItem;
-    blowerMotor?: MajorDeviceItem;
-    radiatorFanMotor?: MajorDeviceItem;
   };
 }
 ```
@@ -1069,10 +1054,30 @@ Firestore
 │   ├── fastChargeCount: number
 │   ├── cellsData: BatteryCell[]  # 셀 정보 배열
 │   ├── diagnosisDetails: DiagnosisDetail[]
-│   ├── majorDevicesInspection?: MajorDevicesInspection  # ⭐ 신규 (주요 장치 검사)
+│   ├── majorDevicesInspection?: MajorDevicesInspection  # ⭐ 신규 (주요 장치 검사 - 조향, 제동)
 │   │   ├── steering: { powerSteeringOilLeak?, steeringGear?, steeringPump?, tierodEndBallJoint? }
-│   │   ├── braking: { brakeOilLevel?, brakeOilLeak?, boosterCondition? }
-│   │   └── electrical: { generatorOutput?, startMotor?, wiperMotor?, blowerMotor?, radiatorFanMotor? }
+│   │   └── braking: { brakeOilLevel?, brakeOilLeak?, boosterCondition? }
+│   ├── vehicleHistoryInfo?: VehicleHistoryInfo  # ⭐ 신규 (2025-11-23)
+│   │   ├── vehicleNumberChangeHistory: VehicleNumberChangeHistory[]  # 차량번호 변경 이력
+│   │   │   ├── changeDate: Timestamp
+│   │   │   ├── reason: string  # 예: "최초 등록", "번호 변경"
+│   │   │   └── vehicleUsage: string  # 예: "개인용", "영업용"
+│   │   └── ownerChangeHistory: OwnerChangeHistory[]  # 소유자 변경 이력
+│   │       ├── changeDate: Timestamp
+│   │       └── vehicleUsage: string
+│   ├── accidentRepairHistory?: AccidentRepairHistory  # ⭐ 신규 (2025-11-23)
+│   │   └── records: AccidentRepairRecord[]  # 사고 이력 배열
+│   │       ├── accidentDate: Timestamp
+│   │       ├── repairParts: RepairPartItem[]  # 수리된 부위 목록
+│   │       │   ├── partName: string  # 예: "앞범퍼", "보닛"
+│   │       │   └── repairTypes: RepairType[]  # 예: ["도장", "교환"]
+│   │       ├── summary?: string  # 수리 내역 요약
+│   │       ├── myCarPartsCost?: number  # 내 차 부품비
+│   │       ├── myCarLaborCost?: number  # 내 차 공임비
+│   │       ├── myCarPaintingCost?: number  # 내 차 도장비
+│   │       ├── otherCarPartsCost?: number  # 상대 차 부품비
+│   │       ├── otherCarLaborCost?: number  # 상대 차 공임비
+│   │       └── otherCarPaintingCost?: number  # 상대 차 도장비
 │   ├── comprehensiveInspection: {
 │   │     inspectionImages: InspectionImageItem[]
 │   │     additionalInfo: string
@@ -1879,8 +1884,8 @@ export const onReportStatusChange = functions.firestore
    - 이미지 업로드 (Firebase Storage)
 
 2. **주요 장치 검사 시스템** ⭐ **신규 추가 (2025-11-10)**
-   - 3개 별도 BottomSheet 컴포넌트 (조향, 제동, 전기)
-   - 조향 (4개 항목), 제동 (3개 항목), 전기 (5개 항목)
+   - 2개 별도 BottomSheet 컴포넌트 (조향, 제동)
+   - 조향 (4개 항목), 제동 (3개 항목)
    - 각 항목별 이미지 업로드 + 상태 선택 + 문제 내용 입력
    - VehicleDiagnosisReportScreen에 모달 표시 추가
    - Firebase majorDevicesInspection 필드 추가
@@ -1913,7 +1918,6 @@ export const onReportStatusChange = functions.firestore
 **주요 장치 검사** ⭐ **신규**:
 - `SteeringBottomSheet.tsx` - 조향 장치 검사 (4개 항목)
 - `BrakingBottomSheet.tsx` - 제동 장치 검사 (3개 항목)
-- `ElectricalBottomSheet.tsx` - 전기 장치 검사 (5개 항목)
 
 6. **UUID 에러 수정** ⭐ **신규 (2025-11-20)**
    - Guest 계정 생성 시 `crypto.getRandomValues()` 에러 해결
@@ -1929,6 +1933,33 @@ export const onReportStatusChange = functions.firestore
    - `file://` 경로 catch-all 처리 추가
    - 모든 로컬 이미지 자동 Firebase Storage 업로드
    - charzing-admin 이미지 404 에러 해결
+
+9. **차량 이력 및 사고/수리 이력 시스템** ⭐ **신규 (2025-11-23)**
+   - **차량 이력 정보** (`VehicleHistoryInfo`)
+     - 차량번호 변경 이력: 변경일, 변경 사유, 차량용도
+     - 소유자 변경 이력: 변경일, 차량용도
+     - 동적 항목 추가/삭제 지원
+   - **사고/수리 이력** (`AccidentRepairHistory`)
+     - 28개 차량 부위 × 6개 수리 유형 체크박스 매트릭스
+     - 내 차 사고 비용: 부품비, 공임비, 도장비
+     - 상대 차 사고 비용: 부품비, 공임비, 도장비
+     - 자동 계산 수리 부위 요약 (도장 N건, 교환 N건 등)
+   - **관리자 웹** (charzing-admin)
+     - `VehicleHistorySection.tsx` - 차량 이력 정보 섹션
+     - `AccidentRepairSection.tsx` - 사고/수리 이력 섹션 (354줄)
+     - 탭 인터페이스 추가 (배터리 진단 정보 / 차량 이력)
+   - **앱 타입 정의**
+     - `firebaseService.ts`에 타입 추가:
+       - `VehicleNumberChangeHistory`
+       - `OwnerChangeHistory`
+       - `VehicleHistoryInfo`
+       - `RepairType`
+       - `RepairPartItem`
+       - `AccidentRepairRecord`
+       - `AccidentRepairHistory`
+     - `VehicleDiagnosisReport`에 필드 추가:
+       - `vehicleHistoryInfo?: VehicleHistoryInfo`
+       - `accidentRepairHistory?: AccidentRepairHistory`
 
 ### 알려진 이슈 🐛
 
@@ -2040,6 +2071,6 @@ export const onReportStatusChange = functions.firestore
 
 ---
 
-**마지막 업데이트**: 2025년 11월 20일
+**마지막 업데이트**: 2025년 11월 23일
 **버전**: 1.1.1
 **작성**: Claude Code 분석 기반

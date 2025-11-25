@@ -672,15 +672,13 @@ const VehicleInspectionScreen: React.FC = () => {
   }, [watch('batteryInfo')]);
 
   const calculateMajorDevicesCompletion = useCallback((): SectionCompletion => {
-    const majorDevices = watch('majorDevices');
-    const hasElectrical = Object.values(majorDevices.electrical || {}).filter((item) => item && item.status).length > 0;
-
+    // 주요 장치 섹션이 제거되었으므로 항상 완료로 처리
     return {
-      completed: hasElectrical ? 1 : 0,
+      completed: 1,
       total: 1,
-      isAllRequiredComplete: hasElectrical,
+      isAllRequiredComplete: true,
     };
-  }, [watch('majorDevices')]);
+  }, []);
 
   const calculateVehicleExteriorCompletion = useCallback((): SectionCompletion => {
     const vehicleExterior = watch('vehicleExterior');
@@ -757,7 +755,6 @@ const VehicleInspectionScreen: React.FC = () => {
     // 🔥 함수 대신 실제 watch 값들을 dependency로 사용
     watch('vehicleInfo'),
     watch('batteryInfo'),
-    watch('majorDevices'),
     watch('vehicleExterior'),
     watch('vehicleUndercarriage'),
     watch('vehicleInterior'),
@@ -1094,7 +1091,7 @@ const VehicleInspectionScreen: React.FC = () => {
           <Text style={[styles.completionText, isAllRequiredComplete && styles.completionTextComplete]}>
             {completed}/{total}
           </Text>
-          {isAllRequiredComplete && <Ionicons name="checkmark-circle" size={24} color="#10B981" />}
+          {isAllRequiredComplete && <Ionicons name="checkmark-circle" size={24} color="#06B6D4" />}
         </View>
       </TouchableOpacity>
     );
@@ -1312,7 +1309,7 @@ const VehicleInspectionScreen: React.FC = () => {
                   <Ionicons
                     name={watch('diagnosticianConfirmation')?.confirmed ? "checkmark-circle" : "clipboard-outline"}
                     size={24}
-                    color={watch('diagnosticianConfirmation')?.confirmed ? "#10B981" : "#6B7280"}
+                    color={watch('diagnosticianConfirmation')?.confirmed ? "#06B6D4" : "#6B7280"}
                   />
                   <View style={styles.diagnosticianButtonTextContainer}>
                     <Text style={styles.diagnosticianButtonLabel}>진단 수행 확인</Text>
@@ -1569,7 +1566,7 @@ const styles = StyleSheet.create({
     color: '#6B7280',
   },
   completionTextComplete: {
-    color: '#10B981',
+    color: '#06B6D4',
   },
   sectionContent: {
     overflow: 'hidden',
@@ -1613,7 +1610,7 @@ const styles = StyleSheet.create({
   },
   diagnosticianButtonValue: {
     fontSize: moderateScale(14),
-    color: '#10B981',
+    color: '#06B6D4',
     fontWeight: '600',
   },
   diagnosticianButtonPlaceholder: {
@@ -1636,7 +1633,7 @@ const styles = StyleSheet.create({
   },
   autoSaveText: {
     fontSize: moderateScale(13),
-    color: '#10B981',
+    color: '#06B6D4',
     fontWeight: '500',
   },
   submitButton: {

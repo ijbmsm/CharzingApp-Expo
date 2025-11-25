@@ -13,10 +13,10 @@ import {RootStackParamList} from '../navigation/RootNavigator';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { useSelector } from 'react-redux';
 import { RootState } from '../store';
-import { moderateScale, verticalScale, scale } from 'react-native-size-matters';
 import Header from '../components/Header';
 import LoadingSpinner from '../components/LoadingSpinner';
 import firebaseService, { VehicleDiagnosisReport } from '../services/firebaseService';
+import { convertToLineSeedFont } from '../styles/fonts';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'DiagnosisReportList'>;
 
@@ -85,6 +85,8 @@ const DiagnosisReportListScreen: React.FC<Props> = ({navigation}) => {
   };
 
   const VehicleReportCard: React.FC<{report: VehicleDiagnosisReport}> = ({report}) => {
+    const diagnosisType = (report as any).diagnosisType || '스탠다드';
+
     return (
       <TouchableOpacity
         style={styles.reportCard}
@@ -92,40 +94,43 @@ const DiagnosisReportListScreen: React.FC<Props> = ({navigation}) => {
         activeOpacity={0.7}>
         <View style={styles.cardHeader}>
           <View style={styles.vehicleInfo}>
-            <Text style={styles.vehicleModel}>{report.vehicleName}</Text>
-            <Text style={styles.reportType}>{report.vehicleYear}</Text>
-          </View>
-          <View style={styles.statusContainer}>
-            <View style={[styles.statusBadge, {backgroundColor: '#06B6D4'}]}>
-              <Text style={styles.statusText}>진단 완료</Text>
+            <View style={styles.vehicleTitleRow}>
+              <Text style={[styles.vehicleModel, convertToLineSeedFont(styles.vehicleModel)]}>
+                {report.vehicleBrand} {report.vehicleName}
+              </Text>
+              <View style={styles.typeBadge}>
+                <Text style={[styles.typeText, convertToLineSeedFont(styles.typeText)]}>
+                  {diagnosisType}
+                </Text>
+              </View>
             </View>
+            <Text style={[styles.vehicleYear, convertToLineSeedFont(styles.vehicleYear)]}>
+              {report.vehicleYear}년식
+            </Text>
           </View>
         </View>
 
-        <View style={styles.cardContent}>
+        <View style={styles.infoGrid}>
           <View style={styles.infoRow}>
-            <View style={styles.infoItem}>
-              <MaterialCommunityIcons name="battery-outline" size={20} color="#6B7280" />
-              <Text style={styles.infoLabel}>SOH</Text>
-              <Text style={styles.infoValue}>{report.sohPercentage}%</Text>
-            </View>
-            <View style={styles.infoItem}>
-              <MaterialCommunityIcons name="car-outline" size={20} color="#6B7280" />
-              <Text style={styles.infoLabel}>주행거리</Text>
-              <Text style={styles.infoValue}>{report.realDrivableDistance}</Text>
-            </View>
+            <Text style={[styles.infoLabel, convertToLineSeedFont(styles.infoLabel)]}>
+              SOH
+            </Text>
+            <Text style={[styles.infoValue, convertToLineSeedFont(styles.infoValue)]}>
+              {report.sohPercentage}%
+            </Text>
           </View>
-        </View>
-
-        <View style={styles.cardFooter}>
-          <Text style={styles.dateText}>
-            진단일: {formatDate(report.diagnosisDate && typeof report.diagnosisDate === 'object' && 'toDate' in report.diagnosisDate
-              ? (report.diagnosisDate as any).toDate()
-              : report.diagnosisDate instanceof Date
-                ? report.diagnosisDate
-                : new Date())}
-          </Text>
-          <MaterialCommunityIcons name="chevron-right" size={20} color="#9CA3AF" />
+          <View style={styles.infoRow}>
+            <Text style={[styles.infoLabel, convertToLineSeedFont(styles.infoLabel)]}>
+              진단일
+            </Text>
+            <Text style={[styles.infoValue, convertToLineSeedFont(styles.infoValue)]}>
+              {formatDate(report.diagnosisDate && typeof report.diagnosisDate === 'object' && 'toDate' in report.diagnosisDate
+                ? (report.diagnosisDate as any).toDate()
+                : report.diagnosisDate instanceof Date
+                  ? report.diagnosisDate
+                  : new Date())}
+            </Text>
+          </View>
         </View>
       </TouchableOpacity>
     );
@@ -152,47 +157,54 @@ const DiagnosisReportListScreen: React.FC<Props> = ({navigation}) => {
                 {/* 요약 카드 */}
                 <View style={styles.summaryCard}>
                   <View style={styles.summaryHeader}>
-                    <MaterialCommunityIcons name="file-document-multiple" size={24} color="#06B6D4" />
-                    <Text style={styles.summaryTitle}>내 진단 리포트</Text>
+                    <MaterialCommunityIcons name="clipboard-text" size={28} color="#06B6D4" />
+                    <Text style={[styles.summaryTitle, convertToLineSeedFont(styles.summaryTitle)]}>
+                      내 진단 리포트
+                    </Text>
                   </View>
-                  <Text style={styles.summaryDescription}>
-                    총 {vehicleReports.length}개의 진단 리포트가 있습니다.
-                  </Text>
                   <View style={styles.summaryStats}>
-                    <View style={styles.statItem}>
-                      <Text style={styles.statNumber}>
-                        {vehicleReports.filter(r => r.status === 'draft').length}
-                      </Text>
-                      <Text style={styles.statLabel}>작성 중</Text>
-                    </View>
-                    <View style={styles.statItem}>
-                      <Text style={styles.statNumber}>
-                        {vehicleReports.filter(r => r.status === 'published').length}
-                      </Text>
-                      <Text style={styles.statLabel}>완료</Text>
-                    </View>
-                    <View style={styles.statItem}>
-                      <Text style={styles.statNumber}>
+                    <View style={styles.summaryStatItem}>
+                      <Text style={[styles.summaryStatNumber, convertToLineSeedFont(styles.summaryStatNumber)]}>
                         {vehicleReports.length}
                       </Text>
-                      <Text style={styles.statLabel}>전체</Text>
+                      <Text style={[styles.summaryStatLabel, convertToLineSeedFont(styles.summaryStatLabel)]}>
+                        전체
+                      </Text>
+                    </View>
+                    <View style={styles.summaryStatItem}>
+                      <Text style={[styles.summaryStatNumber, convertToLineSeedFont(styles.summaryStatNumber)]}>
+                        {vehicleReports.filter(r => r.status === 'published').length}
+                      </Text>
+                      <Text style={[styles.summaryStatLabel, convertToLineSeedFont(styles.summaryStatLabel)]}>
+                        완료
+                      </Text>
+                    </View>
+                    <View style={styles.summaryStatItem}>
+                      <Text style={[styles.summaryStatNumber, convertToLineSeedFont(styles.summaryStatNumber)]}>
+                        {vehicleReports.filter(r => r.status === 'draft' || r.status === 'pending_review').length}
+                      </Text>
+                      <Text style={[styles.summaryStatLabel, convertToLineSeedFont(styles.summaryStatLabel)]}>
+                        작성 중
+                      </Text>
                     </View>
                   </View>
                 </View>
 
-                {/* 차량 진단 리포트 목록 */}
-                <View style={styles.listSection}>
-                  <Text style={styles.sectionTitle}>진단 리포트 목록</Text>
-                  {vehicleReports.map(report => (
-                    <VehicleReportCard key={report.id} report={report} />
-                  ))}
-                </View>
+                {/* 리포트 목록 */}
+                <Text style={[styles.sectionTitle, convertToLineSeedFont(styles.sectionTitle)]}>
+                  진단 리포트 목록
+                </Text>
+                {vehicleReports.map(report => (
+                  <VehicleReportCard key={report.id} report={report} />
+                ))}
               </>
             ) : (
               <View style={styles.emptyContainer}>
                 <MaterialCommunityIcons name="file-document-outline" size={64} color="#D1D5DB" />
-                <Text style={styles.emptyTitle}>진단 리포트가 없습니다</Text>
-                <Text style={styles.emptyDescription}>
+                <Text style={[styles.emptyTitle, convertToLineSeedFont(styles.emptyTitle)]}>
+                  진단 리포트가 없습니다
+                </Text>
+                <Text style={[styles.emptyDescription, convertToLineSeedFont(styles.emptyDescription)]}>
                   아직 진단 리포트가 없습니다.{"\n"}
                   진단 예약을 통해 리포트를 받아보세요.
                 </Text>
@@ -214,164 +226,138 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   content: {
-    padding: scale(16),
+    padding: 20,
   },
+  // 요약 카드
   summaryCard: {
     backgroundColor: '#FFFFFF',
     borderRadius: 12,
-    padding: scale(16),
-    marginBottom: verticalScale(20),
+    padding: 20,
+    marginBottom: 20,
     shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 3.84,
-    elevation: 5,
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.05,
+    shadowRadius: 4,
+    elevation: 2,
   },
   summaryHeader: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginBottom: verticalScale(10),
+    marginBottom: 16,
   },
   summaryTitle: {
-    fontSize: moderateScale(15, 1),
-    fontWeight: '700',
+    fontSize: 17,
+    fontWeight: '600',
     color: '#1F2937',
-    marginLeft: scale(8),
-  },
-  summaryDescription: {
-    fontSize: moderateScale(12, 1),
-    color: '#6B7280',
-    marginBottom: verticalScale(12),
+    marginLeft: 8,
   },
   summaryStats: {
     flexDirection: 'row',
     justifyContent: 'space-around',
   },
-  statItem: {
+  summaryStatItem: {
     alignItems: 'center',
   },
-  statNumber: {
-    fontSize: moderateScale(20, 1),
+  summaryStatNumber: {
+    fontSize: 24,
     fontWeight: '700',
     color: '#06B6D4',
-    marginBottom: verticalScale(4),
+    marginBottom: 4,
   },
-  statLabel: {
-    fontSize: moderateScale(11, 1),
+  summaryStatLabel: {
+    fontSize: 13,
     color: '#6B7280',
   },
-  listSection: {
-    marginBottom: verticalScale(16),
-  },
+  // 섹션 타이틀
   sectionTitle: {
-    fontSize: moderateScale(14, 1),
-    fontWeight: '700',
+    fontSize: 15,
+    fontWeight: '600',
     color: '#1F2937',
-    marginBottom: verticalScale(12),
+    marginBottom: 12,
   },
+  // 리포트 카드
   reportCard: {
     backgroundColor: '#FFFFFF',
     borderRadius: 12,
-    padding: scale(14),
-    marginBottom: verticalScale(12),
+    padding: 20,
+    marginBottom: 12,
     shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 3.84,
-    elevation: 5,
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.05,
+    shadowRadius: 4,
+    elevation: 2,
   },
   cardHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'flex-start',
-    marginBottom: verticalScale(10),
+    marginBottom: 16,
   },
   vehicleInfo: {
     flex: 1,
   },
-  vehicleModel: {
-    fontSize: moderateScale(14, 1),
-    fontWeight: '700',
-    color: '#1F2937',
-    marginBottom: verticalScale(4),
+  vehicleTitleRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 6,
+    gap: 8,
   },
-  reportType: {
-    fontSize: moderateScale(12, 1),
+  vehicleModel: {
+    fontSize: 17,
+    fontWeight: '600',
+    color: '#1F2937',
+  },
+  typeBadge: {
+    backgroundColor: '#F3F4F6',
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 6,
+  },
+  typeText: {
+    fontSize: 11,
+    fontWeight: '600',
     color: '#6B7280',
   },
-  statusContainer: {
-    alignItems: 'flex-end',
+  vehicleYear: {
+    fontSize: 14,
+    color: '#6B7280',
   },
-  statusBadge: {
-    paddingHorizontal: scale(10),
-    paddingVertical: verticalScale(5),
-    borderRadius: 16,
-  },
-  statusText: {
-    fontSize: moderateScale(11, 1),
-    fontWeight: '600',
-    color: '#FFFFFF',
-  },
-  cardContent: {
-    marginBottom: verticalScale(10),
+  // 정보 그리드
+  infoGrid: {
+    gap: 8,
   },
   infoRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-  },
-  infoItem: {
-    flexDirection: 'row',
     alignItems: 'center',
-    flex: 1,
+    paddingVertical: 4,
   },
   infoLabel: {
-    fontSize: moderateScale(12, 1),
+    fontSize: 14,
     color: '#6B7280',
-    marginLeft: scale(6),
-    marginRight: scale(6),
   },
   infoValue: {
-    fontSize: moderateScale(12, 1),
+    fontSize: 14,
     fontWeight: '600',
     color: '#1F2937',
   },
-  cardFooter: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    paddingTop: verticalScale(10),
-    borderTopWidth: 1,
-    borderTopColor: '#E5E7EB',
-  },
-  viewReportText: {
-    fontSize: moderateScale(12, 1),
-    color: '#06B6D4',
-    fontWeight: '600',
-  },
+  // 빈 상태
   emptyContainer: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    paddingVertical: verticalScale(50),
-    paddingHorizontal: scale(20),
+    paddingVertical: 80,
   },
   emptyTitle: {
-    fontSize: moderateScale(15, 1),
+    fontSize: 16,
     fontWeight: '600',
     color: '#6B7280',
-    marginTop: verticalScale(12),
-    marginBottom: verticalScale(6),
+    marginTop: 16,
+    marginBottom: 8,
     textAlign: 'center',
   },
   emptyDescription: {
-    fontSize: moderateScale(12, 1),
+    fontSize: 14,
     color: '#9CA3AF',
     textAlign: 'center',
-    lineHeight: 18,
-  },
-  dateText: {
-    fontSize: moderateScale(11, 1),
-    color: '#6B7280',
+    lineHeight: 20,
   },
 });
 

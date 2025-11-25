@@ -15,6 +15,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { scale, verticalScale, moderateScale } from 'react-native-size-matters';
 import MultipleImagePicker from '../../MultipleImagePicker';
+import { TireAndWheelItem as FirebaseTireAndWheelItem } from '../../../services/firebaseService';
 
 interface TireAndWheelItem {
   treadDepth?: string; // 🔥 number → string (소수점 입력 문제 해결)
@@ -30,11 +31,18 @@ interface TiresAndWheelsData {
   passengerFront?: TireAndWheelItem;
 }
 
+interface FirebaseTiresAndWheelsData {
+  driverFront?: FirebaseTireAndWheelItem;
+  driverRear?: FirebaseTireAndWheelItem;
+  passengerRear?: FirebaseTireAndWheelItem;
+  passengerFront?: FirebaseTireAndWheelItem;
+}
+
 interface TiresAndWheelsBottomSheetProps {
   visible: boolean;
   data: TiresAndWheelsData;
   onClose: () => void;
-  onUpdate: (data: TiresAndWheelsData) => void;
+  onUpdate: (data: FirebaseTiresAndWheelsData) => void;
 }
 
 const TiresAndWheelsBottomSheet: React.FC<TiresAndWheelsBottomSheetProps> = ({
@@ -130,7 +138,21 @@ const TiresAndWheelsBottomSheet: React.FC<TiresAndWheelsBottomSheetProps> = ({
   };
 
   const handleSave = () => {
-    onUpdate(localData);
+    // Convert string treadDepth to number for Firebase
+    const convertedData: FirebaseTiresAndWheelsData = {};
+    const keys: Array<keyof TiresAndWheelsData> = ['driverFront', 'driverRear', 'passengerRear', 'passengerFront'];
+
+    keys.forEach(key => {
+      const item = localData[key];
+      if (item) {
+        convertedData[key] = {
+          ...item,
+          treadDepth: item.treadDepth ? parseFloat(item.treadDepth) : undefined,
+        };
+      }
+    });
+
+    onUpdate(convertedData);
     onClose();
   };
 
@@ -148,7 +170,7 @@ const TiresAndWheelsBottomSheet: React.FC<TiresAndWheelsBottomSheetProps> = ({
     <Modal
       visible={visible}
       animationType="slide"
-      presentationStyle="pageSheet"
+      presentationStyle={Platform.OS === 'ios' ? 'pageSheet' : undefined}
       onRequestClose={handleCancel}
     >
       <KeyboardAvoidingView

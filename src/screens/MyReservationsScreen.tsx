@@ -109,15 +109,15 @@ const MyReservationsScreen: React.FC = () => {
     currentStepIndicatorSize: 30,
     separatorStrokeWidth: 2,
     currentStepStrokeWidth: 2,
-    stepStrokeCurrentColor: '#202632',
+    stepStrokeCurrentColor: '#06B6D4',
     stepStrokeWidth: 2,
-    stepStrokeFinishedColor: '#202632',
+    stepStrokeFinishedColor: '#06B6D4',
     stepStrokeUnFinishedColor: '#E5E7EB',
-    separatorFinishedColor: '#202632',
+    separatorFinishedColor: '#06B6D4',
     separatorUnFinishedColor: '#E5E7EB',
-    stepIndicatorFinishedColor: '#202632',
+    stepIndicatorFinishedColor: '#06B6D4',
     stepIndicatorUnFinishedColor: '#FFFFFF',
-    stepIndicatorCurrentColor: '#202632',
+    stepIndicatorCurrentColor: '#06B6D4',
     stepIndicatorLabelFontSize: 0, // 숫자 숨기기
     currentStepIndicatorLabelFontSize: 0,
     stepIndicatorLabelCurrentColor: 'transparent',
@@ -126,7 +126,7 @@ const MyReservationsScreen: React.FC = () => {
     labelColor: '#9CA3AF',
     labelSize: 10,
     labelFontFamily: 'System',
-    currentStepLabelColor: '#202632',
+    currentStepLabelColor: '#06B6D4',
   };
 
   const renderStepIndicator = (params: any) => {
@@ -409,7 +409,7 @@ const styles = StyleSheet.create({
   priceValue: {
     fontSize: 13,
     fontWeight: '700',
-    color: '#202632',
+    color: '#06B6D4',
   },
   addressValue: {
     fontSize: 11,
@@ -461,7 +461,7 @@ const styles = StyleSheet.create({
     marginBottom: 32,
   },
   reserveButton: {
-    backgroundColor: '#202632',
+    backgroundColor: '#06B6D4',
     paddingHorizontal: 24,
     paddingVertical: 12,
     borderRadius: 8,

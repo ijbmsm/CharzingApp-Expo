@@ -1615,7 +1615,7 @@ const styles = StyleSheet.create({
     marginHorizontal: 16,
   },
   stepIndicator: {
-    backgroundColor: '#202632',
+    backgroundColor: '#06B6D4',
     paddingHorizontal: 12,
     paddingVertical: 6,
     borderRadius: 16,
@@ -1634,7 +1634,7 @@ const styles = StyleSheet.create({
   },
   progressBar: {
     height: '100%',
-    backgroundColor: '#202632',
+    backgroundColor: '#06B6D4',
     borderRadius: 2,
   },
   // 차량 선택 컨테이너 스타일
@@ -1776,7 +1776,7 @@ const styles = StyleSheet.create({
   stepTitle: {
     fontSize: 18,
     fontWeight: '700',
-    color: '#202632',
+    color: '#06B6D4',
     marginBottom: 8,
   },
   inputModeContainer: {
@@ -2206,7 +2206,7 @@ const styles = StyleSheet.create({
     backgroundColor: '#FFFFFF',
   },
   serviceTypeOptionSelected: {
-    borderColor: '#10B981',
+    borderColor: '#06B6D4',
     backgroundColor: '#F0FDF4',
   },
   serviceTypeHeader: {
@@ -2221,7 +2221,7 @@ const styles = StyleSheet.create({
     color: '#1F2937',
   },
   serviceTypeNameSelected: {
-    color: '#10B981',
+    color: '#06B6D4',
   },
   serviceTypePrice: {
     fontSize: 16,
@@ -2229,7 +2229,7 @@ const styles = StyleSheet.create({
     color: '#6B7280',
   },
   serviceTypePriceSelected: {
-    color: '#10B981',
+    color: '#06B6D4',
   },
   serviceTypeDescription: {
     fontSize: 14,

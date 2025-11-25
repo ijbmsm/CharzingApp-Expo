@@ -210,23 +210,16 @@ export interface MajorDeviceItem {
 
 // 주요 장치 검사 (조향, 제동, 전기)
 export interface MajorDevicesInspection {
-  steering: {
+  steering?: {
     powerSteeringOilLeak?: MajorDeviceItem; // 동력조향 작동 오일 누유
     steeringGear?: MajorDeviceItem; // 스티어링 기어
     steeringPump?: MajorDeviceItem; // 스티어링 펌프
     tierodEndBallJoint?: MajorDeviceItem; // 타이로드엔드 및 볼 조인트
   };
-  braking: {
+  braking?: {
     brakeOilLevel?: MajorDeviceItem; // 브레이크 오일 유량 상태
     brakeOilLeak?: MajorDeviceItem; // 브레이크 오일 누유
     boosterCondition?: MajorDeviceItem; // 배력장치 상태
-  };
-  electrical: {
-    generatorOutput?: MajorDeviceItem; // 발전기 출력
-    startMotor?: MajorDeviceItem; // 시동 모터
-    wiperMotor?: MajorDeviceItem; // 와이퍼 모터 기능
-    blowerMotor?: MajorDeviceItem; // 실내송풍 모터
-    radiatorFanMotor?: MajorDeviceItem; // 라디에이터 팬 모터
   };
 }
 

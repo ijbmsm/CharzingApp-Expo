@@ -805,10 +805,10 @@ const styles = StyleSheet.create({
   sectionTitle: convertToLineSeedFont({
     fontSize: 20,
     fontWeight: "bold",
-    color: "#202632",
+    color: "#06B6D4",
   }),
   batteryStatusBadge: {
-    backgroundColor: "#10B981",
+    backgroundColor: "#06B6D4",
     paddingHorizontal: 12,
     paddingVertical: 6,
     borderRadius: 16,
@@ -908,7 +908,7 @@ const styles = StyleSheet.create({
   batteryManufacturer: convertToLineSeedFont({
     fontSize: 18,
     fontWeight: "bold",
-    color: "#202632",
+    color: "#06B6D4",
   }),
   batteryType: convertToLineSeedFont({
     fontSize: 14,
@@ -945,7 +945,7 @@ const styles = StyleSheet.create({
   detailsTitle: convertToLineSeedFont({
     fontSize: 18,
     fontWeight: "bold",
-    color: "#202632",
+    color: "#06B6D4",
     marginBottom: 16,
   }),
   specGrid: {
@@ -1085,7 +1085,7 @@ const styles = StyleSheet.create({
   vehicleImageModel: convertToLineSeedFont({
     fontSize: 18,
     fontWeight: "700",
-    color: "#202632",
+    color: "#06B6D4",
     marginBottom: 4,
   }),
   vehicleImageTrim: convertToLineSeedFont({

@@ -11,6 +11,7 @@ import {
   Alert,
   Dimensions,
   ScrollView,
+  Platform,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
@@ -203,7 +204,7 @@ const VehicleSearchModal: React.FC<VehicleSearchModalProps> = ({
     <Modal
       visible={visible}
       animationType="slide"
-      presentationStyle="pageSheet"
+      presentationStyle={Platform.OS === 'ios' ? 'pageSheet' : undefined}
       onRequestClose={handleClose}
     >
       <SafeAreaView style={styles.container}>

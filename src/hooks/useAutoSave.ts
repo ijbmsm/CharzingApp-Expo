@@ -135,7 +135,7 @@ async function saveImagesInData(data: any, userId: string): Promise<void> {
     );
   }
 
-  // MajorDevices 이미지 (조향, 제동, 전기) - 타입 안전하게 처리
+  // MajorDevices 이미지 (조향, 제동) - 타입 안전하게 처리
   if (data.majorDevices) {
     const devices: any = data.majorDevices;
     if (devices.steering) {
@@ -143,9 +143,6 @@ async function saveImagesInData(data: any, userId: string): Promise<void> {
     }
     if (devices.braking) {
       await saveDeviceImages(devices.braking, userId, 'braking');
-    }
-    if (devices.electrical) {
-      await saveDeviceImages(devices.electrical, userId, 'electrical');
     }
   }
 
@@ -253,7 +250,6 @@ function countImagesInDraft(draft: any): Record<string, number> {
   // MajorDevices (각 장치별 imageUri 카운트)
   let steeringCount = 0;
   let brakingCount = 0;
-  let electricalCount = 0;
 
   if (draft.majorDevices?.steering) {
     steeringCount = Object.values(draft.majorDevices.steering).filter((item: any) => item?.imageUri).length;
@@ -261,13 +257,9 @@ function countImagesInDraft(draft: any): Record<string, number> {
   if (draft.majorDevices?.braking) {
     brakingCount = Object.values(draft.majorDevices.braking).filter((item: any) => item?.imageUri).length;
   }
-  if (draft.majorDevices?.electrical) {
-    electricalCount = Object.values(draft.majorDevices.electrical).filter((item: any) => item?.imageUri).length;
-  }
 
   counts.steering = steeringCount;
   counts.braking = brakingCount;
-  counts.electrical = electricalCount;
 
   // VehicleExterior
   counts.paintThickness = draft.vehicleExterior?.paintThickness?.reduce(

@@ -683,7 +683,7 @@ const styles = StyleSheet.create({
     backgroundColor: '#F3F4F6',
   },
   saveButton: {
-    backgroundColor: '#202632',
+    backgroundColor: '#06B6D4',
   },
   disabledButton: {
     backgroundColor: '#D1D5DB',

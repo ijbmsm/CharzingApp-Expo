@@ -1,17 +1,12 @@
-// import * as Device from 'expo-device';
-// import { MMKV } from 'react-native-mmkv';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
 /**
  * Storage Wrapper
- * - AsyncStorage만 사용 (안정성 우선)
- * - MMKV는 나중에 안정화되면 다시 활성화 예정
- *
- * Note: MMKV는 JSI 이슈로 인해 일시적으로 비활성화
+ * - AsyncStorage 기반 저장소
  */
 class StorageWrapper {
   constructor() {
-    console.log('✅ Storage: AsyncStorage 사용 (MMKV 비활성화)');
+    console.log('✅ Storage: AsyncStorage 사용');
   }
 
   async getItem(key: string): Promise<string | null> {

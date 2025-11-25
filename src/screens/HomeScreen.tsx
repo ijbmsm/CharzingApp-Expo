@@ -339,7 +339,7 @@ export default function HomeScreen() {
       price: "10만원",
       features: ["기본 배터리 진단", "상태 리포트 제공", "전문가 상담"],
       isPremium: false,
-      color: "#10B981",
+      color: "#06B6D4",
     },
     {
       id: "premium",
@@ -1249,8 +1249,8 @@ export default function HomeScreen() {
           <RefreshControl
             refreshing={refreshing}
             onRefresh={onRefresh}
-            colors={["#202632"]} // Android
-            tintColor="#202632" // iOS
+            colors={["#06B6D4"]} // Android
+            tintColor="#06B6D4" // iOS
           />
         }
       >
@@ -1449,7 +1449,7 @@ export default function HomeScreen() {
               <View style={styles.modalContent}>
                 <View style={styles.vehicleDetailCard}>
                   <View style={styles.vehicleIconContainer}>
-                    <Ionicons name="car-sport" size={48} color="#202632" />
+                    <Ionicons name="car-sport" size={48} color="#06B6D4" />
                   </View>
 
                   <View style={styles.vehicleDetailInfo}>
@@ -1474,7 +1474,7 @@ export default function HomeScreen() {
                     style={styles.editButton}
                     onPress={editVehicle}
                   >
-                    <Ionicons name="create-outline" size={20} color="#202632" />
+                    <Ionicons name="create-outline" size={20} color="#06B6D4" />
                     <Text style={styles.editButtonText}>수정</Text>
                   </TouchableOpacity>
 
@@ -1606,7 +1606,7 @@ const styles = StyleSheet.create({
   },
   addMoreText: convertToLineSeedFont({
     fontSize: 14,
-    color: "#202632",
+    color: "#06B6D4",
     fontWeight: "500",
     marginLeft: 6,
   }),
@@ -1662,7 +1662,7 @@ const styles = StyleSheet.create({
   },
   primaryButton: {
     flex: 1,
-    backgroundColor: "#202632",
+    backgroundColor: "#06B6D4",
     borderRadius: 12,
     padding: 16,
   },
@@ -1678,12 +1678,12 @@ const styles = StyleSheet.create({
     borderRadius: 12,
     padding: 16,
     borderWidth: 2,
-    borderColor: "#202632",
+    borderColor: "#06B6D4",
   },
   secondaryButtonText: {
     fontSize: 16,
     fontWeight: "bold",
-    color: "#202632",
+    color: "#06B6D4",
     lineHeight: 20,
   },
   buttonContent: {
@@ -1707,7 +1707,7 @@ const styles = StyleSheet.create({
     width: "100%",
   },
   reserveButton: {
-    backgroundColor: "#202632",
+    backgroundColor: "#06B6D4",
     paddingVertical: 12,
     paddingHorizontal: 24,
     borderRadius: 8,
@@ -1722,7 +1722,7 @@ const styles = StyleSheet.create({
   },
   statusText: {
     fontSize: 12,
-    color: "#202632",
+    color: "#06B6D4",
     textAlign: "center",
     marginTop: 16,
     fontWeight: "500",
@@ -1734,7 +1734,7 @@ const styles = StyleSheet.create({
   reportButton: {
     backgroundColor: "#F0F8FF",
     borderWidth: 1,
-    borderColor: "#202632",
+    borderColor: "#06B6D4",
     borderRadius: 8,
     paddingVertical: 10,
     paddingHorizontal: 12,
@@ -1747,7 +1747,7 @@ const styles = StyleSheet.create({
   reportButtonText: {
     fontSize: 14,
     fontWeight: "600",
-    color: "#202632",
+    color: "#06B6D4",
     marginLeft: 6,
     marginRight: 6,
   },
@@ -1872,7 +1872,7 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     backgroundColor: "#F0F8FF",
     borderWidth: 1,
-    borderColor: "#202632",
+    borderColor: "#06B6D4",
     borderRadius: 12,
     paddingVertical: 12,
     gap: 8,
@@ -1880,7 +1880,7 @@ const styles = StyleSheet.create({
   editButtonText: {
     fontSize: 16,
     fontWeight: "600",
-    color: "#202632",
+    color: "#06B6D4",
   },
   deleteButton: {
     flex: 1,
@@ -1914,7 +1914,7 @@ const styles = StyleSheet.create({
     position: "absolute",
     top: -8,
     right: -8,
-    backgroundColor: "#202632",
+    backgroundColor: "#06B6D4",
     borderRadius: 12,
     width: 24,
     height: 24,
@@ -2192,7 +2192,7 @@ const styles = StyleSheet.create({
   addVehicleButton: {
     flexDirection: "row",
     alignItems: "center",
-    backgroundColor: "#10B981",
+    backgroundColor: "#06B6D4",
     paddingHorizontal: 16,
     paddingVertical: 8,
     borderRadius: 8,

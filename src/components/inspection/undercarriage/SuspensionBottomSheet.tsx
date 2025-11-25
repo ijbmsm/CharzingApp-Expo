@@ -161,7 +161,7 @@ const SuspensionBottomSheet: React.FC<SuspensionBottomSheetProps> = ({
     <Modal
       visible={visible}
       animationType="slide"
-      presentationStyle="pageSheet"
+      presentationStyle={Platform.OS === 'ios' ? 'pageSheet' : undefined}
       onRequestClose={handleCancel}
     >
       <View

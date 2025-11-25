@@ -220,7 +220,7 @@ const ReservationApprovalScreen: React.FC = () => {
                   <Ionicons
                     name={isAssignedToMe ? 'checkmark-circle' : 'person'}
                     size={14}
-                    color={isAssignedToMe ? '#10B981' : '#6B7280'}
+                    color={isAssignedToMe ? '#06B6D4' : '#6B7280'}
                   />
                   <Text style={[styles.statusBadgeText, isAssignedToMe && styles.statusBadgeTextMe]}>
                     {isAssignedToMe ? '내가 담당' : `${reservation.assignedToName} 담당`}
@@ -530,7 +530,7 @@ const styles = StyleSheet.create({
     color: '#6B7280',
   },
   statusBadgeTextMe: {
-    color: '#10B981',
+    color: '#06B6D4',
   },
   reservationTime: {
     fontSize: moderateScale(14),

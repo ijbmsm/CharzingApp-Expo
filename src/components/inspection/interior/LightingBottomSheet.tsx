@@ -6,6 +6,7 @@ import {
   StyleSheet,
   TouchableOpacity,
   ScrollView,
+  Platform,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
@@ -104,7 +105,7 @@ export const LightingBottomSheet: React.FC<LightingBottomSheetProps> = ({
   };
 
   return (
-    <Modal visible={visible} animationType="slide" presentationStyle="pageSheet" onRequestClose={onClose}>
+    <Modal visible={visible} animationType="slide" presentationStyle={Platform.OS === 'ios' ? 'pageSheet' : undefined} onRequestClose={onClose}>
       <SafeAreaView style={commonStyles.modalContainer} edges={['top', 'bottom']}>
         <View style={commonStyles.header}>
           <TouchableOpacity style={commonStyles.closeButton} onPress={onClose}>

@@ -265,7 +265,7 @@ const ReservationDetailScreen: React.FC = () => {
               <View style={styles.reportButtonContainer}>
                 {reportLoading ? (
                   <View style={styles.reportLoadingContainer}>
-                    <ActivityIndicator size="small" color="#202632" />
+                    <ActivityIndicator size="small" color="#06B6D4" />
                     <Text style={styles.reportLoadingText}>리포트 확인 중...</Text>
                   </View>
                 ) : vehicleReport ? (
@@ -459,7 +459,7 @@ const styles = StyleSheet.create({
   reportButton: {
     backgroundColor: '#F0F8FF',
     borderWidth: 1,
-    borderColor: '#202632',
+    borderColor: '#06B6D4',
     borderRadius: 12,
     padding: 16,
   },
@@ -471,7 +471,7 @@ const styles = StyleSheet.create({
   reportButtonText: {
     fontSize: 16,
     fontWeight: '600',
-    color: '#202632',
+    color: '#06B6D4',
     marginLeft: 8,
     marginRight: 8,
   },
@@ -596,7 +596,7 @@ const styles = StyleSheet.create({
   modifyButton: {
     backgroundColor: '#F0F8FF',
     borderWidth: 1,
-    borderColor: '#202632',
+    borderColor: '#06B6D4',
   },
   cancelButton: {
     backgroundColor: '#FEF2F2',
@@ -608,7 +608,7 @@ const styles = StyleSheet.create({
     fontWeight: '600',
   },
   modifyButtonText: {
-    color: '#202632',
+    color: '#06B6D4',
   },
   cancelButtonText: {
     color: '#6B7280',
@@ -671,7 +671,7 @@ const styles = StyleSheet.create({
   priceValue: {
     fontSize: 15,
     fontWeight: '700',
-    color: '#202632',
+    color: '#06B6D4',
   },
   addressValue: {
     fontSize: 12,
@@ -783,7 +783,7 @@ const styles = StyleSheet.create({
     fontWeight: '500',
   },
   bottomModifyText: {
-    color: '#202632',
+    color: '#06B6D4',
   },
   bottomCancelText: {
     color: '#6B7280',

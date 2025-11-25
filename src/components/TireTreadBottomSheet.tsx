@@ -182,7 +182,7 @@ const TireTreadBottomSheet: React.FC<TireTreadBottomSheetProps> = ({
     <Modal
       visible={visible}
       animationType="slide"
-      presentationStyle="pageSheet"
+      presentationStyle={Platform.OS === 'ios' ? 'pageSheet' : undefined}
       onRequestClose={onClose}
     >
       <View

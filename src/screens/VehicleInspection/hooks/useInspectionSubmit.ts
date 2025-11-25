@@ -257,7 +257,6 @@ export const useInspectionSubmit = () => {
         defectiveCellsCount: data.batteryInfo.batteryCells.filter((c) => c.isDefective).length,
         // 주요 장치 검사
         hasSteering: !!data.majorDevices,
-        hasElectrical: !!data.majorDevices?.electrical,
         // 외관 검사
         hasBodyPanel: !!data.vehicleExterior?.bodyPanel,
         bodyPanelCount: data.vehicleExterior?.bodyPanel?.length || 0,

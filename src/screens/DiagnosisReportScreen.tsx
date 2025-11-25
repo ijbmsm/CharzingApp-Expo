@@ -83,7 +83,7 @@ const DiagnosisReportScreen: React.FC<Props> = ({navigation, route}) => {
     switch (status) {
       case 'uploaded': return '#3B82F6';
       case 'processing': return '#F59E0B';
-      case 'completed': return '#10B981';
+      case 'completed': return '#06B6D4';
       default: return '#6B7280';
     }
   };

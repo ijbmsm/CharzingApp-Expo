@@ -9,6 +9,7 @@ import {
   Dimensions,
   Alert,
   SafeAreaView,
+  Platform,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import * as Animatable from 'react-native-animatable';
@@ -85,7 +86,7 @@ const YearSelectionModal: React.FC<YearSelectionModalProps> = ({
     <Modal
       visible={visible}
       animationType="slide"
-      presentationStyle="pageSheet"
+      presentationStyle={Platform.OS === 'ios' ? 'pageSheet' : undefined}
       onRequestClose={onClose}
     >
       <SafeAreaView style={styles.container}>

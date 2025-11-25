@@ -253,7 +253,7 @@ export default function DiagnosticTabScreen() {
                       style={styles.infoSection}
                     >
                       <View style={styles.infoHeader}>
-                        <Ionicons name="battery-charging" size={18} color="#202632" />
+                        <Ionicons name="battery-charging" size={18} color="#06B6D4" />
                         <Text style={styles.infoTitle}>배터리 정보</Text>
                       </View>
                       <View style={styles.infoGrid}>
@@ -306,7 +306,7 @@ export default function DiagnosticTabScreen() {
                       style={styles.infoSection}
                     >
                       <View style={styles.infoHeader}>
-                        <Ionicons name="speedometer" size={18} color="#202632" />
+                        <Ionicons name="speedometer" size={18} color="#06B6D4" />
                         <Text style={styles.infoTitle}>성능 정보</Text>
                       </View>
                       <View style={styles.infoGrid}>
@@ -537,7 +537,7 @@ const styles = StyleSheet.create({
   infoTitle: {
     fontSize: 16,
     fontWeight: '600',
-    color: '#202632',
+    color: '#06B6D4',
   },
   infoGrid: {
     flexDirection: 'row',
@@ -563,7 +563,7 @@ const styles = StyleSheet.create({
   },
   infoValue: {
     fontSize: 14,
-    color: '#202632',
+    color: '#06B6D4',
     fontWeight: '600',
   },
   // 선택된 차량 전체 컨테이너

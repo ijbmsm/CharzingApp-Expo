@@ -30,9 +30,7 @@ const getDefaultValues = (): InspectionFormData => ({
         batteryCells: [],
         defaultCellVoltage: 3.7,
       },
-      majorDevices: {
-        electrical: {},
-      },
+      majorDevices: {},
       vehicleExterior: {
         vehicleExterior: {},
         bodyPanel: [],

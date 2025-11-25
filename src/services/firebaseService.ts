@@ -401,13 +401,6 @@ export interface MajorDevicesInspection {
     brakeOilLeak?: MajorDeviceItem; // 브레이크 오일 누유
     boosterCondition?: MajorDeviceItem; // 배력장치 상태
   };
-  electrical?: {
-    generatorOutput?: MajorDeviceItem; // 발전기 출력
-    startMotor?: MajorDeviceItem; // 시동 모터
-    wiperMotor?: MajorDeviceItem; // 와이퍼 모터 기능
-    blowerMotor?: MajorDeviceItem; // 실내송풍 모터
-    radiatorFanMotor?: MajorDeviceItem; // 라디에이터 팬 모터
-  };
 }
 
 // 차량 외부 점검 (Vehicle Exterior Inspection)
@@ -701,6 +694,62 @@ export interface ComponentReplacementInspection {
   notes?: string;
 }
 
+// ============================================
+// 차량 이력 정보 (2025-11-23 추가)
+// ============================================
+
+// 차량번호 변경 이력
+export interface VehicleNumberChangeHistory {
+  changeDate: Date | FieldValue; // 변경 등록일
+  reason: string; // 변경 사유 (예: "최초 등록", "번호 변경", "이전 등록")
+  vehicleUsage: string; // 차량용도 (예: "개인용", "영업용", "관용", "렌트")
+}
+
+// 소유자 변경 이력
+export interface OwnerChangeHistory {
+  changeDate: Date | FieldValue; // 변경 등록일
+  vehicleUsage: string; // 차량용도
+}
+
+// 차량 이력 정보
+export interface VehicleHistoryInfo {
+  vehicleNumberChangeHistory: VehicleNumberChangeHistory[]; // 차량번호 변경 이력 배열
+  ownerChangeHistory: OwnerChangeHistory[]; // 소유자 변경 이력 배열
+}
+
+// ============================================
+// 사고/수리 이력 (2025-11-23 추가)
+// ============================================
+
+// 수리 유형
+export type RepairType = '도장' | '탈착' | '교환' | '판금' | '수리' | '기타';
+
+// 수리 부위 항목
+export interface RepairPartItem {
+  partName: string; // 부위 이름 (예: "앞범퍼", "보닛")
+  repairTypes: RepairType[]; // 해당 부위의 수리 유형들
+}
+
+// 사고/수리 기록
+export interface AccidentRepairRecord {
+  accidentDate: Date | FieldValue; // 사고 날짜
+  repairParts: RepairPartItem[]; // 수리된 부위 목록
+  summary?: string; // 수리 내역 요약
+  // 내 차 사고 비용
+  myCarPartsCost?: number; // 부품비
+  myCarLaborCost?: number; // 공임비
+  myCarPaintingCost?: number; // 도장비
+  // 상대 차 사고 비용
+  otherCarPartsCost?: number; // 부품비
+  otherCarLaborCost?: number; // 공임비
+  otherCarPaintingCost?: number; // 도장비
+}
+
+// 사고/수리 이력
+export interface AccidentRepairHistory {
+  records: AccidentRepairRecord[]; // 사고 이력 배열
+}
+
 // 상태 변경 이력 (감사 추적)
 export interface StatusChangeLog {
   from: string; // 이전 상태
@@ -737,6 +786,7 @@ export interface VehicleDiagnosisReport {
   vehicleName: string; // 차량명
   vehicleGrade?: string; // 등급/트림 (선택사항)
   vehicleYear: string; // 차량 년식
+  vehicleVIN?: string; // 차대번호 (Vehicle Identification Number)
   vehicleVinImageUris?: string[]; // 차대번호 사진 URIs (복수)
   diagnosisDate: Date | FieldValue; // 진단 날짜
 
@@ -786,6 +836,12 @@ export interface VehicleDiagnosisReport {
 
   // 차량 실내 점검 (신규)
   vehicleInteriorInspection?: VehicleInteriorInspection;
+
+  // 차량 이력 정보 (신규 2025-11-23)
+  vehicleHistoryInfo?: VehicleHistoryInfo;
+
+  // 사고/수리 이력 (신규 2025-11-23)
+  accidentRepairHistory?: AccidentRepairHistory;
 
   // 진단사 수행 확인 (신규)
   diagnosticianConfirmation?: {

@@ -87,9 +87,25 @@ export const VehicleExteriorSection: React.FC = () => {
 
       <TiresAndWheelsBottomSheet
         visible={isTiresWheelsModalVisible}
-        data={tiresWheelsData || { driverFront: undefined, driverRear: undefined, passengerRear: undefined, passengerFront: undefined }}
+        data={(() => {
+          // Convert Firebase number treadDepth to string for TextInput
+          const convertedData: any = {};
+          if (tiresWheelsData) {
+            const keys = ['driverFront', 'driverRear', 'passengerRear', 'passengerFront'] as const;
+            keys.forEach(key => {
+              const item = tiresWheelsData[key];
+              if (item) {
+                convertedData[key] = {
+                  ...item,
+                  treadDepth: item.treadDepth !== undefined ? String(item.treadDepth) : undefined,
+                };
+              }
+            });
+          }
+          return convertedData;
+        })()}
         onClose={() => setIsTiresWheelsModalVisible(false)}
-        onUpdate={(data: { driverFront?: TireAndWheelItem; driverRear?: TireAndWheelItem; passengerRear?: TireAndWheelItem; passengerFront?: TireAndWheelItem }) => {
+        onUpdate={(data) => {
           setValue('vehicleExterior.tiresAndWheels', data, { shouldValidate: true });
           setIsTiresWheelsModalVisible(false);
         }}

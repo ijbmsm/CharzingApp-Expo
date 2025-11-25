@@ -9,7 +9,8 @@ import {
   ActivityIndicator,
   Alert,
   Modal,
-  SafeAreaView
+  SafeAreaView,
+  Platform,
 } from "react-native";
 import { Ionicons } from '@expo/vector-icons';
 import Constants from 'expo-constants';
@@ -256,7 +257,7 @@ export default function AddressSearch({
       <Modal
         visible={modalVisible}
         animationType="slide"
-        presentationStyle="pageSheet"
+        presentationStyle={Platform.OS === 'ios' ? 'pageSheet' : undefined}
         onRequestClose={closeModal}
       >
         <SafeAreaView style={styles.modalContainer}>
