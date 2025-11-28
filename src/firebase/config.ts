@@ -2,6 +2,7 @@ import { getApp, getApps, FirebaseApp } from 'firebase/app';
 import { getFirestore, Firestore } from 'firebase/firestore';
 import { getAuth, Auth } from 'firebase/auth';
 import { getStorage, FirebaseStorage } from 'firebase/storage';
+import { getFunctions, httpsCallable } from 'firebase/functions';
 import { firebaseFacade } from '../services/firebase/config';
 import { FirebaseInitializationStatus } from '../services/firebase/types';
 
@@ -26,6 +27,11 @@ export const getAuthInstance = (): Auth => {
 export const getStorageInstance = (): FirebaseStorage => {
   const app = getAppInstance();
   return getStorage(app, "gs://charzing-d1600.firebasestorage.app");
+};
+
+export const getFunctionsInstance = () => {
+  const app = getAppInstance();
+  return getFunctions(app, 'asia-northeast3');
 };
 
 // 직접 사용할 수 있는 안전한 인스턴스들 (lazy loading)

@@ -3,6 +3,7 @@
 # Environment variables
 .env.*
 .env
+!.env.example
 
 # dependencies
 node_modules/
@@ -41,3 +42,10 @@ yarn-error.*
 scripts/serviceAccountKey.json
 
 .env.local
+
+# Build outputs
+build/
+build-*.aab
+build-*.apk
+build-*.ipa
+*.xcarchive

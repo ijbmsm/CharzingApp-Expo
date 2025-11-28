@@ -41,7 +41,7 @@ const db = admin.firestore();
  * 카카오 로그인용 HTTP 함수 (인증 없이 호출 가능)
  */
 export const kakaoLoginHttp = functions
-  .region('us-central1')
+  .region('asia-northeast3', 'us-central1')
   .runWith({
     memory: '512MB',
     timeoutSeconds: 60,
@@ -291,7 +291,7 @@ export const kakaoLoginHttp = functions
  * 카카오 로그인용 Callable 함수 (기존 호환성)
  */
 export const kakaoLogin = functions
-  .region('us-central1')
+  .region('asia-northeast3', 'us-central1')
   .runWith({
     memory: '512MB',
     timeoutSeconds: 60,
@@ -311,7 +311,7 @@ export const kakaoLogin = functions
       // HTTP 함수로 리다이렉트
       const axios = require('axios');
       const response = await axios.post(
-        'https://us-central1-charzing-d1600.cloudfunctions.net/kakaoLoginHttp',
+        'https://asia-northeast3-charzing-d1600.cloudfunctions.net/kakaoLoginHttp',
         { kakaoAccessToken, userInfo },
         {
           headers: { 'Content-Type': 'application/json' },
@@ -334,7 +334,7 @@ export const kakaoLogin = functions
  * @deprecated 새로운 kakaoLogin 함수를 사용하세요
  */
 export const createKakaoCustomToken = functions
-  .region('us-central1')
+  .region('asia-northeast3', 'us-central1')
   .https.onCall(async (data, context) => {
     try {
       const { kakaoId, email, displayName, photoURL } = data;
@@ -432,7 +432,7 @@ export const createKakaoCustomToken = functions
  * 사용자 프로필 업데이트 (웹과 앱 공통)
  */
 export const updateUserProfile = functions
-  .region('us-central1')
+  .region('asia-northeast3', 'us-central1')
   .https.onCall(async (data, context) => {
     try {
       // 인증 확인
@@ -478,7 +478,7 @@ export const updateUserProfile = functions
  * Google 로그인용 Custom Token 생성
  */
 export const googleLogin = functions
-  .region('us-central1')
+  .region('asia-northeast3', 'us-central1')
   .runWith({
     memory: '512MB',
     timeoutSeconds: 60,
@@ -629,7 +629,7 @@ export const googleLogin = functions
  * Apple 로그인용 Custom Token 생성
  */
 export const createCustomTokenFromApple = functions
-  .region('us-central1')
+  .region('asia-northeast3', 'us-central1')
   .runWith({
     memory: '512MB',
     timeoutSeconds: 60,
@@ -765,7 +765,7 @@ export const createCustomTokenFromApple = functions
  * 회원탈퇴 (웹과 앱 공통)
  */
 export const deleteUserAccount = functions
-  .region('us-central1')
+  .region('asia-northeast3', 'us-central1')
   .https.onCall(async (data, context) => {
     try {
       // 인증 확인
@@ -807,7 +807,7 @@ export const deleteUserAccount = functions
  * 사용자 정보 조회 (웹과 앱 공통)
  */
 export const getUserProfile = functions
-  .region('us-central1')
+  .region('asia-northeast3', 'us-central1')
   .https.onCall(async (data, context) => {
     try {
       // 인증 확인
@@ -860,7 +860,7 @@ export const getUserProfile = functions
  * 진단 예약 생성 (서버사이드 검증 포함)
  */
 export const createDiagnosisReservation = functions
-  .region('us-central1')
+  .region('asia-northeast3', 'us-central1')
   .runWith({
     memory: '512MB',
     timeoutSeconds: 60,
@@ -1055,7 +1055,7 @@ export const createDiagnosisReservation = functions
  * 사용자 진단 예약 목록 조회
  */
 export const getUserDiagnosisReservations = functions
-  .region('us-central1')
+  .region('asia-northeast3', 'us-central1')
   .https.onRequest(async (req, res) => {
     return corsHandler(req, res, async () => {
       try {
@@ -1112,7 +1112,7 @@ export const getUserDiagnosisReservations = functions
  * 사용자 차량 추가 (서버사이드 검증)
  */
 export const addUserVehicle = functions
-  .region('us-central1')
+  .region('asia-northeast3', 'us-central1')
   .https.onCall(async (data, context) => {
     try {
       if (!context.auth) {
@@ -1193,7 +1193,7 @@ export const addUserVehicle = functions
  * 사용자 차량 목록 조회
  */
 export const getUserVehicles = functions
-  .region('us-central1')
+  .region('asia-northeast3', 'us-central1')
   .https.onCall(async (data, context) => {
     try {
       if (!context.auth) {
@@ -1241,7 +1241,7 @@ export const getUserVehicles = functions
  * 푸시 알림 전송 (관리자용)
  */
 export const sendPushNotification = functions
-  .region('us-central1')
+  .region('asia-northeast3', 'us-central1')
   .https.onCall(async (data, context) => {
     try {
       console.log('푸시 알림 전송 요청');
@@ -1415,7 +1415,7 @@ export const sendPushNotification = functions
  * 푸시 알림을 받을 수 있는 사용자 목록 조회 (관리자용)
  */
 export const getUsersWithPushTokens = functions
-  .region('us-central1')
+  .region('asia-northeast3', 'us-central1')
   .https.onCall(async (data, context) => {
     try {
       console.log('사용자 목록 조회');
@@ -1465,7 +1465,7 @@ export const getUsersWithPushTokens = functions
  * 예약 상태 변경 시 자동 푸시 알림
  */
 export const sendReservationStatusNotification = functions
-  .region('us-central1')
+  .region('asia-northeast3', 'us-central1')
   .firestore.document('diagnosisReservations/{reservationId}')
   .onUpdate(async (change, context) => {
     try {
@@ -1648,7 +1648,7 @@ export const sendReservationStatusNotification = functions
  * 진단 리포트 상태 변경 시 자동 푸시 알림 (published 상태로 변경 시)
  */
 export const sendReportPublishedNotification = functions
-  .region('us-central1')
+  .region('asia-northeast3', 'us-central1')
   .firestore.document('vehicleDiagnosisReports/{reportId}')
   .onUpdate(async (change, context) => {
     try {
@@ -1813,7 +1813,7 @@ export const sendReportPublishedNotification = functions
  * 푸시 토큰 저장
  */
 export const savePushToken = functions
-  .region('us-central1')
+  .region('asia-northeast3', 'us-central1')
   .https.onCall(async (data, context) => {
     try {
       if (!context.auth) {
@@ -1868,7 +1868,7 @@ export const savePushToken = functions
  * Admin Web용 푸시 알림 전송 (HTTPS 엔드포인트)
  */
 export const sendPushNotificationAdmin = functions
-  .region('us-central1')
+  .region('asia-northeast3', 'us-central1')
   .https.onRequest(async (req, res) => {
     try {
       // CORS 설정
@@ -2062,7 +2062,7 @@ export const sendPushNotificationAdmin = functions
  * Admin Web용 푸시 토큰 보유 사용자 목록 조회 (HTTPS 엔드포인트)
  */
 export const getUsersWithPushTokensAdmin = functions
-  .region('us-central1')
+  .region('asia-northeast3', 'us-central1')
   .https.onRequest(async (req, res) => {
     try {
       // CORS 설정
@@ -2182,7 +2182,7 @@ interface VehicleTrim {
  * 구조: /vehicles/{brandId}/models/{modelId}/trims/{trimId}/driveTypes/{driveTypeId}
  */
 export const getVehicleTrims = functions
-  .region('us-central1')
+  .region('asia-northeast3', 'us-central1')
   .https.onRequest(async (req, res) => {
     try {
       // CORS 헤더 설정
@@ -2308,7 +2308,7 @@ export const getVehicleTrims = functions
  * 구조: /vehicles/{brandId}
  */
 export const getBrands = functions
-  .region('us-central1')
+  .region('asia-northeast3', 'us-central1')
   .https.onRequest(async (req, res) => {
     // CORS 헤더 설정
     res.set('Access-Control-Allow-Origin', '*');
@@ -2385,7 +2385,7 @@ export const getBrands = functions
  * 구조: /vehicles/{brandId}/models/{modelId}
  */
 export const getModels = functions
-  .region('us-central1')
+  .region('asia-northeast3', 'us-central1')
   .https.onRequest(async (req, res) => {
     // CORS 헤더 설정
     res.set('Access-Control-Allow-Origin', '*');
@@ -2501,24 +2501,51 @@ import { confirmPayment as confirmPaymentAPI, cancelPayment as cancelPaymentAPI 
 import { tossResponseToPaymentDocument, createCancelUpdateData } from './utils/payment-mapper';
 
 function validateConfig(): string {
-  const secretKey = process.env.TOSS_SECRET_KEY;
+  // 환경에 따라 자동으로 키 선택
+  // NODE_ENV가 'production'이면 프로덕션 키, 아니면 테스트 키 사용
+  const isProduction = process.env.NODE_ENV === 'production';
+  const secretKey = isProduction
+    ? process.env.TOSS_SECRET_KEY_PROD
+    : process.env.TOSS_SECRET_KEY_TEST;
 
   if (!secretKey) {
+    const envName = isProduction ? 'TOSS_SECRET_KEY_PROD' : 'TOSS_SECRET_KEY_TEST';
     throw new functions.https.HttpsError(
       'failed-precondition',
-      'Toss Secret Key가 설정되지 않았습니다. ' +
-      'functions/.env 파일에 TOSS_SECRET_KEY를 설정하거나 firebase functions:secrets:set TOSS_SECRET_KEY 명령을 실행하세요.'
+      `Toss Secret Key가 설정되지 않았습니다. ` +
+      `functions/.env 파일에 ${envName}를 설정하세요. ` +
+      `현재 환경: ${process.env.NODE_ENV || 'development'}`
     );
   }
+
+  // 키 형식 검증 (보안)
+  const expectedPrefix = isProduction ? 'live_' : 'test_';
+  if (!secretKey.startsWith(expectedPrefix)) {
+    console.warn(`⚠️ ${isProduction ? '프로덕션' : '테스트'} 환경인데 ${expectedPrefix} 키가 아닙니다: ${secretKey.substring(0, 10)}...`);
+  }
+
+  console.log(`🔑 Toss Secret Key 로드: ${isProduction ? '프로덕션' : '테스트'} 환경 (${secretKey.substring(0, 10)}...)`);
   return secretKey;
 }
 
 export const confirmPaymentFunction = functions
-  .region('asia-northeast3')
+  .region('asia-northeast3', 'us-central1')
   .runWith({
     secrets: ['TOSS_SECRET_KEY'],
   })
   .https.onCall(async (data: ConfirmPaymentRequest, context): Promise<ConfirmPaymentResponse> => {
+    // Sentry: 결제 확정 시작 추적
+    Sentry.addBreadcrumb({
+      category: 'payment',
+      message: 'Payment confirmation started',
+      level: 'info',
+      data: {
+        orderId: data.orderId,
+        amount: data.amount,
+        hasReservationInfo: !!data.reservationInfo,
+      },
+    });
+
     const secretKey = validateConfig();
 
     if (!data.paymentKey || !data.orderId || !data.amount) {
@@ -2680,14 +2707,41 @@ export const confirmPaymentFunction = functions
         }
       }
 
+      // Sentry: 결제 확정 성공
+      Sentry.captureMessage('Payment confirmed and reservation created successfully', {
+        level: 'info',
+        tags: {
+          paymentId: paymentRef.id,
+          orderId: data.orderId,
+          reservationId: reservationId || 'none',
+        },
+        extra: {
+          amount: data.amount,
+          customerName: data.customerInfo.name,
+        },
+      });
+
       return {
         success: true,
         paymentId: paymentRef.id,
         receiptUrl: tossResponse.receipt?.url || null,
+        reservationId,
       };
 
     } catch (error) {
       console.error('결제 승인 실패:', error);
+
+      // Sentry: 결제 확정 실패
+      Sentry.captureException(error, {
+        tags: {
+          orderId: data.orderId,
+          amount: data.amount.toString(),
+        },
+        extra: {
+          paymentKey: data.paymentKey,
+          customerName: data.customerInfo?.name,
+        },
+      });
 
       if (error instanceof functions.https.HttpsError) {
         throw error;
@@ -2702,11 +2756,23 @@ export const confirmPaymentFunction = functions
   });
 
 export const cancelPaymentFunction = functions
-  .region('asia-northeast3')
+  .region('asia-northeast3', 'us-central1')
   .runWith({
     secrets: ['TOSS_SECRET_KEY'],
   })
   .https.onCall(async (data: CancelPaymentRequest, context): Promise<CancelPaymentResponse> => {
+    // Sentry: 결제 취소 시작 추적
+    Sentry.addBreadcrumb({
+      category: 'payment',
+      message: 'Payment cancellation started',
+      level: 'info',
+      data: {
+        paymentId: data.paymentId,
+        cancelReason: data.cancelReason,
+        cancelAmount: data.cancelAmount,
+      },
+    });
+
     const secretKey = validateConfig();
 
     if (!data.paymentId) {
@@ -2825,6 +2891,21 @@ export const cancelPaymentFunction = functions
           }
         }
 
+        // Sentry: 결제 취소 성공
+        Sentry.captureMessage('Payment cancelled successfully', {
+          level: 'info',
+          tags: {
+            paymentId: data.paymentId,
+            status: tossResponse.status,
+            reservationId: paymentData.reservationId || 'none',
+          },
+          extra: {
+            cancelAmount: data.cancelAmount || paymentData.balanceAmount,
+            balanceAmount: tossResponse.balanceAmount,
+            cancelReason: data.cancelReason,
+          },
+        });
+
         return {
           success: true,
           status: tossResponse.status as 'CANCELED' | 'PARTIAL_CANCELED',
@@ -2842,6 +2923,17 @@ export const cancelPaymentFunction = functions
 
     } catch (error) {
       console.error('결제 취소 실패:', error);
+
+      // Sentry: 결제 취소 실패
+      Sentry.captureException(error, {
+        tags: {
+          paymentId: data.paymentId,
+        },
+        extra: {
+          cancelReason: data.cancelReason,
+          cancelAmount: data.cancelAmount,
+        },
+      });
 
       if (error instanceof functions.https.HttpsError) {
         throw error;

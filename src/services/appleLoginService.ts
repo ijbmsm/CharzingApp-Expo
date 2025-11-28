@@ -4,6 +4,7 @@ import { getAuthInstance } from '../firebase/config';
 import Constants from 'expo-constants';
 import firebaseService from './firebaseService';
 import devLog from '../utils/devLog';
+import sentryLogger from '../utils/sentryLogger';
 
 interface AppleAuthResult {
   success: boolean;
@@ -55,13 +56,11 @@ class AppleLoginService {
       devLog.log('🔗 Firebase signInWithCredential 시작...');
       const userCredential = await signInWithCredential(getAuthInstance(), firebaseCredential);
       const firebaseUser = userCredential.user;
-      const isNewUser = (userCredential as any).additionalUserInfo?.isNewUser;
 
       devLog.log('🔥 Firebase Apple Sign-In successful:', {
         uid: firebaseUser.uid,
         email: firebaseUser.email,
-        displayName: firebaseUser.displayName,
-        isNewUser: isNewUser
+        displayName: firebaseUser.displayName
       });
 
       // 세션 저장 확인
@@ -77,7 +76,8 @@ class AppleLoginService {
       const newIdToken = await firebaseUser.getIdToken(true);
       devLog.log('✅ 새 ID Token 발급 완료, 길이:', newIdToken.length);
 
-      // 신규/기존 사용자 판별
+      // 신규/기존 사용자 판별 (Firestore 프로필 기준)
+      let isNewUser = false;
       try {
         devLog.log('📝 사용자 프로필 확인 중...');
 
@@ -86,6 +86,7 @@ class AppleLoginService {
 
         if (!existingProfile) {
           // 신규 사용자 - SignupComplete 화면으로 이동 필요
+          isNewUser = true;
           devLog.log('✅ 신규 사용자 확인:', firebaseUser.uid);
         } else {
           // 기존 사용자 - 로그인 시간만 업데이트
@@ -94,9 +95,13 @@ class AppleLoginService {
         }
       } catch (error) {
         devLog.log('⚠️ 사용자 프로필 확인 에러:', error);
+        // 프로필 조회 실패 시 신규 사용자로 간주
+        isNewUser = true;
       }
 
       devLog.log('✅ Apple 로그인 및 Firebase Auth 세션 유지 완료');
+
+      sentryLogger.logLoginSuccess(firebaseUser.uid, 'apple');
 
       return {
         success: true,
@@ -112,13 +117,16 @@ class AppleLoginService {
         stack: error.stack?.substring(0, 200)
       });
 
-      // 사용자가 취소한 경우
+      // 사용자가 취소한 경우 (Sentry 로깅 안함)
       if (error.code === 'ERR_REQUEST_CANCELED') {
         return {
           success: false,
           error: '로그인이 취소되었습니다.'
         };
       }
+
+      // 실제 에러는 Sentry에 로깅
+      sentryLogger.logLoginFailure('apple', error instanceof Error ? error : new Error(error.message || '알 수 없는 오류'));
 
       // Firebase 인증 에러
       if (error.code?.startsWith('auth/')) {

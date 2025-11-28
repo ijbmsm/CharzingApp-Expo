@@ -27,7 +27,7 @@ class UserService {
   private getAuthInstance() {
     return getAuth();
   }
-  private functions = getFunctions(undefined, 'us-central1');
+  private functions = getFunctions(undefined, 'asia-northeast3');
 
   /**
    * 현재 사용자 프로필 조회 (Cloud Function 사용)

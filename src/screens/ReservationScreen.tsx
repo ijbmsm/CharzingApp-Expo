@@ -185,10 +185,6 @@ const ReservationScreen: React.FC = () => {
   // 5단계: 서비스 타입 선택
   const [serviceType, setServiceType] = useState<'standard' | 'premium' | null>(null);
   const [servicePrice, setServicePrice] = useState<number>(0);
-
-  // 6단계: 예약 확인
-  const [showConfirmationModal, setShowConfirmationModal] = useState<boolean>(false);
-
   // moti 애니메이션을 위한 step 상태로 제어
 
   // 초기 설정 (한 번만 실행)
@@ -731,7 +727,6 @@ const ReservationScreen: React.FC = () => {
       return;
     }
 
-    setShowConfirmationModal(false);
     setIsSubmitting(true);
     showLoading(editMode ? '예약을 수정하는 중...' : '예약을 처리하는 중...');
     
@@ -784,9 +779,8 @@ const ReservationScreen: React.FC = () => {
           ]
         );
       } else {
-        // 생성 모드: 새로운 예약 생성
+        // 생성 모드: 결제 화면으로 이동
         const reservationData = {
-          userId: user?.uid || '',
           userName: contactData.userName,
           userPhone: contactData.userPhone,
           address: addressData.address,
@@ -798,57 +792,35 @@ const ReservationScreen: React.FC = () => {
           vehicleYear: vehicleData.vehicleYear,
           serviceType: serviceData.serviceType,
           servicePrice: serviceData.servicePrice,
-          status: 'pending' as const,
           requestedDate: dateTimeData.requestedDateTime,
           notes: contactData.notes || '',
           source: 'app' as const,
-          createdAt: new Date(),
-          updatedAt: new Date(),
         };
 
-        devLog.log('🚀 Firebase에 저장할 예약 데이터:', JSON.stringify(reservationData, null, 2));
+        // 주문 ID 생성 (고유값)
+        const orderId = `CHZ_${Date.now()}_${Math.random().toString(36).substring(2, 8)}`;
+        const orderName = `${vehicleData.vehicleBrand} ${vehicleData.vehicleModel} 배터리 진단`;
 
-        const reservationId = await firebaseService.createDiagnosisReservation(reservationData);
+        devLog.log('🚀 결제 화면으로 이동:', { orderId, amount: serviceData.servicePrice });
 
-        // Analytics
-        await analyticsService.logCustomEvent('reservation_completed', {
-          reservation_id: reservationId,
-          vehicle_brand: vehicleData.vehicleBrand,
-          vehicle_model: vehicleData.vehicleModel,
-          service_type: serviceData.serviceType,
-          service_price: serviceData.servicePrice,
-          source: 'app',
+        // 로딩 상태 해제 후 결제 화면으로 이동
+        hideLoading();
+        setIsSubmitting(false);
+
+        // 결제 화면으로 이동 (Date 직렬화)
+        navigation.navigate('Payment', {
+          reservationData: {
+            ...reservationData,
+            requestedDate: reservationData.requestedDate instanceof Date
+              ? reservationData.requestedDate.toISOString()
+              : reservationData.requestedDate,
+          },
+          orderId,
+          orderName,
+          amount: serviceData.servicePrice,
         });
 
-        // Crashlytics 로그
-        sentryLogger.logReservationCreated(
-          user?.uid || '',
-          reservationId,
-          {
-            brand: vehicleData.vehicleBrand,
-            model: vehicleData.vehicleModel,
-            year: vehicleData.vehicleYear,
-          },
-          serviceData.serviceType
-        );
-
-        Alert.alert(
-          '예약 완료',
-          '진단 예약이 성공적으로 완료되었습니다.\n담당자가 연락드려 일정을 확정할 예정입니다.',
-          [
-            {
-              text: '확인',
-              onPress: () => {
-                navigation.dispatch(
-                  CommonActions.reset({
-                    index: 0,
-                    routes: [{ name: 'Main' }],
-                  })
-                );
-              },
-            },
-          ]
-        );
+        return; // finally 블록의 hideLoading 중복 호출 방지
       }
     } catch (error) {
       devLog.error('❌ 예약 생성 실패:', error);
@@ -1058,7 +1030,7 @@ const ReservationScreen: React.FC = () => {
         {/* 1단계: 차량 & 서비스 선택 (Step 2 이상에서만 표시) */}
         {currentStep > 1 && (
           <View
-            style={[styles.stepContainer, { opacity: 1, height: currentStep > 1 ? 100 : 0 }]}
+            style={[styles.stepContainer, { opacity: 1, minHeight: 100 }]}
           >
             <TouchableOpacity 
               style={styles.stepCard}
@@ -1086,7 +1058,7 @@ const ReservationScreen: React.FC = () => {
         <View
           style={[styles.stepContainer, {
             opacity: currentStep >= 2 ? 1 : 0,
-            height: currentStep === 2 ? 'auto' : currentStep > 2 ? 100 : 0,
+            ...(currentStep === 2 ? { height: 'auto' } : currentStep > 2 ? { minHeight: 100 } : { height: 0 }),
           }]}
         >
           {currentStep >= 2 && (
@@ -1129,7 +1101,7 @@ const ReservationScreen: React.FC = () => {
         <View
           style={[styles.stepContainer, {
             opacity: currentStep >= 3 ? 1 : 0,
-            height: currentStep === 3 ? 'auto' : currentStep > 3 ? 100 : 0,
+            ...(currentStep === 3 ? { height: 'auto' } : currentStep > 3 ? { minHeight: 100 } : { height: 0 }),
           }]}
         >
           {currentStep >= 3 && (
@@ -1231,7 +1203,7 @@ const ReservationScreen: React.FC = () => {
         <View
           style={[styles.stepContainer, {
             opacity: currentStep >= 4 ? 1 : 0,
-            height: currentStep === 4 ? 'auto' : currentStep > 4 ? 100 : 0,
+            ...(currentStep === 4 ? { height: 'auto' } : currentStep > 4 ? { minHeight: 100 } : { height: 0 }),
           }]}
         >
           {currentStep >= 4 && (
@@ -1308,7 +1280,7 @@ const ReservationScreen: React.FC = () => {
         <View
           style={[styles.stepContainer, {
             opacity: currentStep >= 5 ? 1 : 0,
-            height: currentStep === 5 ? 'auto' : currentStep > 5 ? 100 : 0,
+            ...(currentStep === 5 ? { height: 'auto' } : currentStep > 5 ? { minHeight: 100 } : { height: 0 }),
           }]}
         >
           {currentStep >= 5 && (
@@ -1474,16 +1446,25 @@ const ReservationScreen: React.FC = () => {
               </View>
 
               <View style={styles.noticeContainer}>
-                <Text style={styles.noticeTitle}>📋 안내사항</Text>
-                <Text style={styles.noticeText}>
-                  • 예약 확정 후 담당자가 연락드려 정확한 방문 시간을 조율합니다
-                </Text>
-                <Text style={styles.noticeText}>
-                  • 진단 시간은 약 30분 정도 소요됩니다
-                </Text>
-                <Text style={styles.noticeText}>
-                  • 진단 완료 후 24시간 내 상세 리포트를 제공합니다
-                </Text>
+                <Text style={styles.noticeTitle}>안내사항</Text>
+                <View style={styles.noticeItem}>
+                  <Text style={styles.noticeBullet}>•</Text>
+                  <Text style={styles.noticeText}>
+                    결제 완료 후 담당자가 연락드려 정확한 방문 시간을 조율합니다
+                  </Text>
+                </View>
+                <View style={styles.noticeItem}>
+                  <Text style={styles.noticeBullet}>•</Text>
+                  <Text style={styles.noticeText}>
+                    진단 시간은 약 1시간 정도 소요됩니다
+                  </Text>
+                </View>
+                <View style={styles.noticeItem}>
+                  <Text style={styles.noticeBullet}>•</Text>
+                  <Text style={styles.noticeText}>
+                    진단 완료 후 24시간 내 상세 리포트를 제공합니다
+                  </Text>
+                </View>
               </View>
             </TouchableOpacity>
           )}
@@ -1491,7 +1472,7 @@ const ReservationScreen: React.FC = () => {
       </ScrollView>
 
       {/* 하단 버튼 */}
-      <View style={styles.buttonContainer}>
+      <View style={[styles.buttonContainer, { paddingBottom: Math.max(insets.bottom, 20) }]}>
         {currentStep < 6 ? (
           <TouchableOpacity
             style={[
@@ -1511,55 +1492,14 @@ const ReservationScreen: React.FC = () => {
         ) : (
           <TouchableOpacity
             style={[styles.confirmButton, isSubmitting && styles.confirmButtonDisabled]}
-            onPress={() => setShowConfirmationModal(true)}
+            onPress={handleConfirmReservation}
             disabled={isSubmitting}
           >
-            <Text style={styles.confirmButtonText}>예약 확정하기</Text>
+            <Text style={styles.confirmButtonText}>{editMode ? '수정 완료' : '결제하기'}</Text>
           </TouchableOpacity>
         )}
       </View>
       </KeyboardAvoidingView>
-
-      {/* 예약 확인 모달 */}
-      <Modal
-        visible={showConfirmationModal}
-        animationType="fade"
-        transparent={true}
-        onRequestClose={() => setShowConfirmationModal(false)}
-      >
-        <View style={styles.modalOverlay}>
-          <SafeAreaView style={[styles.modalContainer, { paddingBottom: Math.max(insets.bottom, 24) }]}>
-            <View style={styles.modalHeader}>
-              <Text style={styles.modalTitle}>예약 확정</Text>
-              <TouchableOpacity
-                style={styles.closeButton}
-                onPress={() => setShowConfirmationModal(false)}
-              >
-                <Ionicons name="close" size={24} color="#9CA3AF" />
-              </TouchableOpacity>
-            </View>
-            
-            <Text style={styles.modalText}>
-              입력하신 정보로 예약을 확정하시겠습니까?
-            </Text>
-            
-            <View style={styles.modalButtons}>
-              <TouchableOpacity
-                style={styles.modalCancelButton}
-                onPress={() => setShowConfirmationModal(false)}
-              >
-                <Text style={styles.modalCancelButtonText}>취소</Text>
-              </TouchableOpacity>
-              <TouchableOpacity
-                style={styles.modalConfirmButton}
-                onPress={handleConfirmReservation}
-              >
-                <Text style={styles.modalConfirmButtonText}>확정</Text>
-              </TouchableOpacity>
-            </View>
-          </SafeAreaView>
-        </View>
-      </Modal>
 
       {/* 차량 선택 모달은 1단계에서 직접 처리됨 */}
     </SafeAreaView>
@@ -1754,8 +1694,8 @@ const styles = StyleSheet.create({
   },
   stepContainer: {
     marginHorizontal: 20,
-    marginTop: 16,
-    marginBottom: 16,
+    marginTop: 8,
+    marginBottom: 8,
   },
   stepCard: {
     backgroundColor: '#FFFFFF',
@@ -2006,26 +1946,35 @@ const styles = StyleSheet.create({
     fontWeight: '500',
   },
   noticeContainer: {
-    backgroundColor: '#fff3cd',
+    backgroundColor: '#f5f5f5',
     borderRadius: 12,
     padding: 16,
-    borderWidth: 1,
-    borderColor: '#ffeaa7',
   },
   noticeTitle: {
-    fontSize: 16,
+    fontSize: 14,
     fontWeight: '600',
-    color: '#856404',
+    color: '#888888',
     marginBottom: 12,
   },
-  noticeText: {
+  noticeItem: {
+    flexDirection: 'row',
+    marginBottom: 6,
+  },
+  noticeBullet: {
     fontSize: 13,
-    color: '#856404',
+    color: '#888888',
+    marginRight: 8,
     lineHeight: 18,
-    marginBottom: 4,
+  },
+  noticeText: {
+    flex: 1,
+    fontSize: 13,
+    color: '#888888',
+    lineHeight: 18,
   },
   buttonContainer: {
-    padding: 20,
+    paddingHorizontal: 20,
+    paddingTop: 20,
     borderTopWidth: 1,
     borderTopColor: '#e9ecef',
   },

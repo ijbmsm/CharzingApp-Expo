@@ -1,20 +1,22 @@
+export interface ReservationInfo {
+  vehicle: {
+    make: string;      // 브랜드
+    model: string;     // 모델명
+    year: number;      // 연식
+  };
+  address: string;
+  detailAddress?: string;
+  requestedDate: string;  // ISO string
+  serviceType: 'standard' | 'premium';
+  notes?: string;
+}
+
 export interface ConfirmPaymentRequest {
   paymentKey: string;
   orderId: string;
   amount: number;
-  reservationId?: string;
-  reservationInfo?: {
-    requestedDate: string;
-    vehicle: {
-      make: string;
-      model: string;
-      year: number;
-    };
-    address: string;
-    detailAddress: string;
-    serviceType: string;
-    notes?: string;
-  };
+  reservationId?: string;        // 기존 예약 연결용 (옵션)
+  reservationInfo?: ReservationInfo;  // 새 예약 생성용 (옵션)
   customerInfo: {
     name: string;
     phone: string;
@@ -27,6 +29,7 @@ export interface ConfirmPaymentResponse {
   paymentId: string;
   reservationId?: string;  // 새로 생성된 예약 ID
   receiptUrl: string | null;
+  message?: string;
 }
 
 export interface CancelPaymentRequest {

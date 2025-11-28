@@ -58,4 +58,3 @@ target 'app' do
     )
   end
 end
-$KakaoSDKVersion="2.22.7"

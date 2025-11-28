@@ -3,7 +3,7 @@ export default {
   expo: {
     name: "차징",
     slug: "CharzingApp-Expo",
-    version: "1.1.2",
+    version: "1.1.3",
 
     // Reanimated 호환성을 위해 Old Architecture 사용
     newArchEnabled: false,
@@ -40,7 +40,7 @@ export default {
       bundleIdentifier: "com.charzingapp",
       jsEngine: "hermes",
       icon: "./src/assets/charzingLogo/ios/AppIcon~ios-marketing.png",
-      buildNumber: "3",
+      buildNumber: "2",
       requireFullScreen: false,
 
       infoPlist: {
@@ -67,6 +67,74 @@ export default {
             CFBundleURLSchemes: ["com.charzingapp"],
           },
         ],
+
+        // 결제 앱 딥링크를 위한 URL 스킴 등록 (토스페이먼츠)
+        LSApplicationQueriesSchemes: [
+          // 토스
+          "supertoss",
+          // 카카오페이
+          "kakaotalk",
+          // 카카오뱅크
+          "kakaobank",
+          // 네이버페이
+          "naversearchapp",
+          "naversearchthirdlogin",
+          // ISP (BC카드, 국민카드)
+          "ispmobile",
+          // KB국민카드 & KB은행
+          "kb-acp",
+          "kbpay",
+          "kbbank",
+          "liivbank",
+          "newliiv",
+          // 신한카드
+          "shinhan-sr-ansimclick",
+          "shinhan-sr-ansimclick-naverpay",
+          "shinhan-sr-ansimclick-payco",
+          "shinhan-sr-ansimclick-amorepay",
+          "shinhan-sr-ansimclick-ssgpay",
+          "smshinhanansimclick",
+          // 삼성카드
+          "samsungpay",
+          "mpocket.online.ansimclick",
+          "vguardstart",
+          "monimopay",
+          "monimopayauth",
+          // 현대카드
+          "hdcardappcardansimclick",
+          "smhyundaiansimclick",
+          // 롯데카드
+          "lottesmartpay",
+          "lotteappcard",
+          // 하나카드
+          "hanamopay",
+          "hanaskcardmobileportal",
+          "cloudpay",
+          "hanawalletmembers",
+          // 우리카드
+          "wooricard",
+          "wooriopen",
+          "com.wooricard.wcard",
+          "newsmartpib",
+          // 씨티카드
+          "citispay",
+          "citicardappkr",
+          "citimobileapp",
+          // NH농협카드
+          "nhappcardansimclick",
+          "nhallonepayansimclick",
+          "nonghyupcardansimclick",
+          // 페이코
+          "payco",
+          // SSG페이
+          "shinsegaeeasypayment",
+          // L.PAY
+          "lpayapp",
+          // 핀크
+          "finnq",
+          // 차이
+          "chaipayment",
+        ],
       },
 
       associatedDomains: ["applinks:charzing.kr"],
@@ -86,7 +154,7 @@ export default {
 
       package: "com.charzingapp",
       jsEngine: "hermes",
-      versionCode: 4,
+      versionCode: 31,
 
       permissions: [
         "ACCESS_FINE_LOCATION",
@@ -177,6 +245,7 @@ export default {
       KAKAO_JAVASCRIPT_KEY: process.env.EXPO_PUBLIC_KAKAO_JAVASCRIPT_KEY,
       CLOUD_FUNCTION_URL: process.env.EXPO_PUBLIC_CLOUD_FUNCTION_URL,
       GOOGLE_WEB_CLIENT_ID: process.env.EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID,
+      TOSS_CLIENT_KEY: process.env.EXPO_PUBLIC_TOSS_CLIENT_KEY,
 
       SENTRY_DSN:
         process.env.SENTRY_DSN || "https://2b93a60c59c8ba7748ac8f06159206d8@o4510316675989504.ingest.us.sentry.io/4510316677169152",

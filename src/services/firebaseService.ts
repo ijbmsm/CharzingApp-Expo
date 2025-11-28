@@ -24,11 +24,11 @@ import {
 } from 'firebase/firestore';
 import { getAuth, signOut, signInWithCustomToken } from 'firebase/auth';
 import { getStorage, ref, uploadBytes, getDownloadURL } from 'firebase/storage';
-// import { getFunctions, httpsCallable } from 'firebase/functions'; // Not supported in React Native
+import { getFunctions, httpsCallable, connectFunctionsEmulator } from 'firebase/functions';
 import axios from 'axios';
 import Constants from 'expo-constants';
 import { v4 as uuidv4 } from 'uuid';
-import { getDb, getAuthInstance, getStorageInstance } from '../firebase/config';
+import { getDb, getAuthInstance, getStorageInstance, getFunctionsInstance } from '../firebase/config';
 import logger from './logService';
 import devLog from '../utils/devLog';
 import sentryLogger from '../utils/sentryLogger'; // ⭐ Sentry 로거 추가
@@ -343,6 +343,13 @@ export interface DiagnosisReservation {
 
   // 진단 리포트 연결 (2025-11-20 추가)
   reportId?: string | null;     // 제출된 진단 리포트 ID
+
+  // 결제 정보 (2025-11-25 추가)
+  paymentStatus?: 'pending' | 'paid' | 'failed' | 'refunded';
+  paymentKey?: string;          // 토스페이먼츠 결제 키
+  orderId?: string;             // 주문 ID
+  paidAmount?: number;          // 실제 결제 금액
+  paidAt?: Date | FieldValue;   // 결제 완료 시간
 }
 
 export interface DiagnosisReportFile {
@@ -900,6 +907,10 @@ class FirebaseService {
     return getStorageInstance();
   }
 
+  private get functions() {
+    return getFunctionsInstance();
+  }
+
   // 컬렉션 참조들도 getter로 변경
   private get usersCollectionRef() {
     return collection(this.db, 'users');
@@ -923,7 +934,7 @@ class FirebaseService {
 
   constructor() {
     this.CLOUD_FUNCTION_URL = Constants.expoConfig?.extra?.CLOUD_FUNCTION_URL || 
-      'https://us-central1-charzing-d1600.cloudfunctions.net';
+      'https://asia-northeast3-charzing-d1600.cloudfunctions.net';
   }
 
   /**
@@ -978,35 +989,19 @@ class FirebaseService {
   /**
    * Cloud Function 직접 HTTP 호출 (Firebase Functions SDK 없이)
    */
-  async callCloudFunction(functionName: string, data: any = {}): Promise<any> {
+  async callCloudFunction(functionName: string, data: unknown = {}): Promise<unknown> {
     try {
-      devLog.log(`🌩️ Cloud Function 직접 호출: ${functionName}`);
-      
-      // 인증된 사용자인지 확인
-      const currentUser = this.auth.currentUser;
-      if (!currentUser) {
-        throw new Error('로그인이 필요합니다');
-      }
+      devLog.log(`🌩️ Cloud Function 호출 (Callable): ${functionName}`);
 
-      // ID Token 가져오기
-      const idToken = await currentUser.getIdToken(true);
-      
-      const response = await axios.post(
-        `${this.CLOUD_FUNCTION_URL}/${functionName}`,
-        data,
-        {
-          headers: {
-            'Authorization': `Bearer ${idToken}`,
-            'Content-Type': 'application/json',
-          },
-          timeout: 15000,
-        }
-      );
-      
+      // httpsCallable을 사용하여 Callable Function 호출
+      const callable = httpsCallable(this.functions, functionName);
+      const result = await callable(data);
+
       devLog.log(`✅ Cloud Function 호출 성공: ${functionName}`);
-      return response.data;
-    } catch (error: any) {
-      devLog.error(`❌ Cloud Function 호출 실패 (${functionName}):`, error);
+      return result.data;
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : String(error);
+      devLog.error(`❌ Cloud Function 호출 실패 (${functionName}):`, errorMessage);
       throw error;
     }
   }
@@ -1618,7 +1613,9 @@ class FirebaseService {
     try {
       const currentUser = this.auth.currentUser;
       if (currentUser) {
+        const userId = currentUser.uid;
         await signOut(this.auth);
+        sentryLogger.logLogout(userId);
         devLog.log('Firebase 로그아웃 완료');
       } else {
         devLog.log('Firebase에 로그인된 사용자가 없음 - 로그아웃 스킵');
@@ -1891,18 +1888,19 @@ class FirebaseService {
    */
   async updateReservationReportId(reservationId: string, reportId: string): Promise<void> {
     try {
-      devLog.log('예약에 리포트 ID 연결:', reservationId, reportId);
+      devLog.log('예약에 리포트 ID 연결 및 상태 업데이트:', reservationId, reportId);
 
       const reservationRef = doc(this.db, 'diagnosisReservations', reservationId);
 
       await updateDoc(reservationRef, {
         reportId,
+        status: 'pending_review',  // ⭐ 리포트 제출 시 예약 상태도 '검수 대기'로 변경
         updatedAt: serverTimestamp(),
       });
 
-      devLog.log('✅ 예약에 리포트 ID 연결 완료:', reservationId, reportId);
+      devLog.log('✅ 예약에 리포트 ID 연결 및 상태(pending_review) 업데이트 완료:', reservationId, reportId);
     } catch (error) {
-      devLog.error('❌ 예약에 리포트 ID 연결 실패:', error);
+      devLog.error('❌ 예약에 리포트 ID 연결 및 상태 업데이트 실패:', error);
       throw error;
     }
   }
@@ -2823,8 +2821,9 @@ class FirebaseService {
       devLog.log(`✅ 리포트 이미지 업로드 완료: ${imageName}`, downloadURL);
       return downloadURL;
     } catch (error) {
-      devLog.error(`❌ 리포트 이미지 업로드 실패: ${imageName}`, error);
-      throw new Error(`${imageName} 이미지 업로드에 실패했습니다.`);
+      const errorMessage = error instanceof Error ? error.message : String(error);
+      devLog.error(`❌ 리포트 이미지 업로드 실패: ${imageName}`, { error, imageUri });
+      throw new Error(`${imageName} 업로드 실패: ${errorMessage}`);
     }
   }
 
@@ -2876,20 +2875,59 @@ class FirebaseService {
       // 현재 시각
       const now = serverTimestamp();
 
-      // Firestore에 저장
-      await setDoc(doc(this.db, 'vehicleDiagnosisReports', reportId), {
+      // 🔥 undefined 값 제거 (Firestore에서 undefined 허용 안함)
+      const cleanData = this.removeUndefinedValues({
         ...reportData,
         id: reportId,
         createdAt: now,
         updatedAt: now,
       });
 
+      devLog.log('📝 정리된 데이터 크기:', JSON.stringify(cleanData).length);
+
+      // Firestore에 저장
+      await setDoc(doc(this.db, 'vehicleDiagnosisReports', reportId), cleanData);
+
       devLog.log('✅ 차량 진단 리포트 생성 완료:', reportId);
       return reportId;
     } catch (error) {
+      // 🔥 실제 에러 메시지 로깅 (디버깅용)
       devLog.error('❌ 차량 진단 리포트 생성 실패:', error);
-      throw new Error('진단 리포트 생성에 실패했습니다.');
+      devLog.error('❌ 에러 상세:', {
+        message: error instanceof Error ? error.message : String(error),
+        code: (error as any)?.code,
+        name: error instanceof Error ? error.name : undefined,
+      });
+
+      // 원본 에러 메시지 포함하여 throw
+      const errorMessage = error instanceof Error ? error.message : '알 수 없는 오류';
+      throw new Error(`진단 리포트 생성에 실패했습니다: ${errorMessage}`);
     }
+  }
+
+  /**
+   * 객체에서 undefined 값을 재귀적으로 제거
+   */
+  private removeUndefinedValues(obj: any): any {
+    if (obj === null || obj === undefined) {
+      return null;
+    }
+
+    if (Array.isArray(obj)) {
+      return obj.map(item => this.removeUndefinedValues(item)).filter(item => item !== undefined);
+    }
+
+    if (typeof obj === 'object' && !(obj instanceof Date) && !(obj instanceof Timestamp)) {
+      const cleaned: any = {};
+      for (const [key, value] of Object.entries(obj)) {
+        if (value !== undefined) {
+          cleaned[key] = this.removeUndefinedValues(value);
+        }
+      }
+      return cleaned;
+    }
+
+    return obj;
   }
 
   /**

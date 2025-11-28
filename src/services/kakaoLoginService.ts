@@ -14,6 +14,7 @@ import { Platform, NativeModules } from 'react-native';
 import firebaseService from './firebaseService';
 import logger from './logService';
 import devLog from '../utils/devLog';
+import sentryLogger from '../utils/sentryLogger';
 import kakaoWebLoginService from './kakaoWebLoginService';
 import { 
   ILoginService, 
@@ -224,7 +225,7 @@ class KakaoLoginService implements ILoginService {
         // 4. 사용자 정보 로깅
         const appUser = this.userFactory.createUser(firebaseResult.user, kakaoProfile);
 
-        logger.auth('login_success', 'kakao', true, undefined, firebaseResult.user.uid);
+        sentryLogger.logLoginSuccess(firebaseResult.user.uid, 'kakao');
         devLog.log('✅ 카카오 네이티브 SDK 로그인 성공:', appUser.displayName);
 
         // 기존 사용자인 경우 로그인 시간 업데이트
@@ -257,7 +258,7 @@ class KakaoLoginService implements ILoginService {
       }
 
       devLog.error('❌ 카카오 네이티브 SDK 로그인 실패:', error);
-      logger.auth('login_attempt', 'kakao', false, error);
+      sentryLogger.logLoginFailure('kakao', error instanceof Error ? error : new Error(errorMessage));
 
       // Sentry에 Key Hash 에러 전송
       if (errorMessage.toLowerCase().includes('keyhash') ||

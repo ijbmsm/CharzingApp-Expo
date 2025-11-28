@@ -13,6 +13,7 @@ import Constants from 'expo-constants';
 import firebaseService from './firebaseService';
 import logger from './logService';
 import devLog from '../utils/devLog';
+import sentryLogger from '../utils/sentryLogger';
 import { 
   ILoginService, 
   LoginResult, 
@@ -129,7 +130,6 @@ class KakaoWebLoginService implements ILoginService {
   async login(): Promise<LoginResult> {
     try {
       devLog.log('🌐🌐🌐 [FALLBACK] 카카오 웹 기반 로그인 시작 (네이티브 SDK 아님!)');
-      logger.auth('login_attempt', 'kakao_web');
 
       // 초기화 확인
       if (!this.isInitialized) {
@@ -160,7 +160,7 @@ class KakaoWebLoginService implements ILoginService {
         const appUser = this.userFactory.createUser(firebaseResult.user, kakaoProfile);
         await this.syncUserDocument(appUser, kakaoProfile);
 
-        logger.auth('login_success', 'kakao_web', true, undefined, firebaseResult.user.uid);
+        sentryLogger.logLoginSuccess(firebaseResult.user.uid, 'kakao');
         devLog.log('✅ 카카오 웹 기반 로그인 성공:', appUser.displayName);
 
         return {
@@ -175,7 +175,7 @@ class KakaoWebLoginService implements ILoginService {
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : '알 수 없는 오류';
       devLog.error('❌ 카카오 웹 기반 로그인 실패:', error);
-      logger.auth('login_attempt', 'kakao_web', false, error);
+      sentryLogger.logLoginFailure('kakao', error instanceof Error ? error : new Error(errorMessage));
 
       return {
         success: false,
@@ -300,11 +300,11 @@ class KakaoWebLoginService implements ILoginService {
     const response = await firebaseService.callCloudFunction('createKakaoCustomToken', {
       kakaoId: kakaoProfile.id.toString(),
       email: kakaoProfile.kakao_account?.email,
-      displayName: kakaoProfile.kakao_account?.profile?.nickname || 
+      displayName: kakaoProfile.kakao_account?.profile?.nickname ||
                   kakaoProfile.properties?.nickname || '카카오 사용자',
-      photoURL: kakaoProfile.kakao_account?.profile?.profile_image_url || 
+      photoURL: kakaoProfile.kakao_account?.profile?.profile_image_url ||
                kakaoProfile.properties?.profile_image
-    });
+    }) as { success: boolean; customToken?: string; message?: string };
 
     if (!response.success || !response.customToken) {
       throw new Error(response.message || '커스텀 토큰 생성 실패');

@@ -157,7 +157,213 @@ class SentryLogger {
   }
 
   /**
-   * 결제 완료 로그
+   * 결제 시작 로그
+   */
+  logPaymentStart(
+    userId: string,
+    orderId: string,
+    amount: number,
+    serviceType: string
+  ): void {
+    if (this.isDevelopment) {
+      console.log('📝 [DEV] Sentry 결제 시작 로그:', {
+        userId,
+        orderId,
+        amount,
+        serviceType
+      });
+      return;
+    }
+
+    try {
+      Sentry.addBreadcrumb({
+        message: `💳 결제 시작 - ${amount}원 (${serviceType})`,
+        level: 'info',
+        data: { userId, orderId, amount, serviceType },
+      });
+      Sentry.setTag('last_payment_service_type', serviceType);
+    } catch (error) {
+      console.warn('⚠️ Sentry 결제 시작 로그 실패:', error);
+    }
+  }
+
+  /**
+   * 결제 위젯 초기화 성공 로그
+   */
+  logPaymentWidgetLoaded(orderId: string, clientKey: string): void {
+    if (this.isDevelopment) {
+      console.log('📝 [DEV] Sentry 결제 위젯 로드 로그:', {
+        orderId,
+        clientKey: clientKey.slice(0, 15) + '...'
+      });
+      return;
+    }
+
+    try {
+      Sentry.addBreadcrumb({
+        message: `🎨 결제 위젯 로드 완료`,
+        level: 'info',
+        data: { orderId, clientKey: clientKey.slice(0, 15) + '...' },
+      });
+    } catch (error) {
+      console.warn('⚠️ Sentry 결제 위젯 로드 로그 실패:', error);
+    }
+  }
+
+  /**
+   * 결제 요청 로그 (사용자가 결제 버튼 클릭)
+   */
+  logPaymentRequested(
+    orderId: string,
+    amount: number,
+    customerName: string,
+    paymentMethod?: string
+  ): void {
+    if (this.isDevelopment) {
+      console.log('📝 [DEV] Sentry 결제 요청 로그:', {
+        orderId,
+        amount,
+        customerName,
+        paymentMethod
+      });
+      return;
+    }
+
+    try {
+      Sentry.addBreadcrumb({
+        message: `💰 결제 요청 - ${amount}원`,
+        level: 'info',
+        data: { orderId, amount, customerName, paymentMethod },
+      });
+      if (paymentMethod) {
+        Sentry.setTag('payment_method', paymentMethod);
+      }
+    } catch (error) {
+      console.warn('⚠️ Sentry 결제 요청 로그 실패:', error);
+    }
+  }
+
+  /**
+   * 결제 성공 로그 (Toss 승인)
+   */
+  logPaymentSuccess(
+    paymentKey: string,
+    orderId: string,
+    amount: number
+  ): void {
+    if (this.isDevelopment) {
+      console.log('📝 [DEV] Sentry 결제 성공 로그:', {
+        paymentKey: paymentKey.slice(0, 15) + '...',
+        orderId,
+        amount
+      });
+      return;
+    }
+
+    try {
+      Sentry.addBreadcrumb({
+        message: `✅ 결제 성공 - ${amount}원`,
+        level: 'info',
+        data: { paymentKey: paymentKey.slice(0, 15) + '...', orderId, amount },
+      });
+    } catch (error) {
+      console.warn('⚠️ Sentry 결제 성공 로그 실패:', error);
+    }
+  }
+
+  /**
+   * 결제 실패 로그
+   */
+  logPaymentError(
+    userId: string,
+    orderId: string,
+    errorCode: string,
+    errorMessage: string,
+    amount: number
+  ): void {
+    if (this.isDevelopment) {
+      console.error('📝 [DEV] Sentry 결제 실패 로그:', {
+        userId,
+        orderId,
+        errorCode,
+        errorMessage,
+        amount
+      });
+      return;
+    }
+
+    try {
+      Sentry.addBreadcrumb({
+        message: `❌ 결제 실패 - ${errorCode}`,
+        level: 'error',
+        data: { userId, orderId, errorCode, errorMessage, amount },
+      });
+      Sentry.captureMessage(`결제 실패: ${errorCode} - ${errorMessage}`, {
+        level: 'error',
+        tags: {
+          error_code: errorCode,
+          order_id: orderId,
+        },
+      });
+    } catch (error) {
+      console.warn('⚠️ Sentry 결제 실패 로그 실패:', error);
+    }
+  }
+
+  /**
+   * 결제 취소 로그
+   */
+  logPaymentCancel(userId: string, orderId: string, reason?: string): void {
+    if (this.isDevelopment) {
+      console.log('📝 [DEV] Sentry 결제 취소 로그:', {
+        userId,
+        orderId,
+        reason
+      });
+      return;
+    }
+
+    try {
+      Sentry.addBreadcrumb({
+        message: `🚫 결제 취소${reason ? ` - ${reason}` : ''}`,
+        level: 'info',
+        data: { userId, orderId, reason },
+      });
+    } catch (error) {
+      console.warn('⚠️ Sentry 결제 취소 로그 실패:', error);
+    }
+  }
+
+  /**
+   * 결제 확정 시작 로그 (Firebase Function 호출)
+   */
+  logPaymentConfirmationStart(
+    orderId: string,
+    paymentKey: string,
+    amount: number
+  ): void {
+    if (this.isDevelopment) {
+      console.log('📝 [DEV] Sentry 결제 확정 시작 로그:', {
+        orderId,
+        paymentKey: paymentKey.slice(0, 15) + '...',
+        amount
+      });
+      return;
+    }
+
+    try {
+      Sentry.addBreadcrumb({
+        message: `🔄 결제 확정 시작 - ${amount}원`,
+        level: 'info',
+        data: { orderId, paymentKey: paymentKey.slice(0, 15) + '...', amount },
+      });
+    } catch (error) {
+      console.warn('⚠️ Sentry 결제 확정 시작 로그 실패:', error);
+    }
+  }
+
+  /**
+   * 결제 완료 로그 (확정 완료)
    */
   logPaymentComplete(
     userId: string,

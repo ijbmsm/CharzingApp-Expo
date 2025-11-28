@@ -31,6 +31,10 @@ import DiagnosticTabScreen from '../screens/DiagnosticTabScreen';
 import VehicleInspectionScreen from '../screens/VehicleInspection';
 import ReservationApprovalScreen from '../screens/ReservationApprovalScreen';
 import ReservationsManagementScreen from '../screens/ReservationsManagementScreen';
+import PaymentScreen from '../screens/PaymentScreen';
+import PaymentSuccessScreen from '../screens/PaymentSuccessScreen';
+import PaymentFailureScreen from '../screens/PaymentFailureScreen';
+import { ReservationData } from '../types/payment.types';
 
 // Types
 export type RootStackParamList = {
@@ -123,6 +127,35 @@ export type RootStackParamList = {
     };
   } | undefined;
   AdminReservationList: undefined;
+  // 결제 화면
+  Payment: {
+    reservationData: Omit<ReservationData, 'requestedDate'> & {
+      requestedDate: string | Date;
+    };
+    orderId: string;
+    orderName: string;
+    amount: number;
+  };
+  // 결제 성공 화면
+  PaymentSuccess: {
+    paymentKey: string;
+    orderId: string;
+    amount: number;
+    reservationData: Omit<ReservationData, 'requestedDate'> & {
+      requestedDate: string | Date;
+    };
+  };
+  // 결제 실패 화면
+  PaymentFailure: {
+    errorCode: string;
+    errorMessage: string;
+    orderId: string;
+    orderName: string;
+    amount: number;
+    reservationData?: Omit<ReservationData, 'requestedDate'> & {
+      requestedDate: string | Date;
+    };
+  };
 };
 
 export type MainTabParamList = {
@@ -451,6 +484,22 @@ export default function RootNavigator() {
         <Stack.Screen
           name="VehicleInspection"
           component={VehicleInspectionScreen}
+        />
+        <Stack.Screen
+          name="Payment"
+          component={PaymentScreen}
+        />
+        <Stack.Screen
+          name="PaymentSuccess"
+          component={PaymentSuccessScreen}
+          options={{
+            // 성공 화면은 뒤로가기 제스처 비활성화
+            gestureEnabled: false,
+          }}
+        />
+        <Stack.Screen
+          name="PaymentFailure"
+          component={PaymentFailureScreen}
         />
       </Stack.Navigator>
     </NavigationContainer>

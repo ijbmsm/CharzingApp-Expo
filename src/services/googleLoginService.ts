@@ -4,6 +4,7 @@ import Constants from 'expo-constants';
 import firebaseService from './firebaseService';
 import logger from './logService';
 import devLog from '../utils/devLog';
+import sentryLogger from '../utils/sentryLogger';
 import authPersistenceService from './authPersistenceService';
 
 interface GoogleLoginResult {
@@ -61,10 +62,8 @@ class GoogleLoginService {
    */
   async login(retryCount: number = 0): Promise<GoogleLoginResult> {
     const MAX_RETRIES = 2;
-    
-    try {
-      logger.auth('google_login_attempt', 'google');
 
+    try {
       // 초기화 확인 및 재시도
       if (!this.isInitialized) {
         await this.initialize();
@@ -163,6 +162,8 @@ class GoogleLoginService {
 
       devLog.log('✅ Google 로그인 및 Firebase Auth 세션 유지 완료');
 
+      sentryLogger.logLoginSuccess(firebaseUser.uid, 'google');
+
       return {
         success: true,
         user: firebaseUser,
@@ -187,7 +188,7 @@ class GoogleLoginService {
       // 사용자 취소의 경우 재시도하지 않고 바로 종료
       if (isUserCancelled) {
         devLog.log('👤 사용자가 Google 로그인을 취소했습니다.');
-        logger.auth('google_login_attempt', 'google', false, error);
+        // 사용자 취소는 에러가 아니므로 Sentry 로깅 안함
         return { success: false, error: '로그인이 취소되었습니다.' };
       }
 
@@ -198,7 +199,7 @@ class GoogleLoginService {
       }
 
       // 최종 실패 로그
-      logger.auth('google_login_attempt', 'google', false, error);
+      sentryLogger.logLoginFailure('google', error instanceof Error ? error : new Error(error.message || '알 수 없는 오류'));
 
       // 에러 타입별 처리 (사용자 취소는 이미 위에서 처리됨)
       if (error.code === statusCodes.IN_PROGRESS) {

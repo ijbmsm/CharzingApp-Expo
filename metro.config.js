@@ -4,11 +4,11 @@ const {
 
 const config = getSentryExpoConfig(__dirname);
 
-// Firebase Functions 디렉토리 제외
+// Firebase Functions 디렉토리 제외 (프로젝트 루트의 functions 폴더만)
 config.resolver.blockList = [
-  /functions\/.*/, // functions 디렉토리 전체 제외
-  /functions\/lib\/.*/, // functions/lib 디렉토리 제외
-  /functions\/node_modules\/.*/, // functions/node_modules 제외
+  /^functions\//, // 프로젝트 루트의 functions 디렉토리만 제외
+  /\/functions\/lib\//, // functions/lib 디렉토리 제외
+  /\/functions\/node_modules\//, // functions/node_modules 제외
 ];
 
 // React 19 JSX runtime 해결

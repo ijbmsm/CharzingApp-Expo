@@ -1470,12 +1470,309 @@ InAppNotification {
 - **Expo Notifications**: 0.32.11
 - **FCM**: Firebase Cloud Messaging
 
-### 에러 추적
+### 에러 추적 & 로깅
 - **Sentry**: `@sentry/react-native` 7.5.0
 
 ### 유틸리티
 - **Axios**: 1.12.2
 - **Lodash**: 4.17.21
+
+---
+
+## 📊 로깅 전략 (Logging Strategy)
+
+### 개요
+
+CharzingApp은 **2단계 로깅 시스템**을 사용하여 개발 중 디버깅과 프로덕션 모니터링을 분리합니다.
+
+### 1️⃣ 기본 로깅 도구
+
+#### devLog (`src/utils/devLog.ts`)
+- **환경**: 개발 환경 전용 (`__DEV__` true일 때만 작동)
+- **용도**: 로컬 디버깅, 개발 중 빠른 확인
+- **특징**: 프로덕션에서 자동 비활성화 (성능 영향 없음)
+
+**사용법**:
+```typescript
+import { devLog } from '../utils/devLog';
+
+devLog.log('일반 로그:', data);
+devLog.info('정보성 로그:', info);
+devLog.warn('경고:', warning);
+devLog.error('에러:', error);
+devLog.debug('디버그:', debug);
+```
+
+#### sentryLogger (`src/utils/sentryLogger.ts`)
+- **환경**: 프로덕션 전용 (개발 환경에서는 콘솔 로그만 출력)
+- **용도**: 비즈니스 이벤트 추적, 에러 모니터링, 사용자 행동 분석
+- **특징**: Sentry 대시보드에 Breadcrumb로 기록, 에러 시 captureException
+
+**사용 원칙**:
+- ✅ 주요 비즈니스 로직 (회원가입, 예약, 결제, 진단 리포트 등)
+- ✅ 사용자 액션 추적 (버튼 클릭, 모달 열기/닫기)
+- ✅ 에러 발생 및 복구
+- ❌ 단순 UI 렌더링 로그
+- ❌ 과도한 로깅 (성능 저하 방지)
+
+---
+
+### 2️⃣ 결제 플로우 로깅 (Payment Flow Logging) ⭐
+
+결제는 민감한 비즈니스 로직이므로 **완전한 로깅**이 필수입니다.
+
+#### 📌 결제 플로우 단계별 로깅
+
+```
+1. 결제 화면 진입 (Payment Screen)
+   ↓ devLog.log + sentryLogger.logPaymentStart
+
+2. 결제 위젯 초기화 (TossPaymentWebView)
+   ↓ devLog.log (WebView 내부)
+
+3. 결제 요청 (사용자 버튼 클릭)
+   ↓ devLog.log (WebView 내부)
+
+4. 결제 성공 (Toss 승인)
+   ↓ devLog.log + sentryLogger.logPaymentSuccess
+
+5. 결제 확정 시작 (PaymentSuccessScreen)
+   ↓ devLog.log + sentryLogger.logPaymentConfirmationStart
+
+6. 결제 확정 완료 (Firebase Function 성공)
+   ↓ devLog.log + sentryLogger.logPaymentComplete
+
+[실패 플로우]
+X. 결제 실패 (Toss 거절)
+   ↓ devLog.error + sentryLogger.logPaymentError
+
+X. 결제 취소 (사용자 취소)
+   ↓ devLog.log + sentryLogger.logPaymentCancel
+```
+
+#### 📄 적용된 파일들
+
+**PaymentScreen.tsx**:
+```typescript
+import { devLog } from '../utils/devLog';
+import sentryLogger from '../utils/sentryLogger';
+
+// 결제 시작
+const handleStartPayment = () => {
+  devLog.log('결제 시작 버튼 클릭:', { orderId, amount });
+  if (user?.uid) {
+    sentryLogger.logPaymentStart(user.uid, orderId, amount, serviceType);
+  }
+  setPaymentStarted(true);
+};
+
+// 결제 성공
+const handlePaymentSuccess = (paymentKey, orderId, amount) => {
+  devLog.log('결제 성공:', { paymentKey, orderId, amount });
+  if (user?.uid) {
+    sentryLogger.logPaymentSuccess(paymentKey, orderId, amount);
+  }
+  navigation.replace('PaymentSuccess', { ... });
+};
+
+// 결제 실패
+const handlePaymentFail = (errorCode, errorMessage, orderId) => {
+  devLog.error('결제 실패:', { errorCode, errorMessage, orderId });
+  if (user?.uid) {
+    sentryLogger.logPaymentError(user.uid, orderId, errorCode, errorMessage, amount);
+  }
+  navigation.replace('PaymentFailure', { ... });
+};
+
+// 결제 취소
+const handlePaymentClose = () => {
+  if (user?.uid) {
+    sentryLogger.logPaymentCancel(user.uid, orderId, '사용자 취소');
+  }
+  navigation.goBack();
+};
+```
+
+**PaymentSuccessScreen.tsx**:
+```typescript
+const confirmPayment = async () => {
+  devLog.log('결제 확정 시작:', { paymentKey, orderId, amount });
+
+  // 결제 확정 시작 로깅
+  if (user?.uid) {
+    sentryLogger.logPaymentConfirmationStart(orderId, paymentKey, amount);
+  }
+
+  const result = await firebaseService.callCloudFunction('confirmPaymentFunction', request);
+
+  devLog.log('결제 확정 성공:', result);
+
+  // 결제 완료 로깅
+  if (user?.uid && result.reservationId) {
+    sentryLogger.logPaymentComplete(user.uid, result.reservationId, amount, result.paymentMethod);
+  }
+};
+```
+
+**TossPaymentWebView.tsx**:
+```typescript
+// ✅ console.log → devLog로 교체 완료
+import { devLog } from '../../utils/devLog';
+
+// WebView 메시지 로깅
+devLog.log('📱 [WebView]', message);
+
+// URL 변경 감지
+devLog.log('📍 Navigation URL:', url);
+devLog.log('✅ 결제 성공 감지:', { paymentKey, orderId, amount });
+devLog.log('❌ 결제 실패 감지:', { errorCode, errorMessage });
+```
+
+**PaymentFailureScreen.tsx**:
+```typescript
+// ✅ console.error → devLog.error로 교체 완료
+import { devLog } from '../utils/devLog';
+
+devLog.error('카카오톡 채널 열기 실패:', err);
+```
+
+#### 📋 sentryLogger 결제 관련 메서드 (신규 추가됨)
+
+```typescript
+// 1. 결제 시작
+sentryLogger.logPaymentStart(userId, orderId, amount, serviceType)
+
+// 2. 결제 위젯 로드 완료
+sentryLogger.logPaymentWidgetLoaded(orderId, clientKey)
+
+// 3. 결제 요청 (버튼 클릭)
+sentryLogger.logPaymentRequested(orderId, amount, customerName, paymentMethod?)
+
+// 4. 결제 성공 (Toss 승인)
+sentryLogger.logPaymentSuccess(paymentKey, orderId, amount)
+
+// 5. 결제 실패
+sentryLogger.logPaymentError(userId, orderId, errorCode, errorMessage, amount)
+
+// 6. 결제 취소
+sentryLogger.logPaymentCancel(userId, orderId, reason?)
+
+// 7. 결제 확정 시작 (Firebase Function 호출)
+sentryLogger.logPaymentConfirmationStart(orderId, paymentKey, amount)
+
+// 8. 결제 완료 (확정 완료)
+sentryLogger.logPaymentComplete(userId, reservationId, amount, paymentMethod)
+```
+
+---
+
+### 3️⃣ 로깅 베스트 프랙티스
+
+#### ✅ DO (권장):
+1. **항상 devLog + sentryLogger 조합 사용**
+   ```typescript
+   devLog.error('결제 실패:', error);
+   sentryLogger.logPaymentError(userId, orderId, errorCode, errorMessage, amount);
+   ```
+
+2. **민감 정보 마스킹**
+   ```typescript
+   // ✅ 카드번호, 비밀번호 등은 일부만 표시
+   devLog.log('Client Key:', clientKey.slice(0, 15) + '...');
+   sentryLogger.logPaymentSuccess(paymentKey.slice(0, 15) + '...', orderId, amount);
+   ```
+
+3. **에러 시 충분한 컨텍스트 제공**
+   ```typescript
+   sentryLogger.logPaymentError(
+     userId,
+     orderId,
+     errorCode,      // REJECT_CARD_COMPANY
+     errorMessage,   // 카드사 승인 거절
+     amount          // 결제 금액
+   );
+   ```
+
+4. **user?.uid 체크로 게스트 대응**
+   ```typescript
+   if (user?.uid) {
+     sentryLogger.logPaymentStart(user.uid, orderId, amount, serviceType);
+   }
+   ```
+
+#### ❌ DON'T (금지):
+1. **console.log 직접 사용 금지**
+   ```typescript
+   // ❌ 금지 - 프로덕션에서도 로그 남음
+   console.log('결제 시작:', data);
+
+   // ✅ 올바른 방법
+   devLog.log('결제 시작:', data);
+   ```
+
+2. **과도한 로깅**
+   ```typescript
+   // ❌ 금지 - 렌더링마다 로깅
+   useEffect(() => {
+     devLog.log('컴포넌트 렌더링');
+   });
+
+   // ✅ 올바른 방법 - 의미 있는 액션만
+   const handlePayment = () => {
+     devLog.log('결제 버튼 클릭');
+   };
+   ```
+
+3. **민감 정보 전체 노출**
+   ```typescript
+   // ❌ 금지
+   devLog.log('카드번호:', fullCardNumber);
+   devLog.log('Secret Key:', TOSS_SECRET_KEY);
+
+   // ✅ 올바른 방법
+   devLog.log('카드번호:', cardNumber.slice(0, 4) + '****');
+   devLog.log('Secret Key:', TOSS_SECRET_KEY.slice(0, 10) + '...');
+   ```
+
+---
+
+### 4️⃣ 프로덕션 모니터링 (Sentry Dashboard)
+
+**Sentry에서 확인 가능한 정보**:
+- 결제 플로우 전체 Breadcrumb (시작 → 성공/실패)
+- 에러 발생 시 전체 컨텍스트 (userId, orderId, amount, errorCode)
+- 사용자별 결제 패턴 및 실패율
+- 결제 수단별 성공률 (paymentMethod 태그)
+
+**Sentry 활용**:
+```
+Issues → 결제 관련 에러 필터링
+  - error_code: REJECT_CARD_COMPANY
+  - order_id: CHZ_1234567890
+
+Performance → 결제 확정 소요 시간
+  - logPaymentConfirmationStart ~ logPaymentComplete
+
+Breadcrumbs → 사용자별 결제 플로우 추적
+  1. 💳 결제 시작 - 1000원
+  2. ✅ 결제 성공 - 1000원
+  3. 🔄 결제 확정 시작 - 1000원
+  4. 💳 결제 완료 - 1000원
+```
+
+---
+
+### 5️⃣ 관련 파일
+
+**로깅 유틸리티**:
+- `src/utils/devLog.ts` - 개발 환경 전용 로거
+- `src/utils/sentryLogger.ts` - 프로덕션 로거 (Sentry 통합)
+
+**결제 관련 화면**:
+- `src/screens/PaymentScreen.tsx` - 결제 시작, 성공, 실패 로깅
+- `src/screens/PaymentSuccessScreen.tsx` - 결제 확정 로깅
+- `src/screens/PaymentFailureScreen.tsx` - 에러 처리
+- `src/components/payment/TossPaymentWebView.tsx` - WebView 내부 로깅
 
 ---
 
