@@ -47,6 +47,19 @@ const MyReservationsScreen: React.FC = () => {
     try {
       const userReservations = await firebaseService.getUserDiagnosisReservations(user.uid);
 
+      // 🔍 예약 상태 로깅
+      console.log('📋 [MyReservations] 불러온 예약 목록:', userReservations.length, '개');
+      userReservations.forEach((reservation, index) => {
+        console.log(`📋 [MyReservations] 예약 ${index + 1}:`, {
+          id: reservation.id,
+          status: reservation.status,
+          paymentStatus: reservation.paymentStatus,
+          vehicleBrand: reservation.vehicleBrand,
+          vehicleModel: reservation.vehicleModel,
+          requestedDate: reservation.requestedDate,
+        });
+      });
+
       if (isMounted) {
         setReservations(userReservations);
       }
@@ -182,7 +195,16 @@ const MyReservationsScreen: React.FC = () => {
 
   const renderReservationItem = ({ item }: { item: DiagnosisReservation }) => {
     const currentStep = getStepFromStatus(item.status);
-    
+
+    // 🔍 렌더링 시 상태 로깅
+    console.log('🎨 [MyReservations] 렌더링:', {
+      id: item.id?.slice(0, 8),
+      status: item.status,
+      statusText: getStatusText(item.status),
+      statusColor: getStatusColor(item.status),
+      currentStep,
+    });
+
     return (
       <TouchableOpacity
         style={styles.reservationCard}
