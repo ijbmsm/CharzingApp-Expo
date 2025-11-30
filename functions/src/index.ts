@@ -1468,7 +1468,7 @@ export const getUsersWithPushTokens = functions
  * 예약 상태 변경 시 자동 푸시 알림
  */
 export const sendReservationStatusNotification = functions
-  .region('asia-northeast3', 'us-central1')
+  .region('asia-northeast3')  // ⭐ 중복 알림 방지: 단일 리전만 사용
   .firestore.document('diagnosisReservations/{reservationId}')
   .onUpdate(async (change, context) => {
     try {
@@ -1651,7 +1651,7 @@ export const sendReservationStatusNotification = functions
  * 진단 리포트 상태 변경 시 자동 푸시 알림 (published 상태로 변경 시)
  */
 export const sendReportPublishedNotification = functions
-  .region('asia-northeast3', 'us-central1')
+  .region('asia-northeast3')  // ⭐ 중복 알림 방지: 단일 리전만 사용
   .firestore.document('vehicleDiagnosisReports/{reportId}')
   .onUpdate(async (change, context) => {
     try {
@@ -2603,15 +2603,23 @@ export const confirmPaymentFunction = functions
           console.warn(`⚠️ 예약 상태가 pending_payment가 아닙니다: ${reservationData?.status}`);
         }
 
-        // ⭐ 예약 상태 업데이트: pending_payment → confirmed
+        // ⭐ 예약 상태 업데이트: pending_payment → pending
         await reservationRef.update({
-          status: 'confirmed', // ⭐ 결제 완료로 예약 확정
+          status: 'pending', // ⭐ 결제 완료, 관리자/정비사 확정 대기
           paymentStatus: 'completed', // ⭐ pending → completed
           paymentId: paymentRef.id,
           paymentKey: data.paymentKey, // Toss paymentKey 저장
           orderId: data.orderId, // Toss orderId 저장
           paidAmount: tossResponse.totalAmount,
           paidAt: FieldValue.serverTimestamp(),
+          paymentMethod: paymentDocData.method, // 결제 수단
+          // 카드 결제 정보 (2025-11-30 추가)
+          ...(paymentDocData.paymentMethod.card && {
+            cardCompany: paymentDocData.paymentMethod.card.company,
+            cardNumber: paymentDocData.paymentMethod.card.number,
+            cardType: paymentDocData.paymentMethod.card.cardType,
+            installmentPlanMonths: paymentDocData.paymentMethod.card.installmentPlanMonths,
+          }),
           updatedAt: FieldValue.serverTimestamp(),
         });
 
@@ -2620,17 +2628,17 @@ export const confirmPaymentFunction = functions
           reservationId: data.reservationId,
         });
 
-        console.log(`✅ 예약 업데이트 완료: ${data.reservationId} (pending_payment → confirmed)`);
+        console.log(`✅ 예약 업데이트 완료: ${data.reservationId} (pending_payment → pending)`);
 
         // Sentry: 예약 상태 변경 로깅
         Sentry.addBreadcrumb({
           category: 'reservation',
-          message: 'Reservation status updated',
+          message: 'Reservation payment completed',
           level: 'info',
           data: {
             reservationId: data.reservationId,
             oldStatus: 'pending_payment',
-            newStatus: 'confirmed',
+            newStatus: 'pending',
             paymentId: paymentRef.id,
           },
         });
@@ -2762,6 +2770,15 @@ export const confirmPaymentFunction = functions
         paymentId: paymentRef.id,
         receiptUrl: tossResponse.receipt?.url || null,
         reservationId,
+        // ⭐ 영수증 표시용 추가 필드
+        approvedAt: tossResponse.approvedAt,
+        method: paymentDocData.method,
+        card: paymentDocData.paymentMethod.card ? {
+          company: paymentDocData.paymentMethod.card.company,
+          number: paymentDocData.paymentMethod.card.number,
+          cardType: paymentDocData.paymentMethod.card.cardType,
+          installmentPlanMonths: paymentDocData.paymentMethod.card.installmentPlanMonths,
+        } : undefined,
       };
 
     } catch (error) {
@@ -3068,16 +3085,17 @@ export const tossWebhook = functions
 
       const reservation = reservationDoc.data();
 
-      // 5️⃣ 이미 confirmed 상태면 중복 방지
-      if (reservation!.status === 'confirmed') {
-        console.log('✅ Already confirmed, skipping:', reservationId);
-        res.status(200).send('Already confirmed');
+      // 5️⃣ 이미 결제 완료 상태면 중복 방지
+      if (reservation!.paymentStatus === 'completed') {
+        console.log('✅ Already paid, skipping:', reservationId);
+        res.status(200).send('Already paid');
         return;
       }
 
-      // 6️⃣ 예약 상태 업데이트: pending_payment → confirmed
+      // 6️⃣ 예약 상태 업데이트: pending_payment → pending
       await reservationRef.update({
-        status: 'confirmed',
+        status: 'pending',
+        paymentStatus: 'completed',
         paymentKey: paymentKey,
         orderId: orderId,
         paidAmount: reservation!.servicePrice || 0,
@@ -3085,7 +3103,7 @@ export const tossWebhook = functions
         updatedAt: FieldValue.serverTimestamp(),
       });
 
-      console.log('✅ Reservation confirmed via Webhook:', {
+      console.log('✅ Reservation payment completed via Webhook:', {
         reservationId,
         orderId,
         paymentKey,
@@ -3094,7 +3112,7 @@ export const tossWebhook = functions
       // 7️⃣ Sentry 로깅
       Sentry.addBreadcrumb({
         category: 'payment',
-        message: 'Reservation confirmed via Toss Webhook',
+        message: 'Reservation payment completed via Toss Webhook',
         level: 'info',
         data: { reservationId, orderId, paymentKey },
       });

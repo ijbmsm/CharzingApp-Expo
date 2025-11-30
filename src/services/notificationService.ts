@@ -8,6 +8,7 @@ import { collection, query, orderBy, limit, getDocs, doc, updateDoc, writeBatch,
 import { store } from '../store';
 import { addNotification, markAsRead, markAllAsRead, setNotifications, removeNotification, InAppNotification } from '../store/slices/notificationSlice';
 import { devLog } from '../utils/devLog';
+import { navigate } from '../navigation/RootNavigator';
 
 // 알림 설정 인터페이스
 export interface NotificationSettings {
@@ -319,23 +320,95 @@ class NotificationService {
     }
   }
 
-  // 알림 탭 시 처리 (필요시 특정 화면으로 네비게이션)
-  private handleNotificationResponse(response: Notifications.NotificationResponse) {
+  // 인앱 알림 클릭 처리 (외부에서 호출 가능) ⭐ Public 메서드
+  async handleInAppNotificationClick(notification: any) {
+    try {
+      devLog.log('📱 인앱 알림 클릭:', notification);
+
+      const { data, category } = notification;
+
+      // 카테고리별 네비게이션 매핑
+      if (category === 'reservation' && data?.reservationId) {
+        // 예약 관련 알림 → 예약 상세 화면으로 이동
+        devLog.log('📍 예약 상세로 이동:', data.reservationId);
+
+        try {
+          const reservation = await firebaseService.getDiagnosisReservation(data.reservationId);
+          if (reservation) {
+            navigate('ReservationDetail', { reservation });
+          } else {
+            devLog.warn('⚠️  예약을 찾을 수 없습니다:', data.reservationId);
+          }
+        } catch (error) {
+          devLog.error('❌ 예약 조회 실패:', error);
+        }
+
+      } else if (category === 'report' && data?.reportId) {
+        // 리포트 관련 알림 → 리포트 상세 화면으로 이동
+        devLog.log('📍 리포트 상세로 이동:', data.reportId);
+        navigate('VehicleDiagnosisReport', { reportId: data.reportId });
+
+      } else if (category === 'announcement' || category === 'marketing') {
+        // 공지사항/마케팅 알림 → 특별한 액션 없음 (알림만 표시)
+        devLog.log('ℹ️  공지사항/마케팅 알림 - 네비게이션 없음');
+
+      } else {
+        devLog.log('ℹ️  알림 데이터에 네비게이션 정보 없음:', { category, data });
+      }
+
+    } catch (error) {
+      devLog.error('❌ 인앱 알림 클릭 처리 실패:', error);
+    }
+  }
+
+  // 알림 탭 시 처리 (특정 화면으로 네비게이션) - 푸시 알림용
+  private async handleNotificationResponse(response: Notifications.NotificationResponse) {
     try {
       const { data } = response.notification.request.content;
-      
-      devLog.log('📱 알림 탭됨:', data);
-      
-      // 여기서 특정 데이터에 따라 네비게이션 처리 가능
-      // 예: 예약 관련 알림이면 예약 상세 화면으로 이동
-      if (data?.reservationId) {
-        // navigation.navigate('ReservationDetail', { id: data.reservationId });
-      } else if (data?.reportId) {
-        // navigation.navigate('ReportDetail', { id: data.reportId });
+
+      devLog.log('📱 푸시 알림 탭됨:', data);
+
+      // 알림 데이터 타입 가드
+      const notificationData = data as {
+        category?: string;
+        reservationId?: string;
+        reportId?: string;
+        status?: string;
+        type?: string;
+      };
+
+      // 카테고리별 네비게이션 매핑
+      if (notificationData?.category === 'reservation' && notificationData?.reservationId) {
+        // 예약 관련 알림 → 예약 상세 화면으로 이동
+        devLog.log('📍 예약 상세로 이동:', notificationData.reservationId);
+
+        // Firestore에서 예약 정보 조회 (ReservationDetail 화면에 필요한 데이터)
+        try {
+          const reservation = await firebaseService.getDiagnosisReservation(notificationData.reservationId);
+          if (reservation) {
+            navigate('ReservationDetail', { reservation });
+          } else {
+            devLog.warn('⚠️  예약을 찾을 수 없습니다:', notificationData.reservationId);
+          }
+        } catch (error) {
+          devLog.error('❌ 예약 조회 실패:', error);
+        }
+
+      } else if (notificationData?.category === 'report' && notificationData?.reportId) {
+        // 리포트 관련 알림 → 리포트 상세 화면으로 이동
+        devLog.log('📍 리포트 상세로 이동:', notificationData.reportId);
+        navigate('VehicleDiagnosisReport', { reportId: notificationData.reportId });
+
+      } else if (data?.category === 'announcement' || data?.category === 'marketing') {
+        // 공지사항/마케팅 알림 → 특별한 액션 없음 (알림만 표시)
+        devLog.log('ℹ️  공지사항/마케팅 알림 - 네비게이션 없음');
+
+      } else {
+        devLog.log('ℹ️  알림 데이터에 네비게이션 정보 없음:', data);
       }
-      
+
     } catch (error) {
-      devLog.error('❌ 알림 응답 처리 실패:', error);
+      devLog.error('❌ 푸시 알림 응답 처리 실패:', error);
     }
   }
 

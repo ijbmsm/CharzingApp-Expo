@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { View, Linking, Easing, TouchableOpacity, Text } from 'react-native';
-import { NavigationContainer } from '@react-navigation/native';
+import { NavigationContainer, createNavigationContainerRef } from '@react-navigation/native';
 import { createStackNavigator, StackScreenProps } from '@react-navigation/stack';
 import { createBottomTabNavigator, BottomTabBarProps } from '@react-navigation/bottom-tabs';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -170,6 +170,9 @@ export type MainTabParamList = {
 const Stack = createStackNavigator<RootStackParamList>();
 const Tab = createBottomTabNavigator<MainTabParamList>();
 
+// ⭐ 알림 클릭 네비게이션을 위한 ref 생성 및 export
+export const navigationRef = createNavigationContainerRef<RootStackParamList>();
+
 // Tab bar icon components - 3개 탭용
 const HomeIcon = ({ color, size }: { color: string; size: number }) => (
   <Ionicons name="home-outline" size={size} color={color} />
@@ -325,7 +328,7 @@ export default function RootNavigator() {
   }
 
   return (
-    <NavigationContainer>
+    <NavigationContainer ref={navigationRef}>
       <Stack.Navigator 
         screenOptions={{ 
           headerShown: false,
@@ -507,4 +510,15 @@ export default function RootNavigator() {
       </Stack.Navigator>
     </NavigationContainer>
   );
+}
+
+// ⭐ 알림 클릭 네비게이션 헬퍼 함수 export
+export function navigate<T extends keyof RootStackParamList>(
+  name: T,
+  params?: RootStackParamList[T]
+) {
+  if (navigationRef.isReady()) {
+    // @ts-ignore - navigationRef의 타입 추론 문제 우회
+    navigationRef.navigate(name, params);
+  }
 }

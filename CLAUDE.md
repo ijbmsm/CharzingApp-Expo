@@ -3365,6 +3365,47 @@ export const cleanupAbandonedReservations = functions
 
 ---
 
+## 🔄 최근 변경사항 (2025년 11월 30일)
+
+### ✅ 결제 시스템 개선
+
+#### 1. 카드사 매핑 수정
+**파일**: `functions/src/constants/card-companies.ts`
+- Toss Payments 공식 문서 기준으로 전면 재작성
+- 주요 수정:
+  - `'24': '수협카드'` → `'토스뱅크'` (수정)
+  - `'34': '수협은행'` (신규 추가)
+  - `'3A': '케이뱅크'` (신규 추가)
+- 출처: https://docs.tosspayments.com/codes/org-codes#카드사-코드
+
+#### 2. 결제 디버깅 로그 추가
+**파일**: `functions/src/utils/payment-mapper.ts`
+- issuerCode → 카드사명 매핑 과정 로깅
+- 향후 매핑 이슈 빠른 디버깅 지원
+```typescript
+console.log('🏦 Card IssuerCode:', issuerCode, '→ Company:', companyName);
+console.log('📇 CardType:', tossResponse.card.cardType);
+console.log('💳 Card Number:', tossResponse.card.number);
+```
+
+#### 3. PaymentSuccessScreen UI 개선
+**파일**: `src/screens/PaymentSuccessScreen.tsx`
+- 결제 영수증 + 예약 정보 섹션 통합
+  - 기존: 별도 2개 카드로 분리
+  - 개선: 단일 카드 내 구분선으로 통합
+- "영수증 보기" 버튼 위치 이동
+  - 기존: 카드 내부
+  - 개선: 화면 하단 (독립 버튼)
+- 예약 정보 타이틀 제거 (깔끔한 UI)
+
+#### 4. ReservationDetailScreen 원상복구
+**파일**: `src/screens/ReservationDetailScreen.tsx`
+- 결제 정보를 별도 섹션으로 유지
+- "결제 정보" 타이틀 표시
+- 사용자 피드백 반영한 UI 복구
+
+---
+
 ## 📞 참고 자료
 
 - **Firebase Console**: https://console.firebase.google.com/project/charzing-d1600
@@ -3389,9 +3430,9 @@ export const cleanupAbandonedReservations = functions
    - adminWeb/ 기반 React 웹
    - 예약 관리, 통계 대시보드
 
-4. **결제 시스템**
-   - 아임포트/토스페이먼츠 연동
-   - 예약 시 결제/환불
+4. **결제 시스템 고도화**
+   - 부분 환불 기능
+   - 결제 수단 다양화
 
 5. **차량 데이터 자동 업데이트**
    - 정기적인 크롤링
@@ -3399,6 +3440,6 @@ export const cleanupAbandonedReservations = functions
 
 ---
 
-**마지막 업데이트**: 2025년 11월 28일
+**마지막 업데이트**: 2025년 11월 30일
 **버전**: 1.1.1
 **작성**: Claude Code 분석 기반

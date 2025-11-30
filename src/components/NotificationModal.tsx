@@ -34,7 +34,7 @@ const NotificationModal: React.FC<NotificationModalProps> = ({
 
   const handleMarkAsRead = async (notificationId: string) => {
     if (!user?.uid) return;
-    
+
     try {
       // Firebase와 Redux 모두 업데이트
       await notificationService.markInAppNotificationAsRead(user.uid, notificationId);
@@ -42,6 +42,26 @@ const NotificationModal: React.FC<NotificationModalProps> = ({
       devLog.error('알림 읽음 처리 실패:', error);
       // 에러 발생 시 Redux만 업데이트
       dispatch(markAsRead(notificationId));
+    }
+  };
+
+  // ⭐ 알림 클릭 처리 (읽음 처리 + 네비게이션)
+  const handleNotificationClick = async (notification: InAppNotification) => {
+    if (!user?.uid) return;
+
+    try {
+      // 1. 읽지 않은 알림이면 읽음 처리
+      if (!notification.isRead) {
+        await notificationService.markInAppNotificationAsRead(user.uid, notification.id);
+      }
+
+      // 2. 네비게이션 처리
+      await notificationService.handleInAppNotificationClick(notification);
+
+      // 3. 모달 닫기 (네비게이션 후)
+      onClose();
+    } catch (error) {
+      devLog.error('알림 클릭 처리 실패:', error);
     }
   };
 
@@ -127,7 +147,7 @@ const NotificationModal: React.FC<NotificationModalProps> = ({
         styles.notificationItem,
         !item.isRead && styles.unreadItem
       ]}
-      onPress={() => !item.isRead && handleMarkAsRead(item.id)}
+      onPress={() => handleNotificationClick(item)}
     >
       <View style={styles.notificationHeader}>
         <View style={styles.categoryContainer}>

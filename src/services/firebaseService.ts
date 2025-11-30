@@ -351,6 +351,13 @@ export interface DiagnosisReservation {
   orderId?: string;             // Toss Payments orderId (CHZ_xxx)
   paidAmount?: number;          // 실제 결제 금액
   paidAt?: Date | FieldValue;   // 결제 완료 시간
+  paymentMethod?: string;       // 결제 수단 (카드, 가상계좌 등)
+
+  // 카드 결제 정보 (2025-11-30 추가)
+  cardCompany?: string;         // 카드사 (예: "신한", "국민")
+  cardNumber?: string;          // 카드번호 마스킹 (예: "1234-****-****-5678")
+  cardType?: string;            // 카드 타입 (신용/체크/기프트)
+  installmentPlanMonths?: number; // 할부 개월 (0이면 일시불)
 }
 
 export interface DiagnosisReportFile {
@@ -1839,12 +1846,75 @@ class FirebaseService {
   }
 
   /**
+   * 단일 진단 예약 조회 (ID로)
+   */
+  async getDiagnosisReservation(reservationId: string): Promise<DiagnosisReservation | null> {
+    try {
+      devLog.log('📱 진단 예약 조회:', reservationId);
+
+      const reservationRef = doc(this.db, 'diagnosisReservations', reservationId);
+      const reservationSnap = await getDoc(reservationRef);
+
+      if (!reservationSnap.exists()) {
+        devLog.warn('⚠️  예약을 찾을 수 없습니다:', reservationId);
+        return null;
+      }
+
+      const data = reservationSnap.data();
+      const reservation: DiagnosisReservation = {
+        id: reservationSnap.id,
+        userId: data.userId,
+        userName: data.userName,
+        userPhone: data.userPhone,
+        vehicleBrand: data.vehicleBrand,
+        vehicleModel: data.vehicleModel,
+        vehicleYear: data.vehicleYear,
+        serviceType: data.serviceType,
+        servicePrice: data.servicePrice,
+        status: data.status,
+        requestedDate: data.requestedDate?.toDate() || new Date(),
+        address: data.address,
+        detailAddress: data.detailAddress,
+        latitude: data.latitude,
+        longitude: data.longitude,
+        notes: data.notes,
+        adminNotes: data.adminNotes,
+        assignedTo: data.assignedTo,
+        assignedToName: data.assignedToName,
+        assignedAt: data.assignedAt?.toDate(),
+        confirmedBy: data.confirmedBy,
+        reportId: data.reportId,
+        paymentStatus: data.paymentStatus,
+        paymentId: data.paymentId,
+        paymentKey: data.paymentKey,
+        orderId: data.orderId,
+        paidAmount: data.paidAmount,
+        paidAt: data.paidAt?.toDate(),
+        paymentMethod: data.paymentMethod,
+        cardCompany: data.cardCompany,
+        cardNumber: data.cardNumber,
+        cardType: data.cardType,
+        installmentPlanMonths: data.installmentPlanMonths,
+        source: data.source,
+        createdAt: data.createdAt?.toDate() || new Date(),
+        updatedAt: data.updatedAt?.toDate() || new Date(),
+      };
+
+      devLog.log('✅ 예약 조회 완료:', reservation.id);
+      return reservation;
+    } catch (error) {
+      devLog.error('❌ 예약 조회 실패:', error);
+      throw error;
+    }
+  }
+
+  /**
    * 진단 예약 상태 업데이트
    */
   async updateDiagnosisReservationStatus(reservationId: string, status: DiagnosisReservation['status'], adminNotes?: string): Promise<void> {
     try {
       devLog.log('진단 예약 상태 업데이트:', reservationId, status);
-      
+
       const reservationRef = doc(this.db, 'diagnosisReservations', reservationId);
       
       const updateData: Partial<DiagnosisReservation> = {
