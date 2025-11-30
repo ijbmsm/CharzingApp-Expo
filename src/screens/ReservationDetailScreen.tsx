@@ -213,7 +213,7 @@ const ReservationDetailScreen: React.FC = () => {
 
   const getStatusText = (status: DiagnosisReservation['status']) => {
     switch (status) {
-      case 'pending_payment': return '💳 결제 필요';  // 🔥 pending_payment 추가
+      case 'pending_payment': return '결제 필요';  // 🔥 이모지 제거
       case 'pending': return '접수완료';
       case 'confirmed': return '예약확정';
       case 'completed': return '완료';
@@ -224,7 +224,7 @@ const ReservationDetailScreen: React.FC = () => {
 
   const getStatusColor = (status: DiagnosisReservation['status']) => {
     switch (status) {
-      case 'pending_payment': return '#F59E0B';  // 🔥 주황색 (결제 필요)
+      case 'pending_payment': return '#6B7280';  // 🔥 회색
       case 'pending': return '#06B6D4';
       case 'confirmed': return '#06B6D4';
       case 'completed': return '#06B6D4';
@@ -851,7 +851,7 @@ const styles = StyleSheet.create({
   },
   // 결제 버튼 스타일
   paymentButton: {
-    backgroundColor: '#6B7280',
+    backgroundColor: '#06B6D4',
     borderRadius: 12,
     paddingVertical: 16,
     paddingHorizontal: 24,
