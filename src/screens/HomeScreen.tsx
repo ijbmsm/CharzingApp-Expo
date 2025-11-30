@@ -944,15 +944,47 @@ export default function HomeScreen() {
   };
 
   // 진단 예약하기 핸들러
-  const handleDiagnosisReservation = () => {
-    executeWithAuth(() => {
-      // Analytics: 예약 시작 추적
-      analyticsService.logReservationStarted("manual").catch((error) => {
-        // 무시
-      });
+  const handleDiagnosisReservation = async () => {
+    executeWithAuth(async () => {
+      try {
+        // 1️⃣ 결제 대기 중인 예약이 있는지 체크
+        const reservations = await firebaseService.getUserDiagnosisReservations(user!.uid);
+        const pendingPaymentReservation = reservations.find(
+          (r) => r.status === 'pending_payment'
+        );
 
-      // 새로운 통합 예약 화면으로 이동
-      navigation.navigate("Reservation");
+        if (pendingPaymentReservation) {
+          // 2️⃣ 결제 대기 예약이 있으면 Alert 표시
+          Alert.alert(
+            '진행 중인 예약이 있습니다',
+            '결제가 필요한 예약이 있습니다. 먼저 결제를 완료해주세요.',
+            [
+              {
+                text: '취소',
+                style: 'cancel',
+              },
+              {
+                text: '내 예약 보기',
+                onPress: () => navigation.navigate('MyReservations'),
+              },
+            ]
+          );
+          return;
+        }
+
+        // 3️⃣ 결제 대기 예약이 없으면 정상적으로 진행
+        // Analytics: 예약 시작 추적
+        analyticsService.logReservationStarted("manual").catch((error) => {
+          // 무시
+        });
+
+        // 새로운 통합 예약 화면으로 이동
+        navigation.navigate("Reservation");
+      } catch (error) {
+        console.error('예약 체크 실패:', error);
+        // 에러 발생 시에도 예약 화면으로 진행
+        navigation.navigate("Reservation");
+      }
     }, "진단 예약");
   };
 

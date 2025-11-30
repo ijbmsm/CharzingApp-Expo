@@ -5,6 +5,7 @@ import {
   StyleSheet,
   ScrollView,
   TouchableOpacity,
+  Alert,
 } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useNavigation } from '@react-navigation/native';
@@ -14,20 +15,54 @@ import { RootState } from '../store';
 import Header from '../components/Header';
 import { RootStackParamList } from '../navigation/RootNavigator';
 import { Ionicons } from '@expo/vector-icons';
+import firebaseService from '../services/firebaseService';
 
 type DiagnosticScreenNavigationProp = StackNavigationProp<RootStackParamList>;
 
 const DiagnosticScreen: React.FC = () => {
   const navigation = useNavigation<DiagnosticScreenNavigationProp>();
-  const { isAuthenticated } = useSelector((state: RootState) => state.auth);
+  const { isAuthenticated, user } = useSelector((state: RootState) => state.auth);
   const insets = useSafeAreaInsets();
 
-  const handleReservation = () => {
+  const handleReservation = async () => {
     if (!isAuthenticated) {
       navigation.navigate('Login', { showBackButton: true });
       return;
     }
-    navigation.navigate('DiagnosisReservation');
+
+    try {
+      // 1️⃣ 결제 대기 중인 예약이 있는지 체크
+      const reservations = await firebaseService.getUserDiagnosisReservations(user!.uid);
+      const pendingPaymentReservation = reservations.find(
+        (r) => r.status === 'pending_payment'
+      );
+
+      if (pendingPaymentReservation) {
+        // 2️⃣ 결제 대기 예약이 있으면 Alert 표시
+        Alert.alert(
+          '진행 중인 예약이 있습니다',
+          '결제가 필요한 예약이 있습니다. 먼저 결제를 완료해주세요.',
+          [
+            {
+              text: '취소',
+              style: 'cancel',
+            },
+            {
+              text: '내 예약 보기',
+              onPress: () => navigation.navigate('MyReservations'),
+            },
+          ]
+        );
+        return;
+      }
+
+      // 3️⃣ 결제 대기 예약이 없으면 정상적으로 진행
+      navigation.navigate('DiagnosisReservation');
+    } catch (error) {
+      console.error('예약 체크 실패:', error);
+      // 에러 발생 시에도 예약 화면으로 진행
+      navigation.navigate('DiagnosisReservation');
+    }
   };
 
   return (

@@ -220,8 +220,8 @@ const MyReservationsScreen: React.FC = () => {
           <Text style={styles.dateText}>{formatDate(item.requestedDate)}</Text>
         </View>
         
-        {/* StepIndicator 추가 (취소된 예약은 제외) */}
-        {currentStep >= 0 && (
+        {/* StepIndicator 추가 (취소된 예약, 결제 대기 예약은 제외) */}
+        {currentStep >= 0 && item.status !== 'pending_payment' && (
           <View style={styles.stepIndicatorContainer}>
             <StepIndicator
               customStyles={customStyles}
@@ -279,6 +279,38 @@ const MyReservationsScreen: React.FC = () => {
     );
   };
 
+  const handleNewReservation = async () => {
+    try {
+      // 1️⃣ 결제 대기 중인 예약이 있는지 체크
+      const userReservations = await firebaseService.getUserDiagnosisReservations(user!.uid);
+      const pendingPaymentReservation = userReservations.find(
+        (r) => r.status === 'pending_payment'
+      );
+
+      if (pendingPaymentReservation) {
+        // 2️⃣ 결제 대기 예약이 있으면 Alert 표시
+        Alert.alert(
+          '진행 중인 예약이 있습니다',
+          '결제가 필요한 예약이 있습니다. 먼저 결제를 완료해주세요.',
+          [
+            {
+              text: '확인',
+              style: 'cancel',
+            },
+          ]
+        );
+        return;
+      }
+
+      // 3️⃣ 결제 대기 예약이 없으면 정상적으로 진행
+      navigation.navigate('DiagnosisReservation');
+    } catch (error) {
+      console.error('예약 체크 실패:', error);
+      // 에러 발생 시에도 예약 화면으로 진행
+      navigation.navigate('DiagnosisReservation');
+    }
+  };
+
   const renderEmptyState = () => (
     <View style={styles.emptyContainer}>
       <Ionicons name="calendar-outline" size={64} color="#06B6D4" />
@@ -288,7 +320,7 @@ const MyReservationsScreen: React.FC = () => {
       </Text>
       <TouchableOpacity
         style={styles.reserveButton}
-        onPress={() => navigation.navigate('DiagnosisReservation')}
+        onPress={handleNewReservation}
       >
         <Text style={styles.reserveButtonText}>진단 예약하기</Text>
       </TouchableOpacity>
