@@ -146,6 +146,15 @@ export interface ConfirmPaymentResponse {
   paymentId: string;
   reservationId?: string;
   receiptUrl: string | null;
+  // ⭐ 영수증 표시용 추가 필드
+  approvedAt?: string; // ISO 날짜 문자열
+  method?: PaymentMethod;
+  card?: {
+    company: string; // 카드사 (예: "신한")
+    number: string; // 카드번호 마스킹 (예: "1234-****-****-5678")
+    cardType: CardType; // 카드 타입 (신용/체크/기프트)
+    installmentPlanMonths: number; // 할부 개월 (0이면 일시불)
+  };
 }
 
 // 결제 취소 요청

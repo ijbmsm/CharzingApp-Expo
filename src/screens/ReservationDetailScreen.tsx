@@ -335,24 +335,20 @@ const ReservationDetailScreen: React.FC = () => {
               <Text style={styles.receiptLabel}>서비스</Text>
               <Text style={styles.receiptValue}>방문진단</Text>
             </View>
-            
             <View style={styles.receiptRow}>
               <Text style={styles.receiptLabel}>방문일시</Text>
               <Text style={styles.receiptValue}>{formatDate(currentReservation.requestedDate)}</Text>
             </View>
-
             {currentReservation.userName && (
               <View style={styles.receiptRow}>
                 <Text style={styles.receiptLabel}>예약자</Text>
                 <Text style={styles.receiptValue}>{currentReservation.userName}</Text>
               </View>
             )}
-            
             <View style={styles.receiptRow}>
               <Text style={styles.receiptLabel}>연락처</Text>
               <Text style={styles.receiptValue}>{currentReservation.userPhone || '-'}</Text>
             </View>
-
             {(currentReservation.vehicleBrand || currentReservation.vehicleModel) && (
               <View style={styles.receiptRow}>
                 <Text style={styles.receiptLabel}>차량</Text>
@@ -362,14 +358,6 @@ const ReservationDetailScreen: React.FC = () => {
                 </Text>
               </View>
             )}
-            
-            <View style={styles.receiptRow}>
-              <Text style={styles.receiptLabel}>주소</Text>
-              <Text style={[styles.receiptValue, styles.addressValue]} numberOfLines={2}>
-                {currentReservation.address}{currentReservation.detailAddress && ` ${currentReservation.detailAddress}`}
-              </Text>
-            </View>
-
             {currentReservation.notes && (
               <View style={styles.receiptRow}>
                 <Text style={styles.receiptLabel}>요청사항</Text>
@@ -378,19 +366,22 @@ const ReservationDetailScreen: React.FC = () => {
                 </Text>
               </View>
             )}
-
             <View style={styles.receiptRow}>
               <Text style={styles.receiptLabel}>신청일</Text>
               <Text style={styles.receiptValue}>{formatDate(currentReservation.createdAt)}</Text>
             </View>
-
             <View style={styles.receiptRow}>
               <Text style={styles.receiptLabel}>서비스 타입</Text>
               <Text style={styles.receiptValue}>
                 {currentReservation.serviceType === 'standard' ? '스탠다드' : '프리미엄'}
               </Text>
             </View>
-
+            <View style={styles.receiptRow}>
+              <Text style={styles.receiptLabel}>주소</Text>
+              <Text style={[styles.receiptValue, styles.addressValue]} numberOfLines={2}>
+                {currentReservation.address}{currentReservation.detailAddress && ` ${currentReservation.detailAddress}`}
+              </Text>
+            </View>
             <View style={[styles.receiptRow, styles.priceRow]}>
               <Text style={[styles.receiptLabel, styles.priceLabel]}>결제금액</Text>
               <Text style={styles.priceValue}>

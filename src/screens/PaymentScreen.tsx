@@ -211,24 +211,9 @@ const PaymentScreen: React.FC = () => {
             </View>
 
             <View style={styles.infoRow}>
-              <Text style={styles.infoLabel}>예약 날짜</Text>
+              <Text style={styles.infoLabel}>방문일시</Text>
               <Text style={styles.infoValue}>
                 {formatReservationDate(reservationData.requestedDate)}
-              </Text>
-            </View>
-
-            <View style={styles.infoRow}>
-              <Text style={styles.infoLabel}>차량</Text>
-              <Text style={styles.infoValue}>
-                {reservationData.vehicleBrand} {reservationData.vehicleModel} {reservationData.vehicleYear && `(${reservationData.vehicleYear})`}
-              </Text>
-            </View>
-
-            <View style={styles.infoRow}>
-              <Text style={styles.infoLabel}>방문 주소</Text>
-              <Text style={[styles.infoValue, styles.addressValue]}>
-                {reservationData.address}
-                {reservationData.detailAddress && `\n${reservationData.detailAddress}`}
               </Text>
             </View>
 
@@ -242,10 +227,24 @@ const PaymentScreen: React.FC = () => {
               <Text style={styles.infoValue}>{reservationData.userPhone}</Text>
             </View>
 
+            <View style={styles.infoRow}>
+              <Text style={styles.infoLabel}>차량</Text>
+              <Text style={styles.infoValue}>
+                {reservationData.vehicleBrand} {reservationData.vehicleModel} {reservationData.vehicleYear && `(${reservationData.vehicleYear}년)`}
+              </Text>
+            </View>
+
+            <View style={styles.infoRow}>
+              <Text style={styles.infoLabel}>주소</Text>
+              <Text style={[styles.infoValue, styles.addressValue]}>
+                {reservationData.address}{reservationData.detailAddress && ` ${reservationData.detailAddress}`}
+              </Text>
+            </View>
+
             <View style={styles.divider} />
 
             <View style={styles.totalRow}>
-              <Text style={styles.totalLabel}>결제 금액</Text>
+              <Text style={styles.totalLabel}>결제금액</Text>
               <Text style={styles.totalAmount}>
                 {amount.toLocaleString()}원
               </Text>
@@ -325,41 +324,49 @@ const styles = StyleSheet.create({
   infoRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    alignItems: 'center',
-    paddingVertical: 8,
+    alignItems: 'flex-start',
+    paddingVertical: 6,
+    minHeight: 24,
   },
   infoLabel: {
-    fontSize: 14,
+    fontSize: 13,
     color: '#6B7280',
+    fontWeight: '500',
+    width: 65,
+    flexShrink: 0,
   },
   infoValue: {
-    fontSize: 14,
-    fontWeight: '500',
-    color: '#202632',
-  },
-  addressValue: {
+    fontSize: 13,
+    color: '#1F2937',
     flex: 1,
     textAlign: 'right',
-    lineHeight: 20,
+    fontWeight: '500',
+  },
+  addressValue: {
+    fontSize: 12,
+    lineHeight: 16,
   },
   divider: {
     height: 1,
     backgroundColor: '#E5E7EB',
-    marginVertical: 12,
+    marginVertical: 16,
   },
   totalRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    paddingTop: 4,
+    borderTopWidth: 1,
+    borderTopColor: '#E5E7EB',
+    paddingTop: 12,
+    marginTop: 8,
   },
   totalLabel: {
-    fontSize: 16,
+    fontSize: 14,
     fontWeight: '600',
-    color: '#202632',
+    color: '#1F2937',
   },
   totalAmount: {
-    fontSize: 24,
+    fontSize: 15,
     fontWeight: '700',
     color: '#06B6D4',
   },

@@ -7,6 +7,7 @@ import {
   TouchableOpacity,
   ActivityIndicator,
   ScrollView,
+  Linking,
 } from 'react-native';
 import { useNavigation, useRoute, RouteProp, CommonActions } from '@react-navigation/native';
 import { StackNavigationProp } from '@react-navigation/stack';
@@ -45,6 +46,7 @@ const PaymentSuccessScreen: React.FC = () => {
   const [isConfirmed, setIsConfirmed] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [reservationId, setReservationId] = useState<string | null>(null);
+  const [paymentResult, setPaymentResult] = useState<ConfirmPaymentResponse | null>(null);
 
   // 결제 확정 처리 (Firebase Function 호출)
   const confirmPayment = useCallback(async () => {
@@ -103,6 +105,7 @@ const PaymentSuccessScreen: React.FC = () => {
       }
 
       setReservationId(result.reservationId || null);
+      setPaymentResult(result);
       setIsConfirmed(true);
     } catch (err) {
       devLog.error('결제 확정 실패:', err);
@@ -151,6 +154,29 @@ const PaymentSuccessScreen: React.FC = () => {
       })
     );
   }, [navigation]);
+
+  // 영수증 보기
+  const handleViewReceipt = useCallback(() => {
+    if (paymentResult?.receiptUrl) {
+      Linking.openURL(paymentResult.receiptUrl).catch((err) => {
+        devLog.error('영수증 열기 실패:', err);
+      });
+    }
+  }, [paymentResult]);
+
+  // 결제 일시 포맷팅
+  const formatApprovedAt = (approvedAt?: string): string => {
+    if (!approvedAt) return new Date().toLocaleString('ko-KR');
+    const date = new Date(approvedAt);
+    return date.toLocaleString('ko-KR', {
+      year: 'numeric',
+      month: 'long',
+      day: 'numeric',
+      weekday: 'short',
+      hour: '2-digit',
+      minute: '2-digit',
+    });
+  };
 
   // 로딩 중
   if (isProcessing) {
@@ -220,9 +246,9 @@ const PaymentSuccessScreen: React.FC = () => {
             담당자가 연락드려 일정을 확정할 예정입니다.
           </Text>
 
-          {/* 결제 정보 카드 */}
+          {/* 결제 영수증 카드 */}
           <View style={styles.card}>
-            <Text style={styles.cardTitle}>결제 정보</Text>
+            <Text style={styles.cardTitle}>결제 영수증</Text>
 
             <View style={styles.amountContainer}>
               <Text style={styles.amountLabel}>결제 금액</Text>
@@ -231,17 +257,59 @@ const PaymentSuccessScreen: React.FC = () => {
 
             <View style={styles.divider} />
 
-            <View style={styles.infoRow}>
-              <Text style={styles.infoLabel}>주문번호</Text>
-              <Text style={styles.infoValue}>{orderId}</Text>
+            <View style={styles.receiptRow}>
+              <Text style={styles.receiptLabel}>결제일시</Text>
+              <Text style={styles.receiptValue}>{formatApprovedAt(paymentResult?.approvedAt)}</Text>
             </View>
 
-            <View style={styles.infoRow}>
-              <Text style={styles.infoLabel}>서비스</Text>
-              <Text style={styles.infoValue}>
+            {paymentResult?.card && (
+              <>
+                <View style={styles.receiptRow}>
+                  <Text style={styles.receiptLabel}>카드사</Text>
+                  <Text style={styles.receiptValue}>{paymentResult.card.company}</Text>
+                </View>
+                <View style={styles.receiptRow}>
+                  <Text style={styles.receiptLabel}>카드번호</Text>
+                  <Text style={styles.receiptValue}>{paymentResult.card.number}</Text>
+                </View>
+                <View style={styles.receiptRow}>
+                  <Text style={styles.receiptLabel}>카드종류</Text>
+                  <Text style={styles.receiptValue}>{paymentResult.card.cardType}</Text>
+                </View>
+                <View style={styles.receiptRow}>
+                  <Text style={styles.receiptLabel}>할부</Text>
+                  <Text style={styles.receiptValue}>
+                    {paymentResult.card.installmentPlanMonths === 0
+                      ? '일시불'
+                      : `${paymentResult.card.installmentPlanMonths}개월`}
+                  </Text>
+                </View>
+              </>
+            )}
+
+            <View style={styles.receiptRow}>
+              <Text style={styles.receiptLabel}>주문번호</Text>
+              <Text style={styles.receiptValue}>{orderId}</Text>
+            </View>
+
+            <View style={styles.receiptRow}>
+              <Text style={styles.receiptLabel}>서비스</Text>
+              <Text style={styles.receiptValue}>
                 {reservationData.serviceType === 'premium' ? '프리미엄 진단' : '스탠다드 진단'}
               </Text>
             </View>
+
+            {/* 영수증 보기 버튼 */}
+            {paymentResult?.receiptUrl && (
+              <TouchableOpacity
+                style={styles.receiptButton}
+                onPress={handleViewReceipt}
+                activeOpacity={0.8}
+              >
+                <Ionicons name="receipt-outline" size={18} color={COLORS.PRIMARY} />
+                <Text style={styles.receiptButtonText}>영수증 보기</Text>
+              </TouchableOpacity>
+            )}
           </View>
 
           {/* 예약 정보 카드 */}
@@ -514,6 +582,45 @@ const styles = StyleSheet.create({
     borderRadius: 12,
     paddingVertical: 16,
     alignItems: 'center',
+  },
+  // 영수증 스타일 (ReservationDetailScreen과 동일)
+  receiptRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'flex-start',
+    paddingVertical: 6,
+    minHeight: 24,
+  },
+  receiptLabel: {
+    fontSize: 13,
+    color: COLORS.TEXT_SECONDARY,
+    fontWeight: '500',
+    width: 65,
+    flexShrink: 0,
+  },
+  receiptValue: {
+    fontSize: 13,
+    color: COLORS.TEXT_PRIMARY,
+    flex: 1,
+    textAlign: 'right',
+    fontWeight: '500',
+  },
+  receiptButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#F0F8FF',
+    borderWidth: 1,
+    borderColor: COLORS.PRIMARY,
+    borderRadius: 8,
+    paddingVertical: 12,
+    marginTop: 16,
+    gap: 8,
+  },
+  receiptButtonText: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: COLORS.PRIMARY,
   },
 });
 
