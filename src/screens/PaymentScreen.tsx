@@ -42,10 +42,28 @@ const PaymentScreen: React.FC = () => {
       : reservationData.requestedDate.toISOString(),
   }), [reservationData]);
 
+  // 서비스 타입 한글 변환
+  const getServiceTypeName = (type: string): string => {
+    if (type === 'standard' || type.includes('스탠다드')) return '스탠다드 진단';
+    if (type === 'premium' || type.includes('프리미엄')) return '프리미엄 진단';
+    return type;
+  };
+
+  // 예약 날짜 포맷팅
+  const formatReservationDate = (dateString: string | Date): string => {
+    const date = typeof dateString === 'string' ? new Date(dateString) : dateString;
+    return date.toLocaleDateString('ko-KR', {
+      year: 'numeric',
+      month: 'long',
+      day: 'numeric',
+      weekday: 'short',
+    });
+  };
+
   // 결제 파라미터 생성
   const paymentParams: PaymentParams = useMemo(() => ({
     orderId,
-    orderName,
+    orderName: getServiceTypeName(orderName),
     amount,
     customerName: reservationData.userName,
     customerEmail: user?.email || undefined,
@@ -189,19 +207,39 @@ const PaymentScreen: React.FC = () => {
 
             <View style={styles.infoRow}>
               <Text style={styles.infoLabel}>서비스</Text>
-              <Text style={styles.infoValue}>{orderName}</Text>
+              <Text style={styles.infoValue}>{getServiceTypeName(orderName)}</Text>
+            </View>
+
+            <View style={styles.infoRow}>
+              <Text style={styles.infoLabel}>예약 날짜</Text>
+              <Text style={styles.infoValue}>
+                {formatReservationDate(reservationData.requestedDate)}
+              </Text>
             </View>
 
             <View style={styles.infoRow}>
               <Text style={styles.infoLabel}>차량</Text>
               <Text style={styles.infoValue}>
-                {reservationData.vehicleBrand} {reservationData.vehicleModel}
+                {reservationData.vehicleBrand} {reservationData.vehicleModel} {reservationData.vehicleYear && `(${reservationData.vehicleYear})`}
+              </Text>
+            </View>
+
+            <View style={styles.infoRow}>
+              <Text style={styles.infoLabel}>방문 주소</Text>
+              <Text style={[styles.infoValue, styles.addressValue]}>
+                {reservationData.address}
+                {reservationData.detailAddress && `\n${reservationData.detailAddress}`}
               </Text>
             </View>
 
             <View style={styles.infoRow}>
               <Text style={styles.infoLabel}>예약자</Text>
               <Text style={styles.infoValue}>{reservationData.userName}</Text>
+            </View>
+
+            <View style={styles.infoRow}>
+              <Text style={styles.infoLabel}>연락처</Text>
+              <Text style={styles.infoValue}>{reservationData.userPhone}</Text>
             </View>
 
             <View style={styles.divider} />
@@ -298,6 +336,11 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontWeight: '500',
     color: '#202632',
+  },
+  addressValue: {
+    flex: 1,
+    textAlign: 'right',
+    lineHeight: 20,
   },
   divider: {
     height: 1,
