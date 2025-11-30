@@ -246,7 +246,7 @@ const ReservationDetailScreen: React.FC = () => {
 
   const formatDate = (date: Date | any) => {
     if (!date) return '';
-    
+
     const dateObj = date instanceof Date ? date : date.toDate ? date.toDate() : new Date(date);
     const year = dateObj.getFullYear();
     const month = dateObj.getMonth() + 1;
@@ -254,8 +254,23 @@ const ReservationDetailScreen: React.FC = () => {
     const weekDay = ['일', '월', '화', '수', '목', '금', '토'][dateObj.getDay()];
     const hours = dateObj.getHours().toString().padStart(2, '0');
     const minutes = dateObj.getMinutes().toString().padStart(2, '0');
-    
+
     return `${year}년 ${month}월 ${day}일 (${weekDay}) ${hours}:${minutes}`;
+  };
+
+  // 결제 일시 포맷팅 (PaymentSuccessScreen과 동일)
+  const formatPaymentDate = (date: Date | any): string => {
+    if (!date) return '';
+
+    const dateObj = date instanceof Date ? date : date.toDate ? date.toDate() : new Date(date);
+    return dateObj.toLocaleString('ko-KR', {
+      year: 'numeric',
+      month: 'long',
+      day: 'numeric',
+      weekday: 'short',
+      hour: '2-digit',
+      minute: '2-digit',
+    });
   };
 
 
@@ -395,6 +410,43 @@ const ReservationDetailScreen: React.FC = () => {
               </Text>
             </View>
         </View>
+
+        {/* 결제 정보 - 결제 완료된 예약에만 표시 */}
+        {currentReservation.paymentStatus === 'completed' && currentReservation.paidAt && (
+          <View style={styles.section}>
+            <Text style={styles.sectionTitle}>결제 정보</Text>
+
+            <View style={styles.receiptRow}>
+              <Text style={styles.receiptLabel}>결제일시</Text>
+              <Text style={styles.receiptValue}>{formatPaymentDate(currentReservation.paidAt)}</Text>
+            </View>
+
+            {currentReservation.cardCompany && (
+              <>
+                <View style={styles.receiptRow}>
+                  <Text style={styles.receiptLabel}>카드사</Text>
+                  <Text style={styles.receiptValue}>{currentReservation.cardCompany}</Text>
+                </View>
+                <View style={styles.receiptRow}>
+                  <Text style={styles.receiptLabel}>카드번호</Text>
+                  <Text style={styles.receiptValue}>{currentReservation.cardNumber}</Text>
+                </View>
+                <View style={styles.receiptRow}>
+                  <Text style={styles.receiptLabel}>카드종류</Text>
+                  <Text style={styles.receiptValue}>{currentReservation.cardType}</Text>
+                </View>
+                <View style={styles.receiptRow}>
+                  <Text style={styles.receiptLabel}>할부</Text>
+                  <Text style={styles.receiptValue}>
+                    {currentReservation.installmentPlanMonths === 0
+                      ? '일시불'
+                      : `${currentReservation.installmentPlanMonths}개월`}
+                  </Text>
+                </View>
+              </>
+            )}
+          </View>
+        )}
 
         {/* 관리자 메모 */}
         {currentReservation.adminNotes && (
@@ -672,6 +724,12 @@ const styles = StyleSheet.create({
     elevation: 5,
     borderWidth: 1,
     borderColor: '#E5E7EB',
+  },
+  cardTitle: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    color: '#1F2937',
+    marginBottom: 8,
   },
   statusHeader: {
     alignItems: 'center',

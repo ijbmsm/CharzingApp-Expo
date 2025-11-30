@@ -299,23 +299,10 @@ const PaymentSuccessScreen: React.FC = () => {
               </Text>
             </View>
 
-            {/* 영수증 보기 버튼 */}
-            {paymentResult?.receiptUrl && (
-              <TouchableOpacity
-                style={styles.receiptButton}
-                onPress={handleViewReceipt}
-                activeOpacity={0.8}
-              >
-                <Ionicons name="receipt-outline" size={18} color={COLORS.PRIMARY} />
-                <Text style={styles.receiptButtonText}>영수증 보기</Text>
-              </TouchableOpacity>
-            )}
-          </View>
+            {/* 구분선 */}
+            <View style={styles.divider} />
 
-          {/* 예약 정보 카드 */}
-          <View style={styles.card}>
-            <Text style={styles.cardTitle}>예약 정보</Text>
-
+            {/* 예약 정보 (타이틀 없이 통합) */}
             <View style={styles.infoRow}>
               <Text style={styles.infoLabel}>차량</Text>
               <Text style={styles.infoValue}>
@@ -346,6 +333,18 @@ const PaymentSuccessScreen: React.FC = () => {
               </Text>
             </View>
           </View>
+
+          {/* 영수증 보기 버튼 - 카드 외부 하단으로 이동 */}
+          {paymentResult?.receiptUrl && (
+            <TouchableOpacity
+              style={styles.bottomReceiptButton}
+              onPress={handleViewReceipt}
+              activeOpacity={0.8}
+            >
+              <Ionicons name="receipt-outline" size={20} color={COLORS.PRIMARY} />
+              <Text style={styles.bottomReceiptButtonText}>영수증 보기</Text>
+            </TouchableOpacity>
+          )}
 
           {/* 안내 문구 */}
           <View style={styles.noticeCard}>
@@ -619,6 +618,24 @@ const styles = StyleSheet.create({
   },
   receiptButtonText: {
     fontSize: 14,
+    fontWeight: '600',
+    color: COLORS.PRIMARY,
+  },
+  bottomReceiptButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: COLORS.WHITE,
+    borderWidth: 1,
+    borderColor: COLORS.PRIMARY,
+    borderRadius: 12,
+    paddingVertical: 16,
+    marginHorizontal: 20,
+    marginTop: 8,
+    gap: 8,
+  },
+  bottomReceiptButtonText: {
+    fontSize: 16,
     fontWeight: '600',
     color: COLORS.PRIMARY,
   },

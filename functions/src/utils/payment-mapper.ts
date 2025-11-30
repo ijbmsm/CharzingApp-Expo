@@ -15,8 +15,16 @@ export function extractPaymentMethodDetails(
   };
 
   if (tossResponse.card) {
+    const issuerCode = tossResponse.card.issuerCode;
+    const companyName = getCardCompanyName(issuerCode);
+
+    // 🔍 디버깅: issuerCode와 매핑 결과 로깅
+    console.log('🏦 Card IssuerCode:', issuerCode, '→ Company:', companyName);
+    console.log('📇 CardType:', tossResponse.card.cardType);
+    console.log('💳 Card Number:', tossResponse.card.number);
+
     details.card = {
-      company: getCardCompanyName(tossResponse.card.issuerCode),
+      company: companyName,
       number: tossResponse.card.number,
       cardType: tossResponse.card.cardType,
       ownerType: tossResponse.card.ownerType,
