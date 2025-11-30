@@ -429,7 +429,6 @@ const ReservationDetailScreen: React.FC = () => {
               onPress={handlePayment}
               activeOpacity={0.8}
             >
-              <Ionicons name="card-outline" size={24} color="#FFFFFF" />
               <Text style={styles.paymentButtonText}>결제하기</Text>
             </TouchableOpacity>
           </View>
@@ -852,25 +851,18 @@ const styles = StyleSheet.create({
   },
   // 결제 버튼 스타일
   paymentButton: {
-    backgroundColor: '#F59E0B',
+    backgroundColor: '#6B7280',
     borderRadius: 12,
     paddingVertical: 16,
     paddingHorizontal: 24,
-    flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
     flex: 1,
-    shadowColor: '#F59E0B',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.3,
-    shadowRadius: 8,
-    elevation: 8,
   },
   paymentButtonText: {
     color: '#FFFFFF',
-    fontSize: 18,
-    fontWeight: 'bold',
-    marginLeft: 8,
+    fontSize: 16,
+    fontWeight: '600',
   },
 });
 
