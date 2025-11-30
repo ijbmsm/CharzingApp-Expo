@@ -939,7 +939,9 @@ export const createDiagnosisReservation = functions
           vehicleModel,
           vehicleYear,
           userName,
-          userPhone
+          userPhone,
+          status,              // 🔥 클라이언트에서 보낸 status 받기
+          paymentStatus,       // 🔥 클라이언트에서 보낸 paymentStatus 받기
         } = req.body;
 
         console.log('📅 진단 예약 생성 요청:', uid);
@@ -986,7 +988,8 @@ export const createDiagnosisReservation = functions
           detailAddress: detailAddress || '',
           latitude: Number(latitude),
           longitude: Number(longitude),
-          status: 'pending',
+          status: status || 'pending',              // 🔥 클라이언트에서 보낸 status 사용
+          paymentStatus: paymentStatus || null,    // 🔥 paymentStatus 추가
           requestedDate: admin.firestore.Timestamp.fromDate(requestedDateTime),
           estimatedDuration: '약 30분',
           serviceType: serviceType || '방문 배터리 진단 및 상담',
