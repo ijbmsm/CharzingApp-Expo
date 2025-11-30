@@ -899,9 +899,9 @@ const ReservationScreen: React.FC = () => {
       {/* 프로그레스 인디케이터 */}
       <View style={styles.progressContainer}>
         <View style={styles.progressHeader}>
-          <TouchableOpacity 
+          <TouchableOpacity
             style={styles.backButton}
-            onPress={currentStep === 1 ? () => navigation.goBack() : handlePrevious}
+            onPress={() => navigation.goBack()}
           >
             <Ionicons name="arrow-back" size={24} color="#1F2937" />
           </TouchableOpacity>
@@ -1539,13 +1539,23 @@ const ReservationScreen: React.FC = () => {
             </Text>
           </TouchableOpacity>
         ) : (
-          <TouchableOpacity
-            style={[styles.confirmButton, isSubmitting && styles.confirmButtonDisabled]}
-            onPress={handleConfirmReservation}
-            disabled={isSubmitting}
-          >
-            <Text style={styles.confirmButtonText}>{editMode ? '수정 완료' : '결제하기'}</Text>
-          </TouchableOpacity>
+          <>
+            <TouchableOpacity
+              style={[styles.confirmButton, isSubmitting && styles.confirmButtonDisabled]}
+              onPress={handleConfirmReservation}
+              disabled={isSubmitting}
+            >
+              <Text style={styles.confirmButtonText}>{editMode ? '수정 완료' : '결제하기'}</Text>
+            </TouchableOpacity>
+
+            {/* 이전 버튼 (텍스트만) */}
+            <TouchableOpacity
+              style={styles.previousTextButton}
+              onPress={handlePrevious}
+            >
+              <Text style={styles.previousTextButtonText}>이전</Text>
+            </TouchableOpacity>
+          </>
         )}
       </View>
       </KeyboardAvoidingView>
@@ -2057,6 +2067,16 @@ const styles = StyleSheet.create({
     color: '#fff',
     fontSize: 16,
     fontWeight: '700',
+  },
+  previousTextButton: {
+    paddingVertical: 12,
+    alignItems: 'center',
+    marginTop: 8,
+  },
+  previousTextButtonText: {
+    color: '#6B7280',
+    fontSize: 15,
+    fontWeight: '500',
   },
   modalOverlay: {
     flex: 1,
