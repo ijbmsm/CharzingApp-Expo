@@ -177,6 +177,40 @@ const ReservationDetailScreen: React.FC = () => {
     );
   };
 
+  const handlePayment = () => {
+    // requestedDate를 Date 객체로 변환
+    const requestedDate = typeof currentReservation.requestedDate === 'string'
+      ? new Date(currentReservation.requestedDate)
+      : currentReservation.requestedDate instanceof Date
+      ? currentReservation.requestedDate
+      : (currentReservation.requestedDate as any)?.toDate?.()
+      ? (currentReservation.requestedDate as any).toDate()
+      : new Date();
+
+    // PaymentScreen으로 이동
+    navigation.navigate('Payment', {
+      reservationId: currentReservation.id,
+      orderId: `CHZ_${currentReservation.id}_${Date.now()}`,
+      orderName: currentReservation.serviceType || '방문 배터리 진단',
+      amount: currentReservation.servicePrice || 100000,
+      reservationData: {
+        vehicleBrand: currentReservation.vehicleBrand || '',
+        vehicleModel: currentReservation.vehicleModel || '',
+        vehicleYear: currentReservation.vehicleYear || '',
+        address: currentReservation.address || '',
+        detailAddress: currentReservation.detailAddress,
+        latitude: currentReservation.latitude,
+        longitude: currentReservation.longitude,
+        requestedDate,
+        timeSlot: '', // 예약 상세에서는 timeSlot 정보가 없음
+        serviceType: (currentReservation.serviceType?.includes('프리미엄') ? 'premium' : 'standard') as 'standard' | 'premium',
+        userName: currentReservation.userName || '',
+        userPhone: currentReservation.userPhone || '',
+        notes: currentReservation.notes,
+      },
+    });
+  };
+
   const getStatusText = (status: DiagnosisReservation['status']) => {
     switch (status) {
       case 'pending_payment': return '💳 결제 필요';  // 🔥 pending_payment 추가
@@ -385,9 +419,28 @@ const ReservationDetailScreen: React.FC = () => {
       </ScrollView>
 
       {/* 하단 액션 버튼 */}
+
+      {/* 결제 필요 상태일 때 결제 버튼 */}
+      {currentReservation.status === 'pending_payment' && (
+        <SafeAreaView style={styles.bottomSafeArea} edges={['bottom']}>
+          <View style={styles.bottomActionBar}>
+            <TouchableOpacity
+              style={styles.paymentButton}
+              onPress={handlePayment}
+              activeOpacity={0.8}
+            >
+              <Ionicons name="card-outline" size={24} color="#FFFFFF" />
+              <Text style={styles.paymentButtonText}>결제하기</Text>
+            </TouchableOpacity>
+          </View>
+        </SafeAreaView>
+      )}
+
+      {/* 정비사 할당 시 진단/담당 취소 버튼 */}
       {currentReservation.assignedTo &&
         currentReservation.status !== 'completed' &&
-        currentReservation.status !== 'cancelled' && (
+        currentReservation.status !== 'cancelled' &&
+        currentReservation.status !== 'pending_payment' && (
           <SafeAreaView style={styles.bottomSafeArea} edges={['bottom']}>
             <View style={styles.bottomActionBar}>
               {/* 좌측: 지금 진단 버튼 */}
@@ -796,6 +849,28 @@ const styles = StyleSheet.create({
   },
   bottomUnassignText: {
     color: '#EF4444',
+  },
+  // 결제 버튼 스타일
+  paymentButton: {
+    backgroundColor: '#F59E0B',
+    borderRadius: 12,
+    paddingVertical: 16,
+    paddingHorizontal: 24,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    flex: 1,
+    shadowColor: '#F59E0B',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
+    elevation: 8,
+  },
+  paymentButtonText: {
+    color: '#FFFFFF',
+    fontSize: 18,
+    fontWeight: 'bold',
+    marginLeft: 8,
   },
 });
 
