@@ -2258,6 +2258,32 @@ export const onReportStatusChange = functions.firestore
        - `vehicleHistoryInfo?: VehicleHistoryInfo`
        - `accidentRepairHistory?: AccidentRepairHistory`
 
+10. **결제 시스템 중복 예약 방지 및 pending_payment UI** ⭐ **신규 (2025-11-30)**
+   - **중복 예약 방지 시스템** (`ReservationScreen.tsx`)
+     - `createdReservationId` state 추가 (예약 ID 재사용)
+     - 사용자가 결제 화면에서 뒤로가기 후 재진입 시 기존 예약 재사용
+     - 로그: "♻️ 기존 예약 재사용" 표시
+     - Firestore 쓰기 비용 절감 + 데이터 일관성 유지
+   - **pending_payment 상태 UI 구현**
+     - `MyReservationsScreen.tsx`:
+       - `getStepFromStatus`: pending_payment → step 0 (예약 중)
+       - `getStatusText`: "💳 결제 필요" 표시
+       - `getStatusColor`: 주황색 (#F59E0B)
+     - `ReservationDetailScreen.tsx`:
+       - `getStatusText`: "💳 결제 필요" 표시
+       - `getStatusColor`: 주황색 (#F59E0B)
+       - `getStatusDescription`: "결제가 필요합니다. 결제를 완료해야 예약이 확정됩니다."
+   - **Firebase Functions 배포 완료** (2025-11-30)
+     - ✅ `confirmPaymentFunction` (us-central1, asia-northeast3)
+     - ✅ `tossWebhook` (us-central1, asia-northeast3) - 신규 생성
+       - Webhook URL (US): `https://us-central1-charzing-d1600.cloudfunctions.net/tossWebhook`
+       - Webhook URL (Asia): `https://asia-northeast3-charzing-d1600.cloudfunctions.net/tossWebhook`
+     - ✅ `cleanupPendingPayments` (us-central1, asia-northeast3)
+   - **테스트 가격 설정**
+     - 스탠다드: 100,000원 → 500원
+     - 프리미엄: 200,000원 → 500원
+     - ⚠️ 배포 시 원래 가격으로 복원 필요
+
 ### 알려진 이슈 🐛
 
 1. **차량 이미지 404 오류** (부분 해결)
