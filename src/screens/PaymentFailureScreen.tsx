@@ -1,4 +1,4 @@
-import React, { useCallback } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import {
   View,
   Text,
@@ -7,12 +7,17 @@ import {
   TouchableOpacity,
   ScrollView,
   Linking,
+  Alert,
 } from 'react-native';
 import { useNavigation, useRoute, RouteProp, CommonActions } from '@react-navigation/native';
 import { StackNavigationProp } from '@react-navigation/stack';
 import { Ionicons } from '@expo/vector-icons';
+import { useSelector } from 'react-redux';
 import { RootStackParamList } from '../navigation/RootNavigator';
+import { RootState } from '../store';
+import firebaseService from '../services/firebaseService';
 import { devLog } from '../utils/devLog';
+import sentryLogger from '../utils/sentryLogger';
 
 // 앱 공통 색상
 const COLORS = {
@@ -88,7 +93,11 @@ type PaymentFailureNavigationProp = StackNavigationProp<RootStackParamList, 'Pay
 const PaymentFailureScreen: React.FC = () => {
   const navigation = useNavigation<PaymentFailureNavigationProp>();
   const route = useRoute<PaymentFailureRouteProp>();
-  const { errorCode, errorMessage, orderId, orderName, amount, reservationData } = route.params;
+  const { reservationId, errorCode, errorMessage, orderId, orderName, amount, reservationData } = route.params;
+
+  const user = useSelector((state: RootState) => state.auth.user);
+  const [isCancelling, setIsCancelling] = useState(false);
+  const [isCancelled, setIsCancelled] = useState(false);
 
   // 에러 메시지 가져오기
   const errorInfo = ERROR_MESSAGES[errorCode] || {
@@ -96,18 +105,104 @@ const PaymentFailureScreen: React.FC = () => {
     description: errorMessage || '결제 처리 중 오류가 발생했습니다.',
   };
 
-  // 다시 결제하기 (이전 정보 유지)
-  const handleRetryPayment = useCallback(() => {
-    if (reservationData) {
-      // 기존 정보를 가지고 Payment 화면으로 다시 이동
+  // ⭐ 결제 실패 시 자동으로 예약 취소 (Two-Phase Commit 롤백)
+  useEffect(() => {
+    const cancelReservation = async () => {
+      if (!reservationId || isCancelling || isCancelled) {
+        return;
+      }
+
+      try {
+        setIsCancelling(true);
+        devLog.log('🔄 결제 실패로 인한 예약 자동 취소:', { reservationId, errorCode });
+
+        // Sentry 로깅 - 예약 취소 시작
+        if (user?.uid) {
+          sentryLogger.log('Auto-cancelling reservation due to payment failure', {
+            reservationId,
+            errorCode,
+            orderId,
+          });
+        }
+
+        // Firestore 예약 상태 업데이트: pending_payment → cancelled
+        await firebaseService.updateDiagnosisReservationStatus(reservationId, 'cancelled');
+
+        devLog.log('✅ 예약 자동 취소 완료:', { reservationId });
+        setIsCancelled(true);
+
+        // Sentry 로깅 - 예약 취소 완료
+        if (user?.uid) {
+          sentryLogger.logReservationCancelled(reservationId, `Payment failed: ${errorCode}`);
+        }
+      } catch (error) {
+        devLog.error('❌ 예약 취소 실패:', error);
+
+        // Sentry 로깅 - 예약 취소 실패
+        if (user?.uid) {
+          sentryLogger.logError('Auto-cancel reservation failed on payment failure', error as Error, {
+            reservationId,
+            errorCode,
+          });
+        }
+      } finally {
+        setIsCancelling(false);
+      }
+    };
+
+    cancelReservation();
+  }, [reservationId, errorCode, orderId, user, isCancelling, isCancelled]);
+
+  // 다시 결제하기 (기존 예약 재사용)
+  const handleRetryPayment = useCallback(async () => {
+    if (!reservationId || !reservationData) {
+      devLog.error('❌ 재시도 불가: reservationId 또는 reservationData 없음');
+      return;
+    }
+
+    try {
+      devLog.log('🔄 결제 재시도 시작:', { reservationId, isCancelled });
+
+      // Sentry 로깅
+      if (user?.uid) {
+        sentryLogger.log('User retrying payment after failure', {
+          previousOrderId: orderId,
+          reservationId,
+        });
+      }
+
+      // 1️⃣ 예약 상태 복구: cancelled → pending_payment
+      await firebaseService.updateDiagnosisReservationStatus(reservationId, 'pending_payment');
+      devLog.log('✅ 예약 상태 복구 완료:', { reservationId, newStatus: 'pending_payment' });
+
+      // 2️⃣ 새 주문번호 생성 (재시도 횟수 추가)
+      const retryOrderId = `${orderId}_retry${Date.now()}`;
+      devLog.log('🆕 새 주문번호 생성:', { retryOrderId });
+
+      // 3️⃣ 바로 결제 화면으로 이동 (기존 reservationId 유지)
       navigation.replace('Payment', {
+        reservationId,  // ⭐ 같은 예약 ID 재사용
         reservationData,
-        orderId,
+        orderId: retryOrderId,
         orderName,
         amount,
       });
+
+      devLog.log('✅ 결제 화면으로 이동 완료');
+    } catch (error) {
+      devLog.error('❌ 결제 재시도 실패:', error);
+
+      // Sentry 로깅
+      if (user?.uid) {
+        sentryLogger.logError('Payment retry failed', error as Error, {
+          reservationId,
+          orderId,
+        });
+      }
+
+      Alert.alert('오류', '결제 재시도 중 문제가 발생했습니다. 잠시 후 다시 시도해주세요.');
     }
-  }, [navigation, reservationData, orderId, orderName, amount]);
+  }, [navigation, reservationData, orderId, orderName, amount, reservationId, isCancelled, user]);
 
   // 고객센터 연결 (카카오톡 채널)
   const handleContactSupport = useCallback(() => {

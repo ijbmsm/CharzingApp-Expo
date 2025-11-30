@@ -37,7 +37,7 @@ type PaymentSuccessNavigationProp = StackNavigationProp<RootStackParamList, 'Pay
 const PaymentSuccessScreen: React.FC = () => {
   const navigation = useNavigation<PaymentSuccessNavigationProp>();
   const route = useRoute<PaymentSuccessRouteProp>();
-  const { paymentKey, orderId, amount, reservationData } = route.params;
+  const { reservationId: routeReservationId, paymentKey, orderId, amount, reservationData } = route.params;
 
   const user = useSelector((state: RootState) => state.auth.user);
 
@@ -61,25 +61,30 @@ const PaymentSuccessScreen: React.FC = () => {
         paymentKey,
         orderId,
         amount,
+        reservationId: routeReservationId, // ⭐ 예약 ID 전달 (앱 플로우: 예약 먼저 생성됨)
         customerInfo: {
           name: reservationData.userName,
           phone: reservationData.userPhone,
           email: user?.email,
         },
-        reservationInfo: {
-          vehicle: {
-            make: reservationData.vehicleBrand,
-            model: reservationData.vehicleModel,
-            year: parseInt(reservationData.vehicleYear, 10) || new Date().getFullYear(),
+        // ⭐ reservationInfo는 웹 플로우용 (하위 호환성)
+        // 앱 플로우에서는 이미 생성된 reservationId만 사용
+        ...(!routeReservationId && {
+          reservationInfo: {
+            vehicle: {
+              make: reservationData.vehicleBrand,
+              model: reservationData.vehicleModel,
+              year: parseInt(reservationData.vehicleYear, 10) || new Date().getFullYear(),
+            },
+            address: reservationData.address,
+            detailAddress: reservationData.detailAddress || '',
+            requestedDate: typeof reservationData.requestedDate === 'string'
+              ? reservationData.requestedDate
+              : reservationData.requestedDate.toISOString(),
+            serviceType: reservationData.serviceType,
+            notes: reservationData.notes,
           },
-          address: reservationData.address,
-          detailAddress: reservationData.detailAddress || '',
-          requestedDate: typeof reservationData.requestedDate === 'string'
-            ? reservationData.requestedDate
-            : reservationData.requestedDate.toISOString(),
-          serviceType: reservationData.serviceType,
-          notes: reservationData.notes,
-        },
+        }),
       };
 
       // Firebase Function 호출 (결제 확정 + 예약 생성)

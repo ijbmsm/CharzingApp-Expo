@@ -327,7 +327,7 @@ export interface DiagnosisReservation {
   vehicleYear: string;          // Required (웹과 동일)
   serviceType: string;          // Required (웹과 동일)
   servicePrice: number;         // Required (웹과 동일)
-  status: 'pending' | 'confirmed' | 'in_progress' | 'pending_review' | 'completed' | 'cancelled';
+  status: 'pending' | 'pending_payment' | 'confirmed' | 'in_progress' | 'pending_review' | 'completed' | 'cancelled';
   requestedDate: Date | FieldValue;
   notes?: string;
   adminNotes?: string;
@@ -344,10 +344,11 @@ export interface DiagnosisReservation {
   // 진단 리포트 연결 (2025-11-20 추가)
   reportId?: string | null;     // 제출된 진단 리포트 ID
 
-  // 결제 정보 (2025-11-25 추가)
-  paymentStatus?: 'pending' | 'paid' | 'failed' | 'refunded';
-  paymentKey?: string;          // 토스페이먼츠 결제 키
-  orderId?: string;             // 주문 ID
+  // 결제 정보 (2025-11-28 업데이트)
+  paymentStatus?: 'pending' | 'completed' | 'failed' | 'refunded';
+  paymentId?: string;           // Firestore payments 문서 ID
+  paymentKey?: string;          // Toss Payments paymentKey
+  orderId?: string;             // Toss Payments orderId (CHZ_xxx)
   paidAmount?: number;          // 실제 결제 금액
   paidAt?: Date | FieldValue;   // 결제 완료 시간
 }

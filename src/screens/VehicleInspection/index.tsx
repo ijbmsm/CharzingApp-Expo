@@ -73,7 +73,7 @@ interface ReservationItem {
   vehicleModel?: string;
   vehicleYear?: string;
   requestedDate: Date | Timestamp;
-  status: 'pending' | 'confirmed' | 'in_progress' | 'pending_review' | 'completed' | 'cancelled'; // ⭐ pending_review 추가
+  status: 'pending' | 'pending_payment' | 'confirmed' | 'in_progress' | 'pending_review' | 'completed' | 'cancelled'; // ⭐ pending_payment 추가
 }
 
 type InspectionMode = 'reservation_list' | 'inspection';

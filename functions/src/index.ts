@@ -2501,37 +2501,29 @@ import { confirmPayment as confirmPaymentAPI, cancelPayment as cancelPaymentAPI 
 import { tossResponseToPaymentDocument, createCancelUpdateData } from './utils/payment-mapper';
 
 function validateConfig(): string {
-  // 환경에 따라 자동으로 키 선택
-  // NODE_ENV가 'production'이면 프로덕션 키, 아니면 테스트 키 사용
-  const isProduction = process.env.NODE_ENV === 'production';
-  const secretKey = isProduction
-    ? process.env.TOSS_SECRET_KEY_PROD
-    : process.env.TOSS_SECRET_KEY_TEST;
+  // 프로덕션 키로 고정
+  const secretKey = process.env.TOSS_SECRET_KEY_PROD;
 
   if (!secretKey) {
-    const envName = isProduction ? 'TOSS_SECRET_KEY_PROD' : 'TOSS_SECRET_KEY_TEST';
     throw new functions.https.HttpsError(
       'failed-precondition',
-      `Toss Secret Key가 설정되지 않았습니다. ` +
-      `functions/.env 파일에 ${envName}를 설정하세요. ` +
-      `현재 환경: ${process.env.NODE_ENV || 'development'}`
+      'Toss Secret Key (TOSS_SECRET_KEY_PROD)가 설정되지 않았습니다.'
     );
   }
 
   // 키 형식 검증 (보안)
-  const expectedPrefix = isProduction ? 'live_' : 'test_';
-  if (!secretKey.startsWith(expectedPrefix)) {
-    console.warn(`⚠️ ${isProduction ? '프로덕션' : '테스트'} 환경인데 ${expectedPrefix} 키가 아닙니다: ${secretKey.substring(0, 10)}...`);
+  if (!secretKey.startsWith('live_')) {
+    console.warn(`⚠️ 프로덕션 키가 live_로 시작하지 않습니다: ${secretKey.substring(0, 10)}...`);
   }
 
-  console.log(`🔑 Toss Secret Key 로드: ${isProduction ? '프로덕션' : '테스트'} 환경 (${secretKey.substring(0, 10)}...)`);
+  console.log(`🔑 Toss Secret Key 로드: 프로덕션 환경 (${secretKey.substring(0, 10)}...)`);
   return secretKey;
 }
 
 export const confirmPaymentFunction = functions
   .region('asia-northeast3', 'us-central1')
   .runWith({
-    secrets: ['TOSS_SECRET_KEY'],
+    secrets: ['NODE_ENV', 'TOSS_SECRET_KEY_PROD', 'TOSS_SECRET_KEY_TEST', 'SENTRY_DSN'],
   })
   .https.onCall(async (data: ConfirmPaymentRequest, context): Promise<ConfirmPaymentResponse> => {
     // Sentry: 결제 확정 시작 추적
@@ -2586,8 +2578,65 @@ export const confirmPaymentFunction = functions
 
       let reservationId = data.reservationId;
 
-      if (data.reservationInfo) {
-        // 🔥 Guest User 로직: 토큰이 없으면 Guest UID 생성
+      // ⭐ Two-Phase Commit: 앱 플로우 - 예약 먼저 생성됨
+      if (data.reservationId) {
+        console.log(`🔄 기존 예약 업데이트: ${data.reservationId}`);
+
+        // diagnosisReservations 컬렉션에서 예약 조회
+        const reservationRef = db.collection('diagnosisReservations').doc(data.reservationId);
+        const reservationDoc = await reservationRef.get();
+
+        if (!reservationDoc.exists) {
+          throw new functions.https.HttpsError(
+            'not-found',
+            `예약을 찾을 수 없습니다: ${data.reservationId}`
+          );
+        }
+
+        const reservationData = reservationDoc.data();
+
+        // 예약 상태 검증
+        if (reservationData?.status !== 'pending_payment') {
+          console.warn(`⚠️ 예약 상태가 pending_payment가 아닙니다: ${reservationData?.status}`);
+        }
+
+        // ⭐ 예약 상태 업데이트: pending_payment → confirmed
+        await reservationRef.update({
+          status: 'confirmed', // ⭐ 결제 완료로 예약 확정
+          paymentStatus: 'completed', // ⭐ pending → completed
+          paymentId: paymentRef.id,
+          paymentKey: data.paymentKey, // Toss paymentKey 저장
+          orderId: data.orderId, // Toss orderId 저장
+          paidAmount: tossResponse.totalAmount,
+          paidAt: FieldValue.serverTimestamp(),
+          updatedAt: FieldValue.serverTimestamp(),
+        });
+
+        // payment 문서에 reservationId 연결
+        await paymentRef.update({
+          reservationId: data.reservationId,
+        });
+
+        console.log(`✅ 예약 업데이트 완료: ${data.reservationId} (pending_payment → confirmed)`);
+
+        // Sentry: 예약 상태 변경 로깅
+        Sentry.addBreadcrumb({
+          category: 'reservation',
+          message: 'Reservation status updated',
+          level: 'info',
+          data: {
+            reservationId: data.reservationId,
+            oldStatus: 'pending_payment',
+            newStatus: 'confirmed',
+            paymentId: paymentRef.id,
+          },
+        });
+      }
+      // 🔥 웹 플로우 (하위 호환성): reservationInfo로 새 예약 생성
+      else if (data.reservationInfo) {
+        console.log('🌐 웹 플로우: 새 예약 생성 (Guest User 지원)');
+
+        // Guest User 로직: 토큰이 없으면 Guest UID 생성
         let userId: string;
 
         if (context.auth?.uid) {
@@ -2662,10 +2711,11 @@ export const confirmPaymentFunction = functions
 
           // 결제 정보
           paymentId: paymentRef.id,
-          paymentStatus: 'paid',
-          paymentMethod: tossResponse.method,
-          paymentAmount: tossResponse.totalAmount,
-          paymentCompletedAt: FieldValue.serverTimestamp(),
+          paymentStatus: 'completed', // ⭐ 'paid' → 'completed'로 통일
+          paymentKey: data.paymentKey,
+          orderId: data.orderId,
+          paidAmount: tossResponse.totalAmount,
+          paidAt: FieldValue.serverTimestamp(),
 
           // 사용자 및 소스
           userId: userId, // 🔥 Guest UID 또는 인증된 UID
@@ -2682,29 +2732,12 @@ export const confirmPaymentFunction = functions
           reservationId: reservationRef.id,
         });
 
-        console.log(`예약 생성 완료: ${reservationRef.id}`);
-      } else if (data.reservationId) {
-        // 두 컬렉션 모두 확인 (reservations: 앱 예약, diagnosisReservations: 웹 예약)
-        let reservationRef = db.collection('reservations').doc(data.reservationId);
-        let reservationDoc = await reservationRef.get();
-
-        if (!reservationDoc.exists) {
-          // reservations에 없으면 diagnosisReservations 확인
-          reservationRef = db.collection('diagnosisReservations').doc(data.reservationId);
-          reservationDoc = await reservationRef.get();
-        }
-
-        if (!reservationDoc.exists) {
-          console.warn(`예약 문서를 찾을 수 없습니다: ${data.reservationId}`);
-        } else {
-          await reservationRef.update({
-            paymentId: paymentRef.id,
-            paymentStatus: 'paid',
-            paymentMethod: tossResponse.method,
-            paymentCompletedAt: FieldValue.serverTimestamp(),
-            updatedAt: FieldValue.serverTimestamp(),
-          });
-        }
+        console.log(`✅ 예약 생성 완료 (웹 플로우): ${reservationRef.id}`);
+      } else {
+        throw new functions.https.HttpsError(
+          'invalid-argument',
+          'reservationId 또는 reservationInfo가 필요합니다.'
+        );
       }
 
       // Sentry: 결제 확정 성공
@@ -2758,7 +2791,7 @@ export const confirmPaymentFunction = functions
 export const cancelPaymentFunction = functions
   .region('asia-northeast3', 'us-central1')
   .runWith({
-    secrets: ['TOSS_SECRET_KEY'],
+    secrets: ['NODE_ENV', 'TOSS_SECRET_KEY_PROD', 'TOSS_SECRET_KEY_TEST', 'SENTRY_DSN'],
   })
   .https.onCall(async (data: CancelPaymentRequest, context): Promise<CancelPaymentResponse> => {
     // Sentry: 결제 취소 시작 추적
@@ -2944,5 +2977,300 @@ export const cancelPaymentFunction = functions
         '결제 취소 중 오류가 발생했습니다.',
         error instanceof Error ? { message: error.message } : undefined
       );
+    }
+  });
+
+/**
+ * Toss Payments Webhook (Step 3: 2차 백업)
+ *
+ * @description
+ * Toss가 결제 상태 변경 시 자동으로 호출
+ * confirmPaymentFunction 실패 시 자동 백업
+ * Toss가 최대 24시간 재시도
+ *
+ * @endpoint POST /tossWebhook
+ * @region us-central1, asia-northeast3
+ *
+ * @example Toss가 보내는 요청
+ * {
+ *   "eventType": "PAYMENT_STATUS_CHANGED",
+ *   "createdAt": "2025-11-28T12:34:56.789Z",
+ *   "data": {
+ *     "orderId": "CHZ_abc123",
+ *     "status": "DONE",
+ *     "paymentKey": "tgen_xxxx",
+ *     "approvedAt": "2025-11-28T12:34:56.789Z"
+ *   }
+ * }
+ */
+export const tossWebhook = functions
+  .region('us-central1', 'asia-northeast3')
+  .runWith({
+    memory: '512MB',
+    timeoutSeconds: 60,
+  })
+  .https.onRequest(async (req, res) => {
+    try {
+      // 1️⃣ 보안: POST 메서드만 허용
+      if (req.method !== 'POST') {
+        res.status(405).send('Method Not Allowed');
+        return;
+      }
+
+      console.log('📥 Toss Webhook received:', {
+        ip: req.headers['x-forwarded-for'] || req.connection.remoteAddress,
+        body: req.body,
+      });
+
+      // 2️⃣ Payload 파싱
+      const { eventType, data } = req.body;
+
+      // PAYMENT_STATUS_CHANGED 이벤트만 처리
+      if (eventType !== 'PAYMENT_STATUS_CHANGED') {
+        console.log('⏭️  Ignoring eventType:', eventType);
+        res.status(200).send('OK');
+        return;
+      }
+
+      const { orderId, status, paymentKey } = data;
+
+      // status가 DONE이 아니면 무시
+      if (status !== 'DONE') {
+        console.log('⏭️  Payment not DONE:', { orderId, status });
+        res.status(200).send('OK');
+        return;
+      }
+
+      // 3️⃣ orderId에서 reservationId 추출
+      // 형식: CHZ_{reservationId} 또는 CHZ_{reservationId}_retry{timestamp}
+      const reservationId = orderId.replace(/^CHZ_/, '').split('_')[0];
+      console.log('🔍 Extracted reservationId:', { orderId, reservationId });
+
+      // 4️⃣ 예약 문서 조회
+      const reservationRef = db.collection('diagnosisReservations').doc(reservationId);
+      const reservationDoc = await reservationRef.get();
+
+      if (!reservationDoc.exists) {
+        console.error('❌ Reservation not found:', reservationId);
+
+        // Sentry 로깅
+        Sentry.captureMessage('Toss Webhook: Reservation not found', {
+          level: 'error',
+          tags: { orderId, reservationId },
+        });
+
+        res.status(404).send('Reservation not found');
+        return;
+      }
+
+      const reservation = reservationDoc.data();
+
+      // 5️⃣ 이미 confirmed 상태면 중복 방지
+      if (reservation!.status === 'confirmed') {
+        console.log('✅ Already confirmed, skipping:', reservationId);
+        res.status(200).send('Already confirmed');
+        return;
+      }
+
+      // 6️⃣ 예약 상태 업데이트: pending_payment → confirmed
+      await reservationRef.update({
+        status: 'confirmed',
+        paymentKey: paymentKey,
+        orderId: orderId,
+        paidAmount: reservation!.servicePrice || 0,
+        paidAt: FieldValue.serverTimestamp(),
+        updatedAt: FieldValue.serverTimestamp(),
+      });
+
+      console.log('✅ Reservation confirmed via Webhook:', {
+        reservationId,
+        orderId,
+        paymentKey,
+      });
+
+      // 7️⃣ Sentry 로깅
+      Sentry.addBreadcrumb({
+        category: 'payment',
+        message: 'Reservation confirmed via Toss Webhook',
+        level: 'info',
+        data: { reservationId, orderId, paymentKey },
+      });
+
+      // 8️⃣ 성공 응답
+      res.status(200).send('OK');
+    } catch (error) {
+      console.error('❌ Webhook error:', error);
+
+      // Sentry 에러 캡처
+      Sentry.captureException(error, {
+        tags: {
+          source: 'tossWebhook',
+        },
+      });
+
+      res.status(500).send('Internal Server Error');
+    }
+  });
+
+/**
+ * TTL Cleanup - pending_payment 예약 24시간 후 자동 삭제 (Step 4)
+ *
+ * @description
+ * 매일 자동 실행되어 24시간 지난 미결제 예약을 정리
+ * - pending_payment 상태가 24시간 넘으면 cancelled로 변경
+ * - DB 오염 방지 및 시간대 재사용 가능
+ *
+ * @trigger Cloud Scheduler (Pub/Sub)
+ * @schedule 매일 새벽 3시 (KST) - "0 18 * * *" (UTC)
+ * @region us-central1, asia-northeast3
+ *
+ * @example Cloud Scheduler 설정
+ * Topic: cleanup-pending-payments
+ * Schedule: 0 18 * * * (UTC = 새벽 3시 KST)
+ * Timezone: UTC
+ */
+export const cleanupPendingPayments = functions
+  .region('us-central1', 'asia-northeast3')
+  .runWith({
+    memory: '512MB',
+    timeoutSeconds: 540, // 9분 (최대 시간)
+  })
+  .pubsub.topic('cleanup-pending-payments')
+  .onPublish(async (message) => {
+    const startTime = Date.now();
+    console.log('🧹 Starting TTL Cleanup for pending_payment reservations...');
+
+    try {
+      // 1️⃣ 24시간 전 타임스탬프 계산
+      const twentyFourHoursAgo = admin.firestore.Timestamp.fromMillis(
+        Date.now() - 24 * 60 * 60 * 1000
+      );
+
+      console.log('⏰ Cutoff time:', twentyFourHoursAgo.toDate().toISOString());
+
+      // 2️⃣ pending_payment 상태이면서 24시간 지난 예약 찾기
+      const expiredReservationsSnapshot = await db
+        .collection('diagnosisReservations')
+        .where('status', '==', 'pending_payment')
+        .where('createdAt', '<', twentyFourHoursAgo)
+        .get();
+
+      if (expiredReservationsSnapshot.empty) {
+        console.log('✅ No expired reservations found');
+
+        // Sentry 로깅
+        Sentry.addBreadcrumb({
+          category: 'cleanup',
+          message: 'TTL Cleanup completed - no expired reservations',
+          level: 'info',
+        });
+
+        return;
+      }
+
+      const expiredCount = expiredReservationsSnapshot.size;
+      console.log(`🔍 Found ${expiredCount} expired reservations`);
+
+      // 3️⃣ Batch로 상태 업데이트 (삭제 대신 cancelled로 변경)
+      const batch = db.batch();
+      const reservationIds: string[] = [];
+      const paidReservationIds: string[] = []; // 결제 완료됐는데 pending인 예약
+
+      expiredReservationsSnapshot.docs.forEach((doc) => {
+        const reservation = doc.data();
+
+        // ⚠️ paymentKey가 있으면 실제 결제 완료 → 취소하면 안됨!
+        if (reservation.paymentKey) {
+          paidReservationIds.push(doc.id);
+
+          console.warn('⚠️ Skipping paid reservation (manual review required):', {
+            id: doc.id,
+            paymentKey: reservation.paymentKey?.slice(0, 20) + '...',
+            userId: reservation.userId,
+            createdAt: reservation.createdAt?.toDate().toISOString(),
+          });
+
+          return; // 건너뛰기 - 관리자가 수동으로 확인해야 함
+        }
+
+        // paymentKey 없는 예약만 취소
+        reservationIds.push(doc.id);
+
+        console.log('🗑️  Cancelling unpaid reservation:', {
+          id: doc.id,
+          userId: reservation.userId,
+          createdAt: reservation.createdAt?.toDate().toISOString(),
+          requestedDate: reservation.requestedDate?.toDate().toISOString(),
+        });
+
+        batch.update(doc.ref, {
+          status: 'cancelled',
+          cancelledAt: FieldValue.serverTimestamp(),
+          cancelReason: 'TTL_EXPIRED_24H',
+          updatedAt: FieldValue.serverTimestamp(),
+        });
+      });
+
+      // 4️⃣ Batch 커밋 (paymentKey 없는 예약만)
+      if (reservationIds.length > 0) {
+        await batch.commit();
+      }
+
+      const duration = Date.now() - startTime;
+      console.log(`✅ TTL Cleanup completed: ${reservationIds.length} cancelled, ${paidReservationIds.length} skipped (paid) in ${duration}ms`);
+
+      // 5️⃣ Sentry 로깅
+      Sentry.addBreadcrumb({
+        category: 'cleanup',
+        message: `TTL Cleanup: ${reservationIds.length} cancelled, ${paidReservationIds.length} skipped`,
+        level: 'info',
+        data: {
+          cancelledCount: reservationIds.length,
+          skippedCount: paidReservationIds.length,
+          durationMs: duration,
+          cancelledIds: reservationIds.slice(0, 10),
+          skippedIds: paidReservationIds.slice(0, 10),
+        },
+      });
+
+      // 6️⃣ 결제 완료된 예약이 pending_payment로 남아있으면 경고 (Critical!)
+      if (paidReservationIds.length > 0) {
+        Sentry.captureMessage('TTL Cleanup: Paid reservations stuck in pending_payment', {
+          level: 'error', // Critical 상황 - 즉시 확인 필요
+          tags: {
+            count: paidReservationIds.length.toString(),
+            source: 'TTL_Cleanup',
+          },
+          extra: {
+            reservationIds: paidReservationIds,
+            message: 'These reservations have paymentKey but status is still pending_payment. Webhook and confirmPaymentFunction both failed. MANUAL REVIEW REQUIRED!',
+            action: 'Admin should manually change status to confirmed in charzing-admin',
+          },
+        });
+      }
+
+      // 7️⃣ 많은 예약이 정리된 경우 경고 (비정상적 상황)
+      if (reservationIds.length > 50) {
+        Sentry.captureMessage('TTL Cleanup: High number of expired reservations', {
+          level: 'warning',
+          tags: {
+            count: reservationIds.length.toString(),
+          },
+          extra: {
+            reservationIds: reservationIds.slice(0, 20),
+          },
+        });
+      }
+    } catch (error) {
+      console.error('❌ TTL Cleanup error:', error);
+
+      // Sentry 에러 캡처
+      Sentry.captureException(error, {
+        tags: {
+          source: 'cleanupPendingPayments',
+        },
+      });
+
+      throw error; // Cloud Scheduler 재시도를 위해 throw
     }
   });

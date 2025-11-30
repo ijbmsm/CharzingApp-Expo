@@ -779,10 +779,10 @@ const ReservationScreen: React.FC = () => {
           ]
         );
       } else {
-        // 생성 모드: 결제 화면으로 이동
+        // 생성 모드: 예약 먼저 생성 → 결제 화면으로 이동
         const reservationData = {
           userName: contactData.userName,
-          userPhone: contactData.userPhone,
+          userPhone: contactData.userPhone.replace(/[^0-9]/g, ''),
           address: addressData.address,
           detailAddress: addressData.detailAddress || '',
           latitude: addressData.latitude,
@@ -797,18 +797,46 @@ const ReservationScreen: React.FC = () => {
           source: 'app' as const,
         };
 
-        // 주문 ID 생성 (고유값)
-        const orderId = `CHZ_${Date.now()}_${Math.random().toString(36).substring(2, 8)}`;
+        // 1️⃣ Firestore에 예약 먼저 생성 (status: 'pending_payment')
+        const newReservationId = await firebaseService.createDiagnosisReservation({
+          ...reservationData,
+          userId: user?.uid,
+          status: 'pending_payment',
+          paymentStatus: 'pending',
+        });
+
+        devLog.log('✅ 예약 생성 완료 (pending_payment):', {
+          reservationId: newReservationId,
+          status: 'pending_payment',
+        });
+
+        // 2️⃣ 생성된 예약 ID를 주문번호로 사용
+        const orderId = `CHZ_${newReservationId}`;
         const orderName = `${vehicleData.vehicleBrand} ${vehicleData.vehicleModel} 배터리 진단`;
 
-        devLog.log('🚀 결제 화면으로 이동:', { orderId, amount: serviceData.servicePrice });
+        // Analytics
+        await analyticsService.logCustomEvent('reservation_created_pending', {
+          reservation_id: newReservationId,
+          vehicle_brand: vehicleData.vehicleBrand,
+          vehicle_model: vehicleData.vehicleModel,
+          service_type: serviceData.serviceType,
+          service_price: serviceData.servicePrice,
+          source: 'app',
+        });
+
+        devLog.log('🚀 결제 화면으로 이동:', {
+          reservationId: newReservationId,
+          orderId,
+          amount: serviceData.servicePrice
+        });
 
         // 로딩 상태 해제 후 결제 화면으로 이동
         hideLoading();
         setIsSubmitting(false);
 
-        // 결제 화면으로 이동 (Date 직렬화)
+        // 3️⃣ 결제 화면으로 이동 (예약 ID 포함)
         navigation.navigate('Payment', {
+          reservationId: newReservationId,  // ← 예약 ID 추가
           reservationData: {
             ...reservationData,
             requestedDate: reservationData.requestedDate instanceof Date

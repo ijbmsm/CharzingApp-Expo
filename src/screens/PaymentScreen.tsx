@@ -28,7 +28,7 @@ const FAIL_URL = 'https://charzing.co.kr/payment/fail';
 const PaymentScreen: React.FC = () => {
   const navigation = useNavigation<PaymentScreenNavigationProp>();
   const route = useRoute<PaymentScreenRouteProp>();
-  const { reservationData, orderId, orderName, amount } = route.params;
+  const { reservationId, reservationData, orderId, orderName, amount } = route.params;
 
   const user = useSelector((state: RootState) => state.auth.user);
 
@@ -60,7 +60,7 @@ const PaymentScreen: React.FC = () => {
     completedOrderId: string,
     paidAmount: number
   ) => {
-    devLog.log('결제 성공, PaymentSuccess 화면으로 이동:', { paymentKey, completedOrderId, paidAmount });
+    devLog.log('결제 성공, PaymentSuccess 화면으로 이동:', { paymentKey, completedOrderId, paidAmount, reservationId });
 
     // Sentry 로깅
     if (user?.uid) {
@@ -69,12 +69,13 @@ const PaymentScreen: React.FC = () => {
 
     // PaymentSuccessScreen에서 Firebase Function 호출 및 예약 처리
     navigation.replace('PaymentSuccess', {
+      reservationId, // ⭐ 예약 ID 전달 (앱 플로우: 예약 먼저 생성됨)
       paymentKey,
       orderId: completedOrderId,
       amount: paidAmount,
       reservationData: serializedReservationData,
     });
-  }, [serializedReservationData, navigation, user]);
+  }, [reservationId, serializedReservationData, navigation, user]);
 
   // 결제 실패 처리 - PaymentFailureScreen으로 이동
   const handlePaymentFail = useCallback((
@@ -83,7 +84,7 @@ const PaymentScreen: React.FC = () => {
     failedOrderId: string,
     errorDetail?: string
   ) => {
-    devLog.error('결제 실패, PaymentFailure 화면으로 이동:', { errorCode, errorMessage, failedOrderId, errorDetail });
+    devLog.error('결제 실패, PaymentFailure 화면으로 이동:', { errorCode, errorMessage, failedOrderId, errorDetail, reservationId });
 
     // Sentry 로깅
     if (user?.uid) {
@@ -92,6 +93,7 @@ const PaymentScreen: React.FC = () => {
 
     // PaymentFailureScreen으로 이동
     navigation.replace('PaymentFailure', {
+      reservationId, // ⭐ 예약 ID 전달 (취소용)
       errorCode,
       errorMessage,
       orderId: failedOrderId,
@@ -99,7 +101,7 @@ const PaymentScreen: React.FC = () => {
       amount,
       reservationData: serializedReservationData,
     });
-  }, [serializedReservationData, navigation, orderName, amount, user]);
+  }, [reservationId, serializedReservationData, navigation, orderName, amount, user]);
 
   // 결제창 닫기
   const handlePaymentClose = useCallback(() => {

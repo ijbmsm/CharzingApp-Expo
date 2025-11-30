@@ -123,12 +123,13 @@ export type RootStackParamList = {
       vehicleModel?: string;
       vehicleYear?: string;
       requestedDate: Date | Timestamp | string | FieldValue;
-      status: 'pending' | 'confirmed' | 'in_progress' | 'pending_review' | 'completed' | 'cancelled'; // ⭐ pending_review 추가
+      status: 'pending' | 'pending_payment' | 'confirmed' | 'in_progress' | 'pending_review' | 'completed' | 'cancelled'; // ⭐ pending_payment 추가
     };
   } | undefined;
   AdminReservationList: undefined;
   // 결제 화면
   Payment: {
+    reservationId?: string; // ⭐ 예약 ID (앱 플로우: 예약 먼저 생성)
     reservationData: Omit<ReservationData, 'requestedDate'> & {
       requestedDate: string | Date;
     };
@@ -138,6 +139,7 @@ export type RootStackParamList = {
   };
   // 결제 성공 화면
   PaymentSuccess: {
+    reservationId?: string; // ⭐ 예약 ID (confirmPaymentFunction에 전달)
     paymentKey: string;
     orderId: string;
     amount: number;
@@ -147,6 +149,7 @@ export type RootStackParamList = {
   };
   // 결제 실패 화면
   PaymentFailure: {
+    reservationId?: string; // ⭐ 예약 ID (취소용)
     errorCode: string;
     errorMessage: string;
     orderId: string;
