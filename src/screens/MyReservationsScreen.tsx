@@ -86,9 +86,11 @@ const MyReservationsScreen: React.FC = () => {
     navigation.navigate('ReservationDetail', { reservation: serializableReservation });
   };
 
-  // 상태에 따른 단계 매핑 (HomeScreen과 동일)
+  // 상태에 따른 단계 매핑
   const getStepFromStatus = (status: DiagnosisReservation['status']): number => {
     switch (status) {
+      case 'pending_payment':
+        return 0; // 🔥 결제 대기 (예약 중)
       case 'pending':
         return 0; // 접수완료
       case 'confirmed':
@@ -144,6 +146,7 @@ const MyReservationsScreen: React.FC = () => {
 
   const getStatusText = (status: DiagnosisReservation['status']) => {
     switch (status) {
+      case 'pending_payment': return '💳 결제 필요';  // 🔥 pending_payment 추가
       case 'pending': return '접수완료';
       case 'confirmed': return '예약확정';
       case 'completed': return '완료';
@@ -154,6 +157,7 @@ const MyReservationsScreen: React.FC = () => {
 
   const getStatusColor = (status: DiagnosisReservation['status']) => {
     switch (status) {
+      case 'pending_payment': return '#F59E0B';  // 🔥 주황색 (결제 필요)
       case 'pending': return '#06B6D4';
       case 'confirmed': return '#06B6D4';
       case 'completed': return '#06B6D4';
@@ -215,7 +219,7 @@ const MyReservationsScreen: React.FC = () => {
           </View>
           
           <View style={styles.receiptRow}>
-            <Text style={styles.receiptLabel}>예약자</Text>
+            <Text style={styles.receiptLabel}>예약자ㅇ</Text>
             <Text style={styles.receiptValue}>{item.userName || '-'}</Text>
           </View>
           

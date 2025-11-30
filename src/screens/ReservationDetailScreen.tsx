@@ -179,6 +179,7 @@ const ReservationDetailScreen: React.FC = () => {
 
   const getStatusText = (status: DiagnosisReservation['status']) => {
     switch (status) {
+      case 'pending_payment': return '💳 결제 필요';  // 🔥 pending_payment 추가
       case 'pending': return '접수완료';
       case 'confirmed': return '예약확정';
       case 'completed': return '완료';
@@ -189,6 +190,7 @@ const ReservationDetailScreen: React.FC = () => {
 
   const getStatusColor = (status: DiagnosisReservation['status']) => {
     switch (status) {
+      case 'pending_payment': return '#F59E0B';  // 🔥 주황색 (결제 필요)
       case 'pending': return '#06B6D4';
       case 'confirmed': return '#06B6D4';
       case 'completed': return '#06B6D4';
@@ -199,6 +201,7 @@ const ReservationDetailScreen: React.FC = () => {
 
   const getStatusDescription = (status: DiagnosisReservation['status']) => {
     switch (status) {
+      case 'pending_payment': return '결제가 필요합니다. 결제를 완료해야 예약이 확정됩니다.';  // 🔥 pending_payment 추가
       case 'pending': return '예약 요청이 접수되었습니다. 곧 연락드리겠습니다.';
       case 'confirmed': return '예약이 확정되었습니다. 예정된 시간에 방문해드립니다.';
       case 'completed': return '진단이 완료되었습니다.';

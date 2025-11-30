@@ -185,6 +185,10 @@ const ReservationScreen: React.FC = () => {
   // 5단계: 서비스 타입 선택
   const [serviceType, setServiceType] = useState<'standard' | 'premium' | null>(null);
   const [servicePrice, setServicePrice] = useState<number>(0);
+
+  // 🔥 예약 ID 상태 (중복 생성 방지)
+  const [createdReservationId, setCreatedReservationId] = useState<string | null>(null);
+
   // moti 애니메이션을 위한 step 상태로 제어
 
   // 초기 설정 (한 번만 실행)
@@ -797,37 +801,54 @@ const ReservationScreen: React.FC = () => {
           source: 'app' as const,
         };
 
-        // 1️⃣ Firestore에 예약 먼저 생성 (status: 'pending_payment')
-        const newReservationId = await firebaseService.createDiagnosisReservation({
-          ...reservationData,
-          userId: user?.uid,
-          status: 'pending_payment',
-          paymentStatus: 'pending',
-        });
+        // 🔥 1️⃣ 예약 ID 재사용 로직 (중복 생성 방지!)
+        let reservationId = createdReservationId;
 
-        devLog.log('✅ 예약 생성 완료 (pending_payment):', {
-          reservationId: newReservationId,
-          status: 'pending_payment',
-        });
+        if (!reservationId) {
+          // ✅ 예약이 없으면 새로 생성
+          devLog.log('🆕 새 예약 생성 시작...');
 
-        // 2️⃣ 생성된 예약 ID를 주문번호로 사용
-        const orderId = `CHZ_${newReservationId}`;
+          reservationId = await firebaseService.createDiagnosisReservation({
+            ...reservationData,
+            userId: user?.uid,
+            status: 'pending_payment',
+            paymentStatus: 'pending',
+          });
+
+          // ⭐ State에 저장 (재사용 가능하도록)
+          setCreatedReservationId(reservationId);
+
+          devLog.log('✅ 예약 생성 완료 (pending_payment):', {
+            reservationId,
+            status: 'pending_payment',
+          });
+
+          // Analytics (생성 시에만)
+          await analyticsService.logCustomEvent('reservation_created_pending', {
+            reservation_id: reservationId,
+            vehicle_brand: vehicleData.vehicleBrand,
+            vehicle_model: vehicleData.vehicleModel,
+            service_type: serviceData.serviceType,
+            service_price: serviceData.servicePrice,
+            source: 'app',
+          });
+        } else {
+          // ✅ 이미 예약이 있으면 재사용
+          devLog.log('♻️ 기존 예약 재사용:', {
+            reservationId,
+            status: 'pending_payment (재사용)',
+          });
+        }
+
+        // 2️⃣ 생성된/재사용된 예약 ID를 주문번호로 사용
+        const orderId = `CHZ_${reservationId}`;
         const orderName = `${vehicleData.vehicleBrand} ${vehicleData.vehicleModel} 배터리 진단`;
 
-        // Analytics
-        await analyticsService.logCustomEvent('reservation_created_pending', {
-          reservation_id: newReservationId,
-          vehicle_brand: vehicleData.vehicleBrand,
-          vehicle_model: vehicleData.vehicleModel,
-          service_type: serviceData.serviceType,
-          service_price: serviceData.servicePrice,
-          source: 'app',
-        });
-
         devLog.log('🚀 결제 화면으로 이동:', {
-          reservationId: newReservationId,
+          reservationId,
           orderId,
-          amount: serviceData.servicePrice
+          amount: serviceData.servicePrice,
+          isReused: !!createdReservationId,
         });
 
         // 로딩 상태 해제 후 결제 화면으로 이동
@@ -836,7 +857,7 @@ const ReservationScreen: React.FC = () => {
 
         // 3️⃣ 결제 화면으로 이동 (예약 ID 포함)
         navigation.navigate('Payment', {
-          reservationId: newReservationId,  // ← 예약 ID 추가
+          reservationId,  // ⭐ 생성/재사용된 예약 ID
           reservationData: {
             ...reservationData,
             requestedDate: reservationData.requestedDate instanceof Date
@@ -1332,10 +1353,10 @@ const ReservationScreen: React.FC = () => {
                       ]}
                       onPress={() => {
                         setServiceType('standard');
-                        setServicePrice(100000);
+                        setServicePrice(500);
                         setServiceData({
                           serviceType: 'standard',
-                          servicePrice: 100000,
+                          servicePrice: 500,
                         });
                       }}
                     >
@@ -1350,7 +1371,7 @@ const ReservationScreen: React.FC = () => {
                           styles.serviceTypePrice,
                           serviceType === 'standard' && styles.serviceTypePriceSelected
                         ]}>
-                          100,000원
+                          500원
                         </Text>
                       </View>
                       <Text style={[
@@ -1368,10 +1389,10 @@ const ReservationScreen: React.FC = () => {
                       ]}
                       onPress={() => {
                         setServiceType('premium');
-                        setServicePrice(200000);
+                        setServicePrice(500);
                         setServiceData({
                           serviceType: 'premium',
-                          servicePrice: 200000,
+                          servicePrice: 500,
                         });
                       }}
                     >
@@ -1386,7 +1407,7 @@ const ReservationScreen: React.FC = () => {
                           styles.serviceTypePrice,
                           serviceType === 'premium' && styles.serviceTypePriceSelected
                         ]}>
-                          200,000원
+                          500원
                         </Text>
                       </View>
                       <Text style={[
