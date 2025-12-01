@@ -40,7 +40,7 @@ export default {
       bundleIdentifier: "com.charzingapp",
       jsEngine: "hermes",
       icon: "./src/assets/charzingLogo/ios/AppIcon~ios-marketing.png",
-      buildNumber: "4",
+      buildNumber: "67",
       requireFullScreen: false,
 
       infoPlist: {
@@ -154,7 +154,7 @@ export default {
 
       package: "com.charzingapp",
       jsEngine: "hermes",
-      versionCode: 31,
+      versionCode: 67,
 
       permissions: [
         "ACCESS_FINE_LOCATION",
