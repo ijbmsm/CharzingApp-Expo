@@ -3,7 +3,7 @@ export default {
   expo: {
     name: "차징",
     slug: "CharzingApp-Expo",
-    version: "1.1.4",
+    version: "1.1.5",
 
     // Reanimated 호환성을 위해 Old Architecture 사용
     newArchEnabled: false,
@@ -40,7 +40,7 @@ export default {
       bundleIdentifier: "com.charzingapp",
       jsEngine: "hermes",
       icon: "./src/assets/charzingLogo/ios/AppIcon~ios-marketing.png",
-      buildNumber: "69",
+      buildNumber: "71",
       requireFullScreen: false,
 
       infoPlist: {
@@ -154,7 +154,7 @@ export default {
 
       package: "com.charzingapp",
       jsEngine: "hermes",
-      versionCode: 69,
+      versionCode: 71,
 
       permissions: [
         "ACCESS_FINE_LOCATION",
