@@ -1353,10 +1353,10 @@ const ReservationScreen: React.FC = () => {
                       ]}
                       onPress={() => {
                         setServiceType('standard');
-                        setServicePrice(500);
+                        setServicePrice(100000);
                         setServiceData({
                           serviceType: 'standard',
-                          servicePrice: 500,
+                          servicePrice: 100000,
                         });
                       }}
                     >
@@ -1371,7 +1371,7 @@ const ReservationScreen: React.FC = () => {
                           styles.serviceTypePrice,
                           serviceType === 'standard' && styles.serviceTypePriceSelected
                         ]}>
-                          500원
+                          100,000원
                         </Text>
                       </View>
                       <Text style={[
@@ -1389,10 +1389,10 @@ const ReservationScreen: React.FC = () => {
                       ]}
                       onPress={() => {
                         setServiceType('premium');
-                        setServicePrice(500);
+                        setServicePrice(200000);
                         setServiceData({
                           serviceType: 'premium',
-                          servicePrice: 500,
+                          servicePrice: 200000,
                         });
                       }}
                     >
@@ -1407,7 +1407,7 @@ const ReservationScreen: React.FC = () => {
                           styles.serviceTypePrice,
                           serviceType === 'premium' && styles.serviceTypePriceSelected
                         ]}>
-                          500원
+                          200,000원
                         </Text>
                       </View>
                       <Text style={[

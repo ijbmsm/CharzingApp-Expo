@@ -52,8 +52,8 @@ export const BundlingLoadingScreen: React.FC<BundlingLoadingScreenProps> = ({
             },
           ]}
         >
-          <Image 
-            source={require('../../assets/images/splashLogo.png')} 
+          <Image
+            source={require('../assets/charzingLogo/ios/AppIcon~ios-marketing.png')}
             style={styles.logo}
             resizeMode="contain"
           />
@@ -66,7 +66,7 @@ export const BundlingLoadingScreen: React.FC<BundlingLoadingScreenProps> = ({
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#000000', // 스플래시와 동일한 검은색 배경
+    backgroundColor: '#FFFFFF', // 스플래시와 동일한 하얀색 배경
     justifyContent: 'center',
     alignItems: 'center',
     paddingHorizontal: 20,

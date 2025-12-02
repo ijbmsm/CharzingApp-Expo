@@ -19,7 +19,7 @@ export default {
     githubUrl: "https://github.com/ijbmsm/CharzingApp-Expo",
 
     splash: {
-      image: "./assets/images/splash.png",
+      image: "./src/assets/charzingLogo/ios/AppIcon~ios-marketing.png",
       backgroundColor: "#FFFFFF",
       resizeMode: "contain",
       hideExponentText: true,

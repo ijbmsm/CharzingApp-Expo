@@ -241,8 +241,6 @@ const PaymentScreen: React.FC = () => {
               </Text>
             </View>
 
-            <View style={styles.divider} />
-
             <View style={styles.totalRow}>
               <Text style={styles.totalLabel}>결제금액</Text>
               <Text style={styles.totalAmount}>
