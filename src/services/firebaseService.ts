@@ -3719,6 +3719,15 @@ class FirebaseService {
           const firstVariant = variants[0] || {};
           const defaultBattery = modelData.defaultBattery || {};
 
+          // 🔍 디버그 로깅
+          devLog.log(`🔋 [${trim.name}] 배터리 정보 추출:`, {
+            defaultBatteryCapacity: defaultBattery.capacity,
+            firstVariantBatteryCapacity: firstVariant.batteryCapacity,
+            finalBatteryCapacity: defaultBattery.capacity || firstVariant.batteryCapacity || 0,
+            variantsLength: variants.length,
+            firstVariant: firstVariant
+          });
+
           vehicleTrims.push({
             trimId: trim.trimId,
             trimName: trim.name,
