@@ -3683,79 +3683,54 @@ class FirebaseService {
       // 실제 데이터 구조에 맞게 트림 데이터 변환
       const vehicleTrims: VehicleTrim[] = [];
       
-      trims.forEach((trimGroup: any, groupIndex: number) => {
-        // 디버깅: 트림 그룹 데이터 구조 확인
-        devLog.log(`🔍 [${brandId}] 트림 그룹 ${groupIndex} 구조:`, {
-          hasName: !!trimGroup.name,
-          hasTrimName: !!trimGroup.trimName,
-          hasVariants: !!trimGroup.variants,
-          variantsLength: trimGroup.variants?.length || 0,
-          trimGroupKeys: Object.keys(trimGroup),
-          name: trimGroup.name,
-          trimName: trimGroup.trimName
-        });
+      trims.forEach((trim: any) => {
+        // ✅ 한국 브랜드 구조 (HYUNDAI, KIA) - charzing 웹과 동일
+        if (trim.trimId && trim.name && trim.variants) {
+          const variants = Array.isArray(trim.variants) ? trim.variants : [];
 
-        // 🔧 통합된 데이터 구조 처리 (모든 브랜드 동일)
-        const trimName = trimGroup.name || trimGroup.trimName || `트림 ${groupIndex + 1}`;
-        const driveType = trimGroup.driveType || 'FWD';
-        const trimId = trimGroup.trimId || `${modelId}-trim-${groupIndex}`;
+          // ✅ yearRange 우선 사용 (Firestore에 저장된 트림 연도 범위)
+          const years: number[] = [];
 
-        // variants에서 연도 정보 추출
-        const years: number[] = [];
-        let batteryCapacity = modelData.defaultBattery?.capacity || 0;
+          if (trim.yearRange && trim.yearRange.start) {
+            const startYear = trim.yearRange.start;
+            const endYear = trim.yearRange.end || new Date().getFullYear();
 
-        if (trimGroup.variants && Array.isArray(trimGroup.variants)) {
-          trimGroup.variants.forEach((variant: any) => {
-            // variant.years 배열에서 연도 추출
-            if (variant.years && Array.isArray(variant.years)) {
-              variant.years.forEach((year: any) => {
-                const yearNum = typeof year === 'number' ? year : parseInt(year, 10);
-                if (!isNaN(yearNum) && !years.includes(yearNum)) {
-                  years.push(yearNum);
-                }
-              });
+            for (let year = startYear; year <= endYear; year++) {
+              years.push(year);
             }
-            // variant.year (단일 연도)에서도 추출
-            if (variant.year) {
-              const yearNum = typeof variant.year === 'number' ? variant.year : parseInt(variant.year.toString(), 10);
-              if (!isNaN(yearNum) && !years.includes(yearNum)) {
-                years.push(yearNum);
+            devLog.log(`✅ Trim yearRange 사용: ${startYear} - ${endYear}`);
+          } else {
+            // Fallback: variant.years에서 계산
+            variants.forEach((variant: any) => {
+              if (Array.isArray(variant.years)) {
+                variant.years.forEach((year: any) => {
+                  const yearNum = typeof year === 'number' ? year : parseInt(String(year), 10);
+                  if (!isNaN(yearNum) && !years.includes(yearNum)) {
+                    years.push(yearNum);
+                  }
+                });
               }
-            }
-            if (variant.batteryCapacity) {
-              batteryCapacity = variant.batteryCapacity;
-            }
+            });
+
+            devLog.log(`⚠️ variant.years에서 yearRange 계산: ${years.join(', ')}`);
+          }
+
+          // 첫 번째 variant에서 기본 정보 추출
+          const firstVariant = variants[0] || {};
+          const defaultBattery = modelData.defaultBattery || {};
+
+          vehicleTrims.push({
+            trimId: trim.trimId,
+            trimName: trim.name,
+            brandId: brandId,
+            modelId: modelId,
+            modelName: modelData.name || modelId,
+            driveType: trim.driveType || firstVariant.driveType || 'FWD',
+            // ✅ defaultBattery.capacity 우선 사용
+            batteryCapacity: defaultBattery.capacity || firstVariant.batteryCapacity || 0,
+            years: years.map(y => y.toString())
           });
         }
-
-        // yearRange에서도 연도 정보 추출
-        if (trimGroup.yearRange) {
-          const { start, end } = trimGroup.yearRange;
-          if (start && end) {
-            for (let year = start; year <= end; year++) {
-              if (!years.includes(year)) {
-                years.push(year);
-              }
-            }
-          }
-        }
-
-        // 연도가 없으면 기본값 추가
-        if (years.length === 0) {
-          const currentYear = new Date().getFullYear();
-          years.push(currentYear - 1, currentYear); // 작년, 올해
-        }
-
-        vehicleTrims.push({
-          trimId: trimId,
-          trimName: trimName,
-          brandId: brandId,
-          modelId: modelId,
-          modelName: modelData.name || modelId,
-          driveType: driveType,
-          batteryCapacity: batteryCapacity,
-          years: years.map(y => y.toString())
-        });
       });
       
       devLog.log(`✅ 차량 트림 조회 완료: ${vehicleTrims.length}개`, vehicleTrims);

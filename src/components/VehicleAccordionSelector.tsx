@@ -565,7 +565,7 @@ const VehicleAccordionSelector: React.FC<VehicleAccordionSelectorProps> = ({
               <Text style={[styles.listItemText, convertToLineSeedFont(styles.listItemText)]}>
                 {trim.trimName}
               </Text>
-              {trim.batteryCapacity && (
+              {(trim.batteryCapacity && Number(trim.batteryCapacity) > 0) && (
                 <Text style={[styles.trimSpec, convertToLineSeedFont(styles.trimSpec)]}>
                   {trim.batteryCapacity}kWh
                 </Text>
