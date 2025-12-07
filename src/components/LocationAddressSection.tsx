@@ -225,6 +225,7 @@ const styles = StyleSheet.create({
     backgroundColor: '#F9FAFB',
     height: 48, // 고정 높이
     textAlignVertical: 'center', // 세로 가운데 정렬
+    color: '#000',
   },
   loadingContainer: {
     padding: 20,

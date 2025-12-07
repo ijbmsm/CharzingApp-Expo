@@ -125,20 +125,51 @@ const DiagnosisReservationScreen: React.FC = () => {
       if (!user?.uid) return;
       
       const reservations = await firebaseService.getUserDiagnosisReservations(user.uid);
-      const pendingReservations = reservations.filter((r: any) => 
-        r.status === 'pending' || r.status === 'confirmed'
+      const pendingReservations = reservations.filter((r: any) =>
+        r.status === 'pending' || r.status === 'confirmed' || r.status === 'pending_payment'
       );
-      
+
       if (pendingReservations.length > 0) {
         setHasPendingReservation(true);
-        Alert.alert(
-          '진행 중인 예약이 있습니다',
-          '이미 진행 중인 예약이 있어 새로운 예약을 접수할 수 없습니다.\n기존 예약을 확인하시겠습니까?',
-          [
-            { text: '취소', onPress: () => navigation.goBack() },
-            { text: '예약 확인', onPress: () => navigation.navigate('MyReservations') }
-          ]
-        );
+
+        // 결제 대기 중인 예약이 있는 경우
+        const pendingPaymentReservations = pendingReservations.filter((r: any) => r.status === 'pending_payment');
+
+        if (pendingPaymentReservations.length > 0) {
+          Alert.alert(
+            '결제 대기 중인 예약이 있습니다',
+            '결제하지 않은 예약이 있습니다.\n기존 예약을 삭제하고 새로 예약하시겠습니까?',
+            [
+              { text: '취소', onPress: () => navigation.goBack() },
+              {
+                text: '기존 예약 삭제',
+                style: 'destructive',
+                onPress: async () => {
+                  try {
+                    // 모든 결제 대기 예약 취소
+                    for (const reservation of pendingPaymentReservations) {
+                      await firebaseService.updateDiagnosisReservationStatus(reservation.id, 'cancelled');
+                    }
+                    setHasPendingReservation(false);
+                    Alert.alert('삭제 완료', '기존 예약이 삭제되었습니다. 새로운 예약을 진행해주세요.');
+                  } catch (error) {
+                    Alert.alert('오류', '예약 삭제 중 문제가 발생했습니다.');
+                  }
+                }
+              },
+              { text: '예약 확인', onPress: () => navigation.navigate('MyReservations') }
+            ]
+          );
+        } else {
+          Alert.alert(
+            '진행 중인 예약이 있습니다',
+            '이미 진행 중인 예약이 있어 새로운 예약을 접수할 수 없습니다.\n기존 예약을 확인하시겠습니까?',
+            [
+              { text: '취소', onPress: () => navigation.goBack() },
+              { text: '예약 확인', onPress: () => navigation.navigate('MyReservations') }
+            ]
+          );
+        }
       }
     } catch (error) {
       devLog.error('예약 확인 실패:', error);

@@ -219,6 +219,23 @@ function App() {
 
         if (success) {
           console.log('✅ Firebase 초기화 성공');
+
+          // ⭐ Vehicle Utils 초기화 (동적 브랜드/모델 매핑)
+          try {
+            const { initializeBrandMappings, initializeModelMappings } = await import('@charzing/vehicle-utils');
+            const { getDb } = await import('./src/firebase/config');
+            const db = getDb();
+
+            console.log('🚗 Vehicle Utils 초기화 시작...');
+            await Promise.all([
+              initializeBrandMappings(db),
+              initializeModelMappings(db)
+            ]);
+            console.log('✅ Vehicle Utils 초기화 완료 - 동적 매핑 활성화');
+          } catch (error) {
+            console.error('❌ Vehicle Utils 초기화 실패:', error);
+            // 실패해도 앱은 계속 동작 (fallback으로 하드코딩 사용)
+          }
         } else {
           console.error('❌ Firebase 초기화 실패');
           // Firebase 초기화 실패 시에도 앱은 계속 동작하도록 함

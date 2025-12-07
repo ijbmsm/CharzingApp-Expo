@@ -11,7 +11,6 @@ import {
 import { Ionicons } from '@expo/vector-icons';
 import * as Animatable from 'react-native-animatable';
 import { convertToLineSeedFont } from '../../../styles/fonts';
-import { getBrandLogo } from '../utils/brandMapping';
 import { type BrandData } from '../types';
 
 interface BrandSelectionStepProps {
@@ -40,8 +39,12 @@ const BrandSelectionStep: React.FC<BrandSelectionStepProps> = ({
             activeOpacity={0.7}
           >
             <View style={styles.brandItem}>
-              <Image 
-                source={getBrandLogo(brand.name)} 
+              <Image
+                source={
+                  brand.logoUrl
+                    ? { uri: brand.logoUrl }
+                    : require('../../../assets/images/logo.png')
+                }
                 style={styles.brandLogo}
                 resizeMode="contain"
               />

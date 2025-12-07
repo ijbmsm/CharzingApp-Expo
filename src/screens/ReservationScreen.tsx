@@ -28,7 +28,7 @@ import { useNavigation, useRoute, CommonActions } from '@react-navigation/native
 import { useSelector } from 'react-redux';
 import { RootState } from '../store';
 import { useLoading } from '../contexts/LoadingContext';
-import firebaseService from '../services/firebaseService';
+import firebaseService, { EnrichedUserVehicle } from '../services/firebaseService';
 import analyticsService from '../services/analyticsService';
 import { devLog } from '../utils/devLog';
 import { getAvailableBrands, getAvailableModels, getAvailableYearsForModel, RESERVATION_TYPES, ReservationType, VehicleBrand, VehicleModel } from '../constants/ev-battery-database';
@@ -133,7 +133,7 @@ const ReservationScreen: React.FC = () => {
   const [isSubmitting, setIsSubmitting] = useState<boolean>(false);
   
   // 사용자 차량 목록
-  const [userVehicles, setUserVehicles] = useState<any[]>([]);
+  const [userVehicles, setUserVehicles] = useState<EnrichedUserVehicle[]>([]);
 
   // 단계별 데이터
   const [vehicleData, setVehicleData] = useState<VehicleData | null>(null);
@@ -218,14 +218,24 @@ const ReservationScreen: React.FC = () => {
       devLog.log('⚠️ 사용자 UID가 없음');
       return;
     }
-    
+
     try {
-      devLog.log('🔍 사용자 차량 목록 조회 시작, userId:', user.uid);
-      const vehicles = await firebaseService.getUserVehicles(user.uid);
-      devLog.log('✅ 사용자 차량 목록 로드됨:', {
+      devLog.log('🔍 사용자 차량 목록 조회 시작 (Application-level JOIN), userId:', user.uid);
+
+      // ✅ Application-level JOIN: userVehicles + vehicles
+      const vehicles = await firebaseService.getUserVehiclesEnriched(user.uid);
+
+      devLog.log('✅ 사용자 차량 목록 로드됨 (enriched):', {
         count: vehicles.length,
-        vehicles: vehicles
+        vehicles: vehicles.map(v => ({
+          brandId: v.brandId,
+          modelId: v.modelId,
+          year: v.year,
+          trimId: v.trimId,
+          modelName: v.vehicleData.modelName
+        }))
       });
+
       setUserVehicles([...vehicles]); // 새로운 배열로 강제 리렌더링
     } catch (error) {
       devLog.error('❌ 사용자 차량 목록 로드 실패:', error);
@@ -539,15 +549,15 @@ const ReservationScreen: React.FC = () => {
   };
 
   // 내 차량 선택 핸들러 (한 대만 지원)
-  const handleMyVehicleSelect = (vehicle: any) => {
-    devLog.log('🚗 내 차량 선택됨:', vehicle);
-    
-    // UserVehicle을 VehicleData 형태로 변환
+  const handleMyVehicleSelect = (vehicle: EnrichedUserVehicle) => {
+    devLog.log('🚗 내 차량 선택됨 (enriched):', vehicle);
+
+    // ✅ EnrichedUserVehicle을 VehicleData 형태로 변환
     const vehicleData: VehicleData = {
-      vehicleBrand: safeGetString(vehicle, 'make', ''),
-      vehicleModel: safeGetString(vehicle, 'model', ''),
-      vehicleYear: safeGetNumber(vehicle, 'year', 0).toString(),
-      vehicleTrim: safeGetString(vehicle, 'trim', ''),
+      vehicleBrand: vehicle.brandId,
+      vehicleModel: vehicle.vehicleData.modelName,
+      vehicleYear: vehicle.year.toString(),
+      vehicleTrim: vehicle.trimId,
     };
     
     setVehicleData(vehicleData);
@@ -951,24 +961,26 @@ const ReservationScreen: React.FC = () => {
                 try {
                   // 선택된 차량을 사용자 차량 목록에 추가
                   if (user?.uid) {
-                    console.log('💾 사용자 차량 목록에 추가 중...');
-                    const userVehicleData = {
+                    console.log('💾 사용자 차량 목록에 추가 중 (참조만 저장)...');
+
+                    // ✅ 참조만 저장 (vehicles 컬렉션과 JOIN 방식)
+                    const vehicleId = await firebaseService.addUserVehicle({
                       userId: user.uid,
-                      make: vehicle.make,
-                      model: vehicle.model,
-                      trim: vehicle.trim,
+                      brandId: vehicle.brandId,   // Firestore ID만
+                      modelId: vehicle.modelId,   // Firestore ID만
                       year: vehicle.year,
-                      batteryCapacity: vehicle.batteryCapacity ? String(vehicle.batteryCapacity) : undefined,
-                      imageUrl: vehicle.imageUrl,
+                      trimId: vehicle.trimId,     // Firestore ID만
+                      isActive: true,
+                    });
+
+                    console.log('✅ 사용자 차량 추가 완료 (참조):', {
+                      vehicleId,
                       brandId: vehicle.brandId,
                       modelId: vehicle.modelId,
-                      trimId: vehicle.trimId,
-                      isActive: true,
-                    };
-                    
-                    const vehicleId = await firebaseService.addUserVehicle(userVehicleData);
-                    console.log('✅ 사용자 차량 추가 완료 - vehicleId:', vehicleId);
-                    
+                      year: vehicle.year,
+                      trimId: vehicle.trimId
+                    });
+
                     // 로컬 차량 목록도 업데이트
                     await loadUserVehicles();
                     console.log('🔄 ReservationScreen 로컬 차량 목록 업데이트 완료');
@@ -1021,15 +1033,15 @@ const ReservationScreen: React.FC = () => {
                   activeOpacity={0.7}
                 >
                   <View style={styles.myVehicleInfo}>
-                    <Text 
+                    <Text
                       style={styles.myVehicleName}
                       numberOfLines={1}
                       ellipsizeMode="tail"
                     >
-                      {userVehicles[0]?.year} {userVehicles[0]?.make} {userVehicles[0]?.model}
+                      {userVehicles[0]?.year} {userVehicles[0]?.vehicleData?.modelName}
                     </Text>
-                    {userVehicles[0]?.trim && (
-                      <Text style={styles.myVehicleTrim}>{userVehicles[0]?.trim}</Text>
+                    {userVehicles[0]?.trimId && (
+                      <Text style={styles.myVehicleTrim}>{userVehicles[0]?.trimId}</Text>
                     )}
                   </View>
                   <Ionicons name="chevron-forward" size={18} color="#9CA3AF" />
@@ -1819,6 +1831,7 @@ const styles = StyleSheet.create({
     paddingVertical: 12,
     fontSize: 16,
     backgroundColor: '#fff',
+    color: '#000',
   },
   textInputError: {
     borderColor: '#f44336',

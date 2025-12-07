@@ -47,119 +47,36 @@ import {
 import { scale, verticalScale, moderateScale } from 'react-native-size-matters';
 
 // 차량 카드 컴포넌트
+// ✅ EnrichedUserVehicle 사용 (이미 JOIN된 데이터)
 interface VehicleCardProps {
-  vehicle: UserVehicle;
-  onEdit?: () => void; // 선택사항으로 만들어서 재사용성 높임
+  vehicle: EnrichedUserVehicle;
+  onEdit?: () => void;
 }
 
 const VehicleCard: React.FC<VehicleCardProps> = ({ vehicle, onEdit }) => {
   const [imageLoaded, setImageLoaded] = React.useState(false);
   const [imageError, setImageError] = React.useState(false);
-  const [vehicleDetails, setVehicleDetails] =
-    React.useState<VehicleDetails | null>(null);
-  const [loading, setLoading] = React.useState(true);
 
-  // 이미지 URL 정규화
-  const normalizeImageUrl = (url: string | undefined): string => {
-    if (!url) return "";
-
-    try {
-      // Firebase Storage URL 패턴 확인
-      if (!url.includes("firebasestorage.googleapis.com")) {
-        return url; // Firebase Storage URL이 아니면 그대로 반환
-      }
-
-      const urlObj = new URL(url);
-
-      // 버킷 이름 추출 (URL path에서 /v0/b/{bucket}/o/ 패턴)
-      const bucketMatch = urlObj.pathname.match(/\/v0\/b\/([^\/]+)\/o\//);
-      if (!bucketMatch || !bucketMatch[1]) return url;
-      const bucket = bucketMatch[1];
-
-      // 경로에서 /o/ 이후의 인코딩된 파일 경로 추출
-      const pathMatch = urlObj.pathname.match(/\/o\/(.+)/);
-      if (!pathMatch || !pathMatch[1]) return url;
-
-      // 이미 인코딩된 경로를 한번 디코딩
-      let filePath = decodeURIComponent(pathMatch[1]);
-
-      // 다시 인코딩 (정확한 인코딩 보장)
-      const encodedPath = encodeURIComponent(filePath);
-
-      // 새 URL 구성
-      const newUrl = `https://firebasestorage.googleapis.com/v0/b/${bucket}/o/${encodedPath}?alt=media`;
-
-      console.log("🔄 [VehicleCard] URL 정규화:", {
-        original: url,
-        normalized: newUrl,
-      });
-      return newUrl;
-    } catch (error) {
-      console.error("❌ [VehicleCard] URL 정규화 실패:", error);
-      return url; // 파싱 실패 시 원본 반환
-    }
-  };
-
-  // Firebase에서 차량 상세 정보 가져오기
-  React.useEffect(() => {
-    const fetchVehicleDetails = async () => {
-      try {
-        setLoading(true);
-        // 이미지 상태 초기화
-        setImageLoaded(false);
-        setImageError(false);
-
-        const details = await firebaseService.getVehicleDetails(
-          vehicle.make,
-          vehicle.model,
-          vehicle.year,
-          vehicle.trim
-        );
-        console.log(`🖼️ [VehicleCard] 차량 이미지 URL:`, {
-          vehicleId: vehicle.id,
-          make: vehicle.make,
-          model: vehicle.model,
-          year: vehicle.year,
-          trim: vehicle.trim,
-          detailsImageUrl: details?.imageUrl,
-          vehicleImageUrl: vehicle.imageUrl,
-          finalUrl: details?.imageUrl || vehicle.imageUrl || "NONE",
-        });
-        setVehicleDetails(details);
-      } catch (error) {
-        console.error("❌ [VehicleCard] 차량 상세 정보 로드 실패:", error);
-        handleFirebaseError(error, {
-          screenName: "HomeScreen",
-          actionName: "load_vehicle_details",
-        });
-        setVehicleDetails(null);
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    fetchVehicleDetails();
-  }, [vehicle.id, vehicle.make, vehicle.model, vehicle.year, vehicle.trim]);
-
-  // 로딩 중이면 스켈레톤 카드 표시
-  if (loading) {
-    return <SkeletonVehicleCard />;
-  }
+  // ✅ 이미 JOIN된 vehicleData 직접 사용
+  const { vehicleData } = vehicle;
 
   return (
     <View style={styles.vehicleCard}>
-      {/* 차량 이미지 */}
+      {/* ✅ JOIN된 이미지 URL 사용 */}
       <View style={styles.vehicleImageContainer}>
-        {vehicleDetails?.imageUrl && !imageError ? (
+        {vehicleData.imageUrl && !imageError ? (
           <Image
-            source={{ uri: normalizeImageUrl(vehicleDetails.imageUrl) }}
+            source={{ uri: vehicleData.imageUrl }}
             style={styles.vehicleImage}
             onLoad={() => {
-              console.log("✅ [VehicleCard] 이미지 로드 성공");
+              console.log("✅ [VehicleCard] 이미지 로드 성공:", vehicleData.imageUrl);
               setImageLoaded(true);
             }}
             onError={(error) => {
-              console.error("❌ [VehicleCard] 이미지 로드 실패:", error.nativeEvent);
+              console.error("❌ [VehicleCard] 이미지 로드 실패:", {
+                url: vehicleData.imageUrl,
+                error: error.nativeEvent
+              });
               setImageError(true);
             }}
           />
@@ -170,28 +87,26 @@ const VehicleCard: React.FC<VehicleCardProps> = ({ vehicle, onEdit }) => {
         )}
       </View>
 
-      {/* 차량 정보 */}
+      {/* ✅ JOIN된 차량 정보 사용 */}
       <View style={styles.vehicleInfo}>
         <View style={styles.vehicleCardHeader}>
           <View style={styles.vehicleCardNameContainer}>
             <Text style={styles.vehicleCardName}>
-              {vehicle.nickname ||
-                `${vehicle.make} ${vehicleDetails?.modelName || vehicle.model}`}
+              {vehicle.nickname || `${vehicleData.modelName}`}
             </Text>
             <Text style={styles.vehicleCardDetails}>
-              {vehicle.year}년 {vehicle.trim ? `${vehicle.trim} ` : ""}
-              
+              {vehicle.year}년 {vehicle.trimId}
             </Text>
           </View>
         </View>
 
-        {/* 배터리 및 성능 정보 (영수증 스타일) - 항상 표시 */}
+        {/* ✅ JOIN된 배터리 및 성능 정보 */}
         <View style={styles.vehicleCardReceiptSection}>
               {/* 1. 배터리 제조사 */}
               <View style={styles.vehicleCardReceiptRow}>
                 <Text style={styles.vehicleCardDetails}>배터리 제조사</Text>
                 <Text style={styles.vehicleCardDetails}>
-                  {vehicleDetails?.battery.manufacturer || "알 수 없음"}
+                  {vehicleData.battery.manufacturer || "알 수 없음"}
                 </Text>
               </View>
 
@@ -199,8 +114,8 @@ const VehicleCard: React.FC<VehicleCardProps> = ({ vehicle, onEdit }) => {
               <View style={styles.vehicleCardReceiptRow}>
                 <Text style={styles.vehicleCardDetails}>완충 시 주행거리</Text>
                 <Text style={styles.vehicleCardDetails}>
-                  {vehicleDetails?.performance.range
-                    ? `${vehicleDetails.performance.range}km`
+                  {vehicleData.performance.range
+                    ? `${vehicleData.performance.range}km`
                     : "알 수 없음"}
                 </Text>
               </View>
@@ -297,12 +212,18 @@ const VehicleCard: React.FC<VehicleCardProps> = ({ vehicle, onEdit }) => {
 type HomeScreenNavigationProp = NativeStackNavigationProp<RootStackParamList>;
 
 interface CompletedVehicle {
+  // 표시용 이름 (기존 호환성)
   make: string;
   model: string;
   trim: string;
   year: number;
   batteryCapacity?: number | string;
   imageUrl?: string;
+
+  // Firestore 조회용 ID (동적 매칭 결과)
+  brandId: string;     // "hyundai", "kia", "tesla"
+  modelId: string;     // "IONIQ-5", "EV6", "MODEL-3"
+  trimId: string;      // "exclusive", "long-range"
 }
 
 export default function HomeScreen() {
@@ -323,7 +244,7 @@ export default function HomeScreen() {
   const [reportLoading, setReportLoading] = useState(false);
   const [showVehicleModal, setShowVehicleModal] = useState(false);
   const [vehicleModalEditMode, setVehicleModalEditMode] = useState(false);
-  const [userVehicles, setUserVehicles] = useState<UserVehicle[]>([]);
+  const [userVehicles, setUserVehicles] = useState<EnrichedUserVehicle[]>([]);
   const [vehiclesLoading, setVehiclesLoading] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
 
@@ -358,7 +279,7 @@ export default function HomeScreen() {
 
   // 차량 상세 모달 관련 상태
   const [showVehicleDetail, setShowVehicleDetail] = useState(false);
-  const [selectedVehicle, setSelectedVehicle] = useState<UserVehicle | null>(
+  const [selectedVehicle, setSelectedVehicle] = useState<EnrichedUserVehicle | null>(
     null
   );
   const [deletingVehicle, setDeletingVehicle] = useState(false);
@@ -519,12 +440,14 @@ export default function HomeScreen() {
       }
 
       logger.userAction("load_user_vehicles", user.uid);
-      const vehicles = await firebaseService.getUserVehicles(user.uid);
+
+      // ✅ Application-level JOIN: userVehicles + vehicles
+      const vehicles = await firebaseService.getUserVehiclesEnriched(user.uid);
 
       console.log("✅ loadUserVehicles 완료 - 차량 수:", vehicles.length);
       console.log(
         "📋 로드된 차량 목록:",
-        vehicles.map((v) => `${v.year} ${v.make} ${v.model}`)
+        vehicles.map((v) => `${v.year} ${v.brandId} ${v.modelId} (${v.vehicleData.modelName})`)
       );
 
       if (isMountedRef.current) {
@@ -1000,7 +923,7 @@ export default function HomeScreen() {
 
   // 차량 선택 핸들러
   const handleSelectVehicle = async (completedVehicle: CompletedVehicle) => {
-    // Convert CompletedVehicle format to old Vehicle format for compatibility
+    // ✅ CompletedVehicle에서 필수 참조 필드 포함
     const vehicle = {
       make: completedVehicle.make,
       model: completedVehicle.model,
@@ -1008,6 +931,10 @@ export default function HomeScreen() {
       batteryCapacity: completedVehicle.batteryCapacity || "",
       range: "",
       trim: completedVehicle.trim,
+      // ✅ Firestore 참조 필드 (필수)
+      brandId: completedVehicle.brandId,
+      modelId: completedVehicle.modelId,
+      trimId: completedVehicle.trimId,
     };
     try {
       if (!user) return;
@@ -1051,7 +978,7 @@ export default function HomeScreen() {
         // isMountedRef와 무관하게 직접 차량 목록 새로고침
         try {
           setVehiclesLoading(true);
-          const updatedVehicles = await firebaseService.getUserVehicles(
+          const updatedVehicles = await firebaseService.getUserVehiclesEnriched(
             user.uid
           );
           setUserVehicles(updatedVehicles);
@@ -1082,20 +1009,14 @@ export default function HomeScreen() {
           user?.uid
         );
 
+        // ✅ 참조만 저장 (vehicles 컬렉션과 JOIN 방식)
         const vehicleId = await firebaseService.addUserVehicle({
           userId: user.uid,
-          make: vehicle.make,
-          model: vehicle.model,
+          brandId: vehicle.brandId,   // Firestore ID만
+          modelId: vehicle.modelId,   // Firestore ID만
           year: vehicle.year,
-          trim: vehicle.trim,
-          batteryCapacity:
-            typeof vehicle.batteryCapacity === "number"
-              ? `${vehicle.batteryCapacity}kWh`
-              : vehicle.batteryCapacity || "",
-          range:
-            typeof vehicle.range === "number"
-              ? `${vehicle.range}km`
-              : vehicle.range || "",
+          trimId: vehicle.trimId,     // Firestore ID만
+          nickname: '',               // 빈 문자열로 기본값 설정
           isActive: true,
         });
 
@@ -1111,7 +1032,7 @@ export default function HomeScreen() {
         // isMountedRef와 무관하게 직접 차량 목록 새로고침
         try {
           setVehiclesLoading(true);
-          const updatedVehicles = await firebaseService.getUserVehicles(
+          const updatedVehicles = await firebaseService.getUserVehiclesEnriched(
             user.uid
           );
           setUserVehicles(updatedVehicles);
@@ -1551,14 +1472,14 @@ const styles = StyleSheet.create({
     alignItems: "center",
   },
   welcomeTitle: convertToLineSeedFont({
-    fontSize: moderateScale(18, 1),
+    fontSize: moderateScale(18, 0.3),
     fontWeight: "bold",
     color: "#1F2937",
     textAlign: "center",
     marginBottom: verticalScale(8),
   }),
   welcomeSubtitle: convertToLineSeedFont({
-    fontSize: moderateScale(13, 1),
+    fontSize: moderateScale(13, 0.3),
     color: "#6B7280",
     textAlign: "center",
     lineHeight: 20,
@@ -1614,7 +1535,7 @@ const styles = StyleSheet.create({
     paddingBottom: 0,
   },
   vehicleName: convertToLineSeedFont({
-    fontSize: moderateScale(13, 1),
+    fontSize: moderateScale(13, 0.3),
     fontWeight: "600",
     color: "#1F2937",
     marginBottom: 4,
@@ -1986,7 +1907,7 @@ const styles = StyleSheet.create({
     paddingBottom:scale(4),
   },
   statusTitle: convertToLineSeedFont({
-    fontSize: moderateScale(12, 1),
+    fontSize: moderateScale(12, 0.3),
     fontWeight: "bold",
     color: "#1F2937",
   }),
@@ -1996,7 +1917,7 @@ const styles = StyleSheet.create({
     gap: scale(4),
   },
   usageHistoryText: convertToLineSeedFont({
-    fontSize: moderateScale(14),
+    fontSize: moderateScale(14, 0.3),
     color: "#6B7280",
   }),
   statusContent: {
@@ -2007,7 +1928,7 @@ const styles = StyleSheet.create({
     justifyContent: "center", // 내용을 수직 중앙 정렬
   },
   statusMessage: convertToLineSeedFont({
-    fontSize: moderateScale(13, 1),
+    fontSize: moderateScale(13, 0.3),
     color: "#6B7280",
     textAlign: "center",
   }),
@@ -2022,7 +1943,7 @@ const styles = StyleSheet.create({
     alignItems: "center",
   },
   diagnosisButtonText: convertToLineSeedFont({
-    fontSize: moderateScale(14, 1),
+    fontSize: moderateScale(14, 0.3),
     fontWeight: "bold",
     color: "#FFFFFF",
   }),
@@ -2077,14 +1998,14 @@ const styles = StyleSheet.create({
     marginBottom: verticalScale(4),
   },
   actionTitle: convertToLineSeedFont({
-    fontSize: moderateScale(12, 1),
+    fontSize: moderateScale(12, 0.3),
     fontWeight: "bold",
     color: "#1F2937",
     marginBottom: verticalScale(2),
     textAlign: "center",
   }),
   actionSubtitle: convertToLineSeedFont({
-    fontSize: moderateScale(9, 1),
+    fontSize: moderateScale(9, 0.3),
     color: "#6B7280",
     textAlign: "center",
   }),
@@ -2255,7 +2176,7 @@ const styles = StyleSheet.create({
     color: "#06B6D4",
   }),
   addVehicleHeaderText: convertToLineSeedFont({
-    fontSize: moderateScale(13, 1),
+    fontSize: moderateScale(13, 0.3),
     fontWeight: "600",
     color: "#06B6D4",
   }),
@@ -2321,13 +2242,13 @@ const styles = StyleSheet.create({
     borderColor: "#E0F2FE",
   },
   vehicleCardName: convertToLineSeedFont({
-    fontSize: moderateScale(14, 1),
+    fontSize: moderateScale(14, 0.3),
     fontWeight: "bold",
     color: "#1F2937",
     marginBottom: 4,
   }),
   vehicleCardDetails: convertToLineSeedFont({
-    fontSize: moderateScale(12, 1),
+    fontSize: moderateScale(12, 0.3),
     color: "#6B7280",
     lineHeight: 18,
   }),
@@ -2352,7 +2273,7 @@ const styles = StyleSheet.create({
     textAlign: "center",
   }),
   vehicleCardSpecValue: convertToLineSeedFont({
-    fontSize: moderateScale(12, 1),
+    fontSize: moderateScale(12, 0.3),
     fontWeight: "600",
     color: "#1F2937",
     textAlign: "center",

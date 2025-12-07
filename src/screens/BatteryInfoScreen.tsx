@@ -132,6 +132,33 @@ export default function BatteryInfoScreen() {
     }
   };
 
+  // ⭐ 동적 이미지 URL 생성 함수
+  const generateDynamicImageUrl = (vehicle: CompletedVehicle): string | null => {
+    if (!vehicle.brandId || !vehicle.modelId) {
+      console.warn('⚠️ [BatteryInfoScreen] brandId 또는 modelId 누락:', vehicle);
+      return null;
+    }
+
+    // @charzing/vehicle-utils 패키지 사용
+    const { generateVehicleImageUrl } = require('@charzing/vehicle-utils');
+    const url = generateVehicleImageUrl({
+      brandId: vehicle.brandId,
+      modelId: vehicle.modelId,
+      year: vehicle.year,
+      trim: vehicle.trim
+    });
+
+    console.log(`🖼️ [BatteryInfoScreen] 동적 이미지 URL 생성:`, {
+      brandId: vehicle.brandId,
+      modelId: vehicle.modelId,
+      year: vehicle.year,
+      trim: vehicle.trim,
+      generatedUrl: url
+    });
+
+    return url;
+  };
+
   // 차량 선택 핸들러 - 실제 Firebase 구조에 맞게 데이터 조회
   const handleVehicleSelect = async (vehicle: CompletedVehicle) => {
     // console.log("🔋 배터리 정보 조회할 차량 선택:", vehicle);
@@ -475,21 +502,25 @@ export default function BatteryInfoScreen() {
                 </View>
               </View>
 
-              {/* 차량 이미지 카드 - variant imageUrl 우선 사용 */}
+              {/* 차량 이미지 카드 - ⭐ 동적 URL만 사용 */}
               {(() => {
-                const variantImageUrl = safeGetString(batteryInfo.selectedVariant, "imageUrl", "");
-                const rawImageUrl = variantImageUrl !== "정보 없음" && variantImageUrl
-                  ? variantImageUrl
-                  : batteryInfo.modelData?.imageUrl;
+                const dynamicImageUrl = generateDynamicImageUrl(batteryInfo.vehicle);
 
-                const imageUrl = normalizeImageUrl(rawImageUrl);
-
-                return imageUrl ? (
+                return dynamicImageUrl ? (
                   <View style={styles.vehicleImageCard}>
                     <Image
-                      source={{ uri: imageUrl }}
+                      source={{ uri: dynamicImageUrl }}
                       style={styles.vehicleImage}
                       resizeMode="contain"
+                      onLoad={() => {
+                        console.log("✅ [BatteryInfoScreen] 이미지 로드 성공:", dynamicImageUrl);
+                      }}
+                      onError={(error) => {
+                        console.error("❌ [BatteryInfoScreen] 이미지 로드 실패:", {
+                          url: dynamicImageUrl,
+                          error: error.nativeEvent
+                        });
+                      }}
                     />
                   </View>
                 ) : null;

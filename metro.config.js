@@ -1,8 +1,13 @@
+const path = require('path');
 const {
   getSentryExpoConfig
 } = require("@sentry/react-native/metro");
 
 const config = getSentryExpoConfig(__dirname);
+
+// ✅ @charzing/vehicle-utils 로컬 패키지 watchFolders 추가
+const vehicleUtilsPath = path.resolve(__dirname, '../charzing-vehicle-utils');
+config.watchFolders = [vehicleUtilsPath];
 
 // Firebase Functions 디렉토리 제외 (프로젝트 루트의 functions 폴더만)
 config.resolver.blockList = [
@@ -11,10 +16,11 @@ config.resolver.blockList = [
   /\/functions\/node_modules\//, // functions/node_modules 제외
 ];
 
-// React 19 JSX runtime 해결
+// React 19 JSX runtime 해결 + vehicle-utils 로컬 경로
 config.resolver.alias = {
   'react/jsx-dev-runtime': 'react/jsx-dev-runtime.js',
   'react/jsx-runtime': 'react/jsx-runtime.js',
+  '@charzing/vehicle-utils': vehicleUtilsPath,
 };
 
 // Metro 서버 커스터마이즈

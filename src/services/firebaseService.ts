@@ -28,6 +28,11 @@ import { getFunctions, httpsCallable, connectFunctionsEmulator } from 'firebase/
 import axios from 'axios';
 import Constants from 'expo-constants';
 import { v4 as uuidv4 } from 'uuid';
+import {
+  generateVehicleImageUrl as generateImageUrl,
+  normalizeBrandId,
+  type BrandId
+} from '@charzing/vehicle-utils';
 import { getDb, getAuthInstance, getStorageInstance, getFunctionsInstance } from '../firebase/config';
 import logger from './logService';
 import devLog from '../utils/devLog';
@@ -36,173 +41,24 @@ import { handleFirebaseError, handleNetworkError, handleError } from './errorHan
 
 // 차량 이미지 URL 생성 유틸리티
 // Firebase Storage에 실제 존재하는 차량 이미지 구조 (실제 데이터 기반)
-const vehicleImageDatabase: Record<string, Record<string, { years: number[]; trims: string[]; fallbackYear: number; }>> = {
-  'HYUNDAI': {
-    'IONIQ-5': { 
-      years: [2021, 2022, 2023, 2025], 
-      trims: ['e', 'standard'],
-      fallbackYear: 2025 
-    },
-    'IONIQ-6': { 
-      years: [2023, 2024, 2025], 
-      trims: ['e', 'standard'],
-      fallbackYear: 2025 
-    },
-    'KONA-ELECTRIC': { 
-      years: [2018, 2020, 2022, 2023], 
-      trims: ['e'],
-      fallbackYear: 2023 
-    }
-  },
-  'KIA': {
-    'EV6': { 
-      years: [2022, 2025], 
-      trims: ['e'],
-      fallbackYear: 2025 
-    },
-    'EV9': { 
-      years: [2024], 
-      trims: ['e'],
-      fallbackYear: 2024 
-    },
-    'NIRO-EV': { 
-      years: [2018, 2022], 
-      trims: ['e'],
-      fallbackYear: 2022 
-    }
-  },
-  'TESLA': {
-    'MODEL-S': { 
-      years: [2017, 2018, 2020, 2022, 2024, 2025], 
-      trims: ['e'],
-      fallbackYear: 2025 
-    },
-    'MODEL-3': { 
-      years: [2020, 2023, 2025], 
-      trims: ['e'],
-      fallbackYear: 2025 
-    },
-    'MODEL-X': { 
-      years: [2018, 2020, 2023, 2025], 
-      trims: ['e'],
-      fallbackYear: 2025 
-    },
-    'MODEL-Y': { 
-      years: [2024, 2025], 
-      trims: ['e'],
-      fallbackYear: 2025 
-    }
-  },
-  'BMW': {
-    'i4': { 
-      years: [2024, 2025], 
-      trims: ['e'],
-      fallbackYear: 2025 
-    },
-    'iX': { 
-      years: [2025, 2026], 
-      trims: ['e'],
-      fallbackYear: 2026 
-    }
-  }
-};
+// 하드코딩된 vehicleImageDatabase 제거됨
+// @charzing/vehicle-utils 패키지의 동적 URL 생성 함수 사용
 
+// @charzing/vehicle-utils 패키지의 generateVehicleImageUrl 사용
 const generateVehicleImageUrl = (make: string, model: string, year: number, trim?: string): string => {
   try {
-    // 브랜드명 정규화
-    const brandMapping: Record<string, string> = {
-      '현대': 'HYUNDAI', 'HYUNDAI': 'HYUNDAI', 'Hyundai': 'HYUNDAI',
-      '기아': 'KIA', 'KIA': 'KIA', 'Kia': 'KIA',
-      '테슬라': 'TESLA', 'TESLA': 'TESLA', 'Tesla': 'TESLA',
-      'BMW': 'BMW', 'bmw': 'BMW',
-      '메르세데스-벤츠': 'MERCEDES-BENZ', 'Mercedes-Benz': 'MERCEDES-BENZ', 'MERCEDES-BENZ': 'MERCEDES-BENZ',
-      '아우디': 'AUDI', 'AUDI': 'AUDI', 'Audi': 'AUDI',
-      '포르쉐': 'PORSCHE', 'PORSCHE': 'PORSCHE', 'Porsche': 'PORSCHE',
-      'MINI': 'MINI', 'Mini': 'MINI', 'mini': 'MINI'
-    };
+    devLog.log('🔍 이미지 URL 생성 시작 (패키지 함수):', { make, model, year, trim });
 
-    // 모델명 정규화
-    const modelMapping: Record<string, string> = {
-      '아이오닉 5': 'IONIQ-5', 'IONIQ 5': 'IONIQ-5', 'ioniq-5': 'IONIQ-5',
-      '아이오닉 6': 'IONIQ-6', 'IONIQ 6': 'IONIQ-6', 'ioniq-6': 'IONIQ-6',
-      '코나 일렉트릭': 'KONA-ELECTRIC', 'KONA Electric': 'KONA-ELECTRIC', 'kona-electric': 'KONA-ELECTRIC',
-      'EV6': 'EV6', 'ev6': 'EV6',
-      'EV9': 'EV9', 'ev9': 'EV9',
-      '니로 EV': 'NIRO-EV', 'NIRO EV': 'NIRO-EV', 'niro-ev': 'NIRO-EV',
-      'Model S': 'MODEL-S', 'model-s': 'MODEL-S',
-      'Model 3': 'MODEL-3', 'model-3': 'MODEL-3',
-      'Model X': 'MODEL-X', 'model-x': 'MODEL-X',
-      'Model Y': 'MODEL-Y', 'model-y': 'MODEL-Y',
-      'i3': 'i3', 'I3': 'i3',
-      'i4': 'i4', 'I4': 'i4',
-      'iX': 'iX', 'IX': 'iX', 'ix': 'iX'
-    };
-
-    const normalizedBrand = brandMapping[make] || make.toUpperCase();
-    const normalizedModel = modelMapping[model] || model.toUpperCase().replace(/\s+/g, '-');
-    
-    devLog.log('🔍 이미지 URL 생성 시작:', { make, model, year, trim, normalizedBrand, normalizedModel });
-
-    // 차량 정보 조회
-    const vehicleInfo = vehicleImageDatabase[normalizedBrand]?.[normalizedModel];
-    
-    let finalYear = year;
-    let finalTrim = '';
-    
-    if (vehicleInfo) {
-      // 1. 연도 fallback: 해당 연도가 없으면 가장 가까운 연도 찾기
-      if (!vehicleInfo.years.includes(year)) {
-        // 가장 가까운 연도 찾기
-        const sortedYears = vehicleInfo.years.sort((a: number, b: number) => Math.abs(a - year) - Math.abs(b - year));
-        finalYear = sortedYears[0] || vehicleInfo.fallbackYear;
-        devLog.log(`⚠️ ${year}년 이미지 없음, ${finalYear}년으로 대체`);
-      }
-      
-      // 2. 트림 fallback
-      if (trim) {
-        const trimLower = trim.toLowerCase();
-        if (vehicleInfo.trims.includes(trimLower)) {
-          finalTrim = `_${trimLower}`;
-        } else if (vehicleInfo.trims.includes('standard')) {
-          finalTrim = '_standard';
-          devLog.log(`⚠️ ${trim} 트림 없음, standard로 대체`);
-        } else if (vehicleInfo.trims.includes('e')) {
-          finalTrim = '_e';
-          devLog.log(`⚠️ ${trim} 트림 없음, e로 대체`);
-        } else {
-          // 트림명 없는 기본 이미지 시도
-          finalTrim = '';
-          devLog.log(`⚠️ ${trim} 트림 없음, 기본 이미지 사용`);
-        }
-      } else {
-        // 트림 지정 안됨 - 기본 이미지 먼저 시도, 없으면 standard, 그 다음 e
-        if (vehicleInfo.trims.includes('standard')) {
-          finalTrim = '_standard';
-        } else if (vehicleInfo.trims.includes('e')) {
-          finalTrim = '_e';
-        }
-      }
-    } else {
-      devLog.warn(`⚠️ 차량 정보 없음: ${normalizedBrand}/${normalizedModel}, 기본 URL 생성 시도`);
-      // 데이터베이스에 없는 차량은 기본 로직 사용
-      if (trim && ['standard', 'e', 'se', 'jcw'].includes(trim.toLowerCase())) {
-        finalTrim = `_${trim.toLowerCase()}`;
-      }
-    }
-    
-    // Firebase Storage URL 생성
-    const baseUrl = 'https://firebasestorage.googleapis.com/v0/b/charzing-d1600.firebasestorage.app/o/vehicle-images%2F';
-    const fileName = `${normalizedBrand.toLowerCase()}_${normalizedModel.toLowerCase().replace(/-/g, '_')}_${finalYear}${finalTrim}.png`;
-    const imageUrl = `${baseUrl}${normalizedBrand}%2F${normalizedModel}%2F${finalYear}%2F${fileName}?alt=media`;
-    
-    devLog.log('✅ 최종 이미지 URL:', {
-      originalInput: { make, model, year, trim },
-      normalized: { normalizedBrand, normalizedModel },
-      final: { finalYear, finalTrim },
-      fileName,
-      imageUrl
+    // 패키지 함수 호출
+    const imageUrl = generateImageUrl({
+      brandId: make,
+      modelId: model,
+      year: year,
+      trim: trim
     });
-    
+
+    devLog.log('✅ 최종 이미지 URL:', { make, model, year, trim, imageUrl });
+
     return imageUrl;
   } catch (error) {
     devLog.error('❌ 차량 이미지 URL 생성 실패:', error);
@@ -231,20 +87,29 @@ export interface UserProfile {
   updatedAt: Date | FieldValue;
 }
 
+// ✅ UserVehicle - 참조만 저장 (vehicles 컬렉션과 JOIN)
 export interface UserVehicle {
   id: string;
   userId: string;
-  make: string; // 제조사 (현대, 기아, 테슬라 등)
-  model: string; // 모델명 (아이오닉 5, EV6 등)
-  year: number; // 연식
-  trim?: string; // 트림 (Exclusive, Long Range 등)
-  batteryCapacity?: string; // 배터리 용량
-  range?: string; // 주행거리
-  nickname?: string; // 차량 별명
-  imageUrl?: string; // 차량 이미지 URL
-  isActive: boolean; // 활성 차량 여부 (메인 차량)
+
+  // Firestore vehicles 컬렉션 참조 (필수)
+  brandId: string;    // 예: "tesla", "hyundai", "kia"
+  modelId: string;    // 예: "MODEL-3", "IONIQ-5", "EV6"
+  year: number;       // 예: 2024
+  trimId: string;     // 예: "rwd", "long-range", "exclusive"
+
+  // 사용자 커스텀 정보
+  nickname?: string;  // 차량 별명 (예: "내 차")
+  isActive: boolean;  // 활성 차량 여부 (메인 차량)
+
   createdAt: Date | FieldValue;
   updatedAt: Date | FieldValue;
+}
+
+// ✅ EnrichedUserVehicle - JOIN 결과 (vehicles 데이터 포함)
+export interface EnrichedUserVehicle extends UserVehicle {
+  // vehicles 컬렉션에서 JOIN된 실제 데이터
+  vehicleData: VehicleDetails;
 }
 
 // Firebase에서 조회한 차량 상세 정보
@@ -3262,39 +3127,57 @@ class FirebaseService {
    */
   async addUserVehicle(vehicleData: Omit<UserVehicle, 'id' | 'createdAt' | 'updatedAt'>): Promise<string> {
     try {
-      devLog.log('📱 클라이언트에서 사용자 차량 추가 시작:', vehicleData);
-      
+      devLog.log('📱 사용자 차량 추가 (참조만 저장):', vehicleData);
+
       // 현재 로그인한 사용자만 차량을 추가할 수 있도록 체크
       if (!this.auth.currentUser || this.auth.currentUser.uid !== vehicleData.userId) {
         throw new Error('접근 권한이 없습니다.');
       }
 
+      // ✅ 필수 참조 필드 검증
+      if (!vehicleData.brandId || !vehicleData.modelId || !vehicleData.trimId) {
+        throw new Error('brandId, modelId, trimId는 필수입니다. 차량 선택 시 Firestore ID가 전달되어야 합니다.');
+      }
+
       const now = serverTimestamp();
       const vehicleRef = doc(collection(this.db, 'userVehicles'));
-      
-      // 차량 이미지 URL 자동 생성
-      const imageUrl = generateVehicleImageUrl(vehicleData.make, vehicleData.model, vehicleData.year, vehicleData.trim);
-      
-      // undefined 값들을 제거하여 Firebase 에러 방지
-      const cleanVehicleData: any = {};
-      Object.entries({ ...vehicleData, imageUrl }).forEach(([key, value]) => {
-        if (value !== undefined) {
-          cleanVehicleData[key] = value;
-        }
-      });
 
+      // ✅ 참조만 저장 (vehicles 컬렉션과 JOIN 방식)
       const completeVehicleData = {
-        ...cleanVehicleData,
+        userId: vehicleData.userId,
+        brandId: vehicleData.brandId,
+        modelId: vehicleData.modelId,
+        year: vehicleData.year,
+        trimId: vehicleData.trimId,
+        nickname: vehicleData.nickname || '', // ✅ undefined 방지
+        isActive: vehicleData.isActive ?? true,
         createdAt: now,
         updatedAt: now,
       };
-      
+
       await setDoc(vehicleRef, completeVehicleData);
-      
-      logger.vehicle('add', { make: vehicleData.make, model: vehicleData.model, year: vehicleData.year }, vehicleData.userId);
+
+      devLog.log('✅ 사용자 차량 추가 완료 (참조):', {
+        id: vehicleRef.id,
+        brandId: vehicleData.brandId,
+        modelId: vehicleData.modelId,
+        year: vehicleData.year,
+        trimId: vehicleData.trimId
+      });
+
+      logger.vehicle('add', {
+        brandId: vehicleData.brandId,
+        modelId: vehicleData.modelId,
+        year: vehicleData.year
+      }, vehicleData.userId);
+
       return vehicleRef.id;
     } catch (error: any) {
-      logger.vehicle('add_failed', { make: vehicleData.make, model: vehicleData.model }, vehicleData.userId, { error: error.message });
+      devLog.error('❌ 사용자 차량 추가 실패:', error);
+      logger.vehicle('add_failed', {
+        brandId: vehicleData.brandId,
+        modelId: vehicleData.modelId
+      }, vehicleData.userId, { error: error.message });
       throw error;
     }
   }
@@ -3341,6 +3224,197 @@ class FirebaseService {
       return vehicles;
     } catch (error: any) {
       logger.firebaseOperation('get_user_vehicles', 'userVehicles', false, error, userId);
+      throw error;
+    }
+  }
+
+  /**
+   * 이미지 URL 정규화 (토큰 제거하고 alt=media 사용)
+   * ✅ 이중 인코딩 방지: 이미 올바르게 인코딩된 경로는 그대로 사용
+   */
+  private normalizeImageUrl(url: string | undefined): string {
+    if (!url) return '';
+
+    try {
+      // Firebase Storage URL 패턴 확인
+      if (!url.includes('firebasestorage.googleapis.com')) {
+        return url; // Firebase Storage URL이 아니면 그대로 반환
+      }
+
+      const urlObj = new URL(url);
+
+      // 버킷 이름 추출
+      const bucketMatch = urlObj.pathname.match(/\/v0\/b\/([^\/]+)\/o\//);
+      if (!bucketMatch || !bucketMatch[1]) return url;
+      const bucket = bucketMatch[1];
+
+      // 경로에서 /o/ 이후의 경로 추출 (이미 인코딩된 상태)
+      const pathMatch = urlObj.pathname.match(/\/o\/(.+)/);
+      if (!pathMatch || !pathMatch[1]) return url;
+
+      // ✅ 이미 올바르게 인코딩된 경로는 그대로 사용 (재인코딩 금지)
+      const encodedPath = pathMatch[1];
+
+      // ✅ 토큰 제거하고 alt=media만 사용
+      const newUrl = `https://firebasestorage.googleapis.com/v0/b/${bucket}/o/${encodedPath}?alt=media`;
+
+      devLog.log('🔄 URL 정규화:', {
+        original: url.substring(0, 100) + '...',
+        normalized: newUrl.substring(0, 100) + '...'
+      });
+
+      return newUrl;
+    } catch (error) {
+      devLog.error('❌ URL 정규화 실패:', error);
+      return url; // 파싱 실패 시 원본 반환
+    }
+  }
+
+  /**
+   * ✅ Application-level JOIN: userVehicles + vehicles
+   * 사용자 차량 참조를 vehicles 컬렉션과 JOIN하여 전체 데이터 반환
+   */
+  async getUserVehiclesEnriched(userId: string): Promise<EnrichedUserVehicle[]> {
+    try {
+      devLog.log('🔗 Application-level JOIN 시작:', userId);
+
+      // Step 1: userVehicles 참조 조회
+      const userVehicles = await this.getUserVehicles(userId);
+
+      if (userVehicles.length === 0) {
+        devLog.log('📭 사용자 차량 없음');
+        return [];
+      }
+
+      // Step 2: 각 차량 참조를 vehicles 컬렉션과 JOIN
+      const enrichedVehicles = await Promise.all(
+        userVehicles.map(async (userVehicle) => {
+          try {
+            // ✅ 필수 참조 필드 검증
+            if (!userVehicle.brandId || !userVehicle.modelId || !userVehicle.trimId) {
+              throw new Error(
+                `❌ 손상된 차량 데이터 (필수 필드 누락): ` +
+                `brandId=${userVehicle.brandId}, modelId=${userVehicle.modelId}, trimId=${userVehicle.trimId}. ` +
+                `이 차량 문서를 삭제하거나 수정해주세요: ${userVehicle.id}`
+              );
+            }
+
+            devLog.log('🔍 차량 데이터 조회 중:', {
+              brandId: userVehicle.brandId,
+              modelId: userVehicle.modelId,
+              year: userVehicle.year,
+              trimId: userVehicle.trimId
+            });
+
+            // ✅ vehicles 컬렉션에서 직접 조회 (brandId 그대로 사용)
+            const modelDocRef = doc(
+              this.db,
+              'vehicles',
+              userVehicle.brandId,
+              'models',
+              userVehicle.modelId
+            );
+            const modelDoc = await getDoc(modelDocRef);
+
+            if (!modelDoc.exists()) {
+              throw new Error(`Vehicle not found: ${userVehicle.brandId}/${userVehicle.modelId}`);
+            }
+
+            const vehicleData = modelDoc.data();
+
+            // 트림 찾기
+            const trim = vehicleData.trims?.find(
+              (t: any) => t.trimId === userVehicle.trimId
+            );
+
+            if (!trim) {
+              throw new Error(`Trim not found: ${userVehicle.trimId}`);
+            }
+
+            // 연도에 맞는 variant 찾기
+            const variant = trim.variants?.find(
+              (v: any) => Array.isArray(v.years) && v.years.includes(userVehicle.year.toString())
+            );
+
+            // ✅ 이미지 URL (이미지만 fallback 허용)
+            const { generateVehicleImageUrl } = require('@charzing/vehicle-utils');
+
+            // ✅ 올바른 형식의 imageUrl만 사용 (연도 폴더 포함 여부 검증)
+            const isValidImageUrl = (url: string | undefined): boolean => {
+              if (!url) return false;
+              // 올바른 형식: vehicle-images/BRAND/MODEL/YEAR/filename.png
+              return /vehicle-images\/[A-Z_]+\/[A-Z0-9-]+\/\d{4}\//.test(url);
+            };
+
+            const imageUrl = (isValidImageUrl(variant?.imageUrl) ? variant.imageUrl : null) ||
+                           (isValidImageUrl(vehicleData.imageUrl) ? vehicleData.imageUrl : null) ||
+                           generateVehicleImageUrl({
+                             brandId: userVehicle.brandId,
+                             modelId: userVehicle.modelId,
+                             year: userVehicle.year,
+                             trim: userVehicle.trimId
+                           });
+
+            // VehicleDetails 구성
+            const vehicleDetails: VehicleDetails = {
+              modelName: vehicleData.name || userVehicle.modelId,
+              imageUrl: this.normalizeImageUrl(imageUrl),
+              battery: {
+                capacity: variant?.capacity || trim.defaultBattery?.capacity || 0,
+                manufacturer: trim.batteryManufacturer || '',
+                cellType: trim.batteryType || '',
+                voltage: trim.batteryVoltage || 400
+              },
+              performance: {
+                range: variant?.range || trim.defaultBattery?.range || 0,
+                power: parseFloat(trim.powerMax) || 0,
+                torque: parseFloat(trim.torqueMax) || 0,
+                acceleration: parseFloat(trim.acceleration) || 0,
+                topSpeed: parseFloat(trim.topSpeed) || 0,
+                driveType: trim.driveType || '',
+                efficiency: parseFloat(trim.efficiency) || 0,
+                chargingSpeed: variant?.specifications?.chargingSpeed || '',
+                chargingConnector: variant?.specifications?.chargingConnector
+              }
+            };
+
+            devLog.log('✅ JOIN 성공:', userVehicle.id);
+
+            return {
+              ...userVehicle,
+              vehicleData: vehicleDetails
+            } as EnrichedUserVehicle;
+
+          } catch (error) {
+            devLog.error(`❌ JOIN 실패 (${userVehicle.id}):`, {
+              error,
+              userVehicle: {
+                brandId: userVehicle.brandId,
+                modelId: userVehicle.modelId,
+                year: userVehicle.year,
+                trimId: userVehicle.trimId
+              },
+              path: `vehicles/${userVehicle.brandId}/models/${userVehicle.modelId}`
+            });
+            // JOIN 실패 시 null 반환 (필터링됨)
+            return null;
+          }
+        })
+      );
+
+      // null 제거
+      const validVehicles = enrichedVehicles.filter((v): v is EnrichedUserVehicle => v !== null);
+
+      devLog.log('🎉 Application-level JOIN 완료:', {
+        total: userVehicles.length,
+        success: validVehicles.length,
+        failed: userVehicles.length - validVehicles.length
+      });
+
+      return validVehicles;
+
+    } catch (error: any) {
+      devLog.error('❌ getUserVehiclesEnriched 실패:', error);
       throw error;
     }
   }
@@ -3620,101 +3694,68 @@ class FirebaseService {
           name: trimGroup.name,
           trimName: trimGroup.trimName
         });
-        
-        // 브랜드별 데이터 구조 처리
-        // 아우디는 특별한 구조: variants 배열의 각 항목이 개별 트림이고, 상위에 name/trimName이 없음
-        if (brandId === 'audi' && trimGroup.variants && Array.isArray(trimGroup.variants) && !trimGroup.name && !trimGroup.trimName) {
-          // 아우디는 variants 배열의 각 항목이 개별 트림임
-          trimGroup.variants.forEach((variant: any, variantIndex: number) => {
-            const trimName = variant.trimName || variant.name || `트림 ${variantIndex + 1}`;
-            const driveType = variant.driveType || 'FWD';
-            const trimId = variant.trimId || `${modelId}-${variant.trimId || variantIndex}`;
-            
-            // 연도 정보 추출
-            const years: string[] = [];
+
+        // 🔧 통합된 데이터 구조 처리 (모든 브랜드 동일)
+        const trimName = trimGroup.name || trimGroup.trimName || `트림 ${groupIndex + 1}`;
+        const driveType = trimGroup.driveType || 'FWD';
+        const trimId = trimGroup.trimId || `${modelId}-trim-${groupIndex}`;
+
+        // variants에서 연도 정보 추출
+        const years: number[] = [];
+        let batteryCapacity = modelData.defaultBattery?.capacity || 0;
+
+        if (trimGroup.variants && Array.isArray(trimGroup.variants)) {
+          trimGroup.variants.forEach((variant: any) => {
+            // variant.years 배열에서 연도 추출
             if (variant.years && Array.isArray(variant.years)) {
-              years.push(...variant.years);
-            } else if (variant.year) {
-              years.push(variant.year.toString());
-            }
-            
-            // 배터리 용량
-            let batteryCapacity = variant.batteryCapacity || modelData.defaultBattery?.capacity || 0;
-            
-            vehicleTrims.push({
-              trimId: trimId,
-              trimName: trimName,
-              brandId: brandId,
-              modelId: modelId,
-              modelName: modelData.name || modelId,
-              driveType: driveType,
-              batteryCapacity: batteryCapacity,
-              years: years
-            });
-          });
-        } else {
-          // 기존 로직 (현대, 기아 등)
-          const trimName = trimGroup.name || trimGroup.trimName || `트림 ${groupIndex + 1}`;
-          const driveType = trimGroup.driveType || 'FWD';
-          const trimId = trimGroup.trimId || `${modelId}-trim-${groupIndex}`;
-          
-          // variants에서 연도 정보 추출
-          const years: number[] = [];
-          let batteryCapacity = modelData.defaultBattery?.capacity || 0;
-          
-          if (trimGroup.variants && Array.isArray(trimGroup.variants)) {
-            trimGroup.variants.forEach((variant: any) => {
-              // variant.years 배열에서 연도 추출
-              if (variant.years && Array.isArray(variant.years)) {
-                variant.years.forEach((year: string) => {
-                  const yearNum = parseInt(year, 10);
-                  if (!isNaN(yearNum) && !years.includes(yearNum)) {
-                    years.push(yearNum);
-                  }
-                });
-              }
-              // variant.year (단일 연도)에서도 추출
-              if (variant.year) {
-                const yearNum = parseInt(variant.year.toString(), 10);
+              variant.years.forEach((year: any) => {
+                const yearNum = typeof year === 'number' ? year : parseInt(year, 10);
                 if (!isNaN(yearNum) && !years.includes(yearNum)) {
                   years.push(yearNum);
                 }
+              });
+            }
+            // variant.year (단일 연도)에서도 추출
+            if (variant.year) {
+              const yearNum = typeof variant.year === 'number' ? variant.year : parseInt(variant.year.toString(), 10);
+              if (!isNaN(yearNum) && !years.includes(yearNum)) {
+                years.push(yearNum);
               }
-              if (variant.batteryCapacity) {
-                batteryCapacity = variant.batteryCapacity;
-              }
-            });
-          }
-          
-          // yearRange에서도 연도 정보 추출
-          if (trimGroup.yearRange) {
-            const { start, end } = trimGroup.yearRange;
-            if (start && end) {
-              for (let year = start; year <= end; year++) {
-                if (!years.includes(year)) {
-                  years.push(year);
-                }
+            }
+            if (variant.batteryCapacity) {
+              batteryCapacity = variant.batteryCapacity;
+            }
+          });
+        }
+
+        // yearRange에서도 연도 정보 추출
+        if (trimGroup.yearRange) {
+          const { start, end } = trimGroup.yearRange;
+          if (start && end) {
+            for (let year = start; year <= end; year++) {
+              if (!years.includes(year)) {
+                years.push(year);
               }
             }
           }
-          
-          // 연도가 없으면 기본값 추가
-          if (years.length === 0) {
-            const currentYear = new Date().getFullYear();
-            years.push(currentYear - 1, currentYear); // 작년, 올해
-          }
-
-          vehicleTrims.push({
-            trimId: trimId,
-            trimName: trimName,
-            brandId: brandId,
-            modelId: modelId,
-            modelName: modelData.name || modelId,
-            driveType: driveType,
-            batteryCapacity: batteryCapacity,
-            years: years.map(y => y.toString())
-          });
         }
+
+        // 연도가 없으면 기본값 추가
+        if (years.length === 0) {
+          const currentYear = new Date().getFullYear();
+          years.push(currentYear - 1, currentYear); // 작년, 올해
+        }
+
+        vehicleTrims.push({
+          trimId: trimId,
+          trimName: trimName,
+          brandId: brandId,
+          modelId: modelId,
+          modelName: modelData.name || modelId,
+          driveType: driveType,
+          batteryCapacity: batteryCapacity,
+          years: years.map(y => y.toString())
+        });
       });
       
       devLog.log(`✅ 차량 트림 조회 완료: ${vehicleTrims.length}개`, vehicleTrims);
@@ -3732,153 +3773,29 @@ class FirebaseService {
   async getVehicleDetails(make: string, model: string, year: number, trim?: string): Promise<VehicleDetails | null> {
     try {
       await this.waitForFirebaseReady();
-      
-      // 브랜드명 정규화
-      const brandMapping: Record<string, string> = {
-        '현대': 'hyundai',
-        'HYUNDAI': 'hyundai',
-        'Hyundai': 'hyundai',
-        '기아': 'kia', 
-        'KIA': 'kia',
-        'Kia': 'kia',
-        '테슬라': 'tesla',
-        'TESLA': 'tesla',
-        'Tesla': 'tesla',
-        'BMW': 'BMW',
-        'bmw': 'BMW',
-        '비엠더블유': 'BMW',
-        '메르세데스-벤츠': 'mercedes-benz',
-        'Mercedes-Benz': 'mercedes-benz',
-        'MERCEDES-BENZ': 'mercedes-benz',
-        '벤츠': 'mercedes-benz',
-        '메르세데스-마이바흐': 'mercedes-maybach',
-        'Mercedes-Maybach': 'mercedes-maybach',
-        'MERCEDES-MAYBACH': 'mercedes-maybach',
-        '마이바흐': 'mercedes-maybach',
-        'Maybach': 'mercedes-maybach',
-        'MAYBACH': 'mercedes-maybach',
-        '아우디': 'audi',
-        'AUDI': 'audi',
-        'Audi': 'audi',
-        '포르쉐': 'PORSCHE',
-        'PORSCHE': 'PORSCHE',
-        'Porsche': 'PORSCHE',
-        'MINI': 'MINI',
-        'Mini': 'MINI',
-        'mini': 'MINI',
-        '미니': 'MINI'
-      };
 
-      const brandId = brandMapping[make] || make.toLowerCase();
-      
-      // 동적 모델 검색: 실제 Firestore에 있는 모델 중에서 가장 유사한 것 찾기
-      let modelId: string | null = null;
-      
-      // 1차 시도: 입력 모델명을 정규화해서 직접 조회
-      const normalizedModel = model.toLowerCase().replace(/[\s\-]/g, '-');
-      
-      // 2차 시도: 해당 브랜드의 모든 모델 목록 가져와서 유사도 매칭
-      try {
-        const brandDocRef = doc(this.db, 'vehicles', brandId);
-        const modelsCollectionRef = collection(brandDocRef, 'models');
-        const modelsSnapshot = await getDocs(modelsCollectionRef);
-        
-        if (!modelsSnapshot.empty) {
-          const availableModels = modelsSnapshot.docs.map(doc => doc.id);
-          devLog.log(`📋 ${brandId} 브랜드 사용 가능한 모델들:`, availableModels);
-          
-          // 정확히 일치하는 모델 찾기
-          modelId = availableModels.find(availableModel => 
-            availableModel.toLowerCase() === normalizedModel ||
-            availableModel.toLowerCase().replace(/[\s\-]/g, '-') === normalizedModel
-          ) || null;
-          
-          if (!modelId) {
-            // 한국어-영어 모델명 매핑 시도
-            const koreanModelMapping: Record<string, string> = {
-              // MINI
-              '쿠퍼': 'COOPER',
-              '컨트리맨': 'COUNTRYMAN', 
-              '에이스맨': 'ACEMAN',
-              // 현대
-              '아이오닉': 'IONIQ',
-              '코나': 'KONA',
-              '넥소': 'NEXO',
-              '캐스퍼': 'CASPER',
-              // 기아
-              '니로': 'NIRO',
-              '레이': 'ray-ev',
-              // BMW
-              '아이': 'i',
-              // 기타 필요시 추가...
-            };
-            
-            // 한국어 매핑 시도
-            for (const [korean, english] of Object.entries(koreanModelMapping)) {
-              if (model.includes(korean)) {
-                // 정확한 매칭 우선 시도
-                let matchedModel = availableModels.find(am => am === english);
-                // 정확한 매칭이 없으면 포함 관계로 매칭
-                if (!matchedModel) {
-                  matchedModel = availableModels.find(am => am.includes(english) || english.includes(am));
-                }
-                if (matchedModel) {
-                  modelId = matchedModel;
-                  devLog.log(`🌏 한국어 매핑 성공: "${model}" (${korean}) → "${modelId}"`);
-                  break;
-                }
-              }
-            }
-            
-            // 한국어 매핑이 실패하면 기존 유사도 매칭 시도
-            if (!modelId) {
-              const inputWords = model.toLowerCase().replace(/[\s\-]/g, ' ').split(' ').filter(w => w.length > 0);
-              let bestMatch = null;
-              let bestScore = 0;
-              
-              for (const availableModel of availableModels) {
-                const modelWords = availableModel.toLowerCase().replace(/[\s\-]/g, ' ').split(' ').filter(w => w.length > 0);
-                let score = 0;
-                
-                // 단어별 매칭 점수 계산
-                for (const inputWord of inputWords) {
-                  for (const modelWord of modelWords) {
-                    if (inputWord === modelWord) {
-                      score += 2; // 정확한 단어 매칭
-                    } else if (inputWord.includes(modelWord) || modelWord.includes(inputWord)) {
-                      score += 1; // 부분 매칭
-                    }
-                  }
-                }
-                
-                if (score > bestScore) {
-                  bestScore = score;
-                  bestMatch = availableModel;
-                }
-              }
-              
-              if (bestMatch && bestScore > 0) {
-                modelId = bestMatch;
-                devLog.log(`🎯 유사도 매칭 성공: "${model}" → "${modelId}" (점수: ${bestScore})`);
-              }
-            }
-            
-            
-            if (!modelId) {
-              devLog.warn(`❌ 매칭 실패: "${model}" in ${brandId}, 사용 가능한 모델: ${availableModels.join(', ')}`);
-              return null;
-            }
-          } else {
-            devLog.log(`✅ 정확한 매칭: "${model}" → "${modelId}"`);
-          }
-        } else {
-          devLog.warn(`❌ ${brandId} 브랜드에 모델이 없습니다.`);
-          return null;
-        }
-      } catch (modelsError) {
-        devLog.error(`❌ 모델 목록 조회 실패:`, modelsError);
+      // ⭐ 동적 브랜드 매핑 사용 (@charzing/vehicle-utils)
+      const { getDynamicBrandMapping } = await import('@charzing/vehicle-utils');
+      const brandMapping = getDynamicBrandMapping(make);
+
+      if (!brandMapping) {
+        devLog.warn(`❌ 브랜드 매핑 실패: "${make}"`);
         return null;
       }
+
+      const brandId = brandMapping.firestoreId;
+      
+      // ⭐ 동적 모델 매핑 사용 (@charzing/vehicle-utils)
+      const { getDynamicModelMapping } = await import('@charzing/vehicle-utils');
+      const modelMapping = getDynamicModelMapping(brandId, model);
+
+      if (!modelMapping) {
+        devLog.warn(`❌ 모델 매핑 실패: "${model}" in ${brandId}`);
+        return null;
+      }
+
+      const modelId = modelMapping.firestoreId;
+      devLog.log(`✅ 동적 매핑 성공: "${model}" → "${modelId}"`);
       
       devLog.log(`🔍 차량 조회 시작:`, {
         original: { make, model, year, trim },
@@ -4042,7 +3959,7 @@ class FirebaseService {
       // 상세 정보 구성
       const details: VehicleDetails = {
         modelName: vehicleData.name || model, // 실제 Firebase 모델명 사용
-        imageUrl: normalizeImageUrl(matchedVariant?.imageUrl || vehicleData.imageUrl), // variant 이미지 우선, 없으면 기본 이미지
+        imageUrl: this.normalizeImageUrl(matchedVariant?.imageUrl || vehicleData.imageUrl), // variant 이미지 우선, 없으면 기본 이미지
         battery: {
           capacity: matchedVariant?.batteryCapacity || 
                    (typeof defaultBattery.capacity === 'string' ? parseInt(defaultBattery.capacity.replace('kWh', '')) : defaultBattery.capacity) || 0,
@@ -4189,6 +4106,7 @@ class FirebaseService {
       return null;
     }
   }
+
 }
 
 // 싱글톤 인스턴스 생성
