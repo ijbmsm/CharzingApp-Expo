@@ -3515,21 +3515,26 @@ class FirebaseService {
               });
             } else {
               // YearTemplate 없음 - trim 이미지 사용 (연도 매칭)
+              const generatedUrl = generateVehicleImageUrl({
+                brandId: userVehicle.brandId,
+                modelId: userVehicle.modelId,
+                year: userVehicle.year
+              });
+
               devLog.log(`🖼️ [JOIN] Model 이미지 소스 확인 (${userVehicle.year}년):`, {
                 trimId: trim.trimId,
                 variantImageUrl: variantForYear?.imageUrl || '없음',
                 trimImageUrl: trim.imageUrl || '없음',
-                modelImageUrl: vehicleData.imageUrl || '없음'
+                modelImageUrl: vehicleData.imageUrl || '없음',
+                generatedUrl: generatedUrl
               });
 
               imageUrl = variantForYear?.imageUrl ||
                         trim.imageUrl ||
                         vehicleData.imageUrl ||
-                        generateVehicleImageUrl({
-                          brandId: userVehicle.brandId,
-                          modelId: userVehicle.modelId,
-                          year: userVehicle.year
-                        });
+                        generatedUrl;
+
+              devLog.log(`🖼️ [JOIN] 최종 선택된 이미지 URL:`, imageUrl);
             }
 
             // VehicleDetails 구성

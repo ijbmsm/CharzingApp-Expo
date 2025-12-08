@@ -159,10 +159,8 @@ export default function BatteryInfoScreen() {
     return url;
   };
 
-  // 차량 선택 핸들러 - 실제 Firebase 구조에 맞게 데이터 조회
+  // 차량 선택 핸들러 - getUserVehiclesEnriched와 동일한 로직 사용
   const handleVehicleSelect = async (vehicle: CompletedVehicle) => {
-    // console.log("🔋 배터리 정보 조회할 차량 선택:", vehicle);
-
     setBatteryInfo({
       vehicle,
       modelData: null,
@@ -173,17 +171,15 @@ export default function BatteryInfoScreen() {
     setShowVehicleModal(false);
 
     try {
-      // VehicleAccordionSelector에서 넘어오는 데이터는 이미 올바른 영어 ID를 포함
-      // vehicle.brandId와 vehicle.modelId 사용 (한글명 말고)
-      // 브랜드별로 다른 modelId 대소문자 규칙 적용
-      const brandId = vehicle.brandId; // "PORSCHE" 형태 그대로 유지
-      // MINI는 대문자 모델 ID 사용, 나머지는 소문자
-      const modelId =
-        brandId === "MINI" ? vehicle.modelId : vehicle.modelId.toLowerCase();
+      const brandId = vehicle.brandId;
+      const modelId = brandId === "MINI" ? vehicle.modelId : vehicle.modelId.toLowerCase();
 
-      // console.log(
-      //   `🔍 실제 Firebase 경로: vehicles/${brandId}/models/${modelId}`
-      // );
+      console.log(`🔍 [BatteryInfo] 데이터 조회:`, {
+        brandId,
+        modelId,
+        trimId: vehicle.trimId,
+        year: vehicle.year
+      });
 
       // vehicles/{brandId}/models/{modelId} 문서에서 모델 데이터 가져오기
       const modelData = await firebaseService.getModelData(brandId, modelId);
@@ -192,118 +188,97 @@ export default function BatteryInfoScreen() {
         throw new Error("해당 차량의 데이터를 찾을 수 없습니다.");
       }
 
-      // 브랜드별로 다른 Firebase 구조 지원 - 타입 안전하게 처리
-      let selectedVariant: Record<string, unknown> | null = null;
+      // 트림 찾기
+      const trim = modelData.trims?.find((t: any) => t.trimId === vehicle.trimId);
 
-      // console.log(
-      //   `🔍 트림 찾기: trimId=${vehicle.trimId}, trimName=${vehicle.trim}`
-      // );
-      // console.log(
-      //   `🔍 실제 Firebase 트림 데이터 구조:`,
-      //   JSON.stringify(modelData.trims, null, 2)
-      // );
+      if (!trim) {
+        throw new Error(`트림을 찾을 수 없습니다: ${vehicle.trimId}`);
+      }
 
-      // ⭐ Phase 5.1.5: YearTemplate 우선 조회
-      if (modelData.yearTemplates && modelData.yearTemplates.length > 0) {
-        console.log(`🔍 [BatteryInfo] YearTemplate 검색:`, {
-          trimId: vehicle.trimId,
-          year: vehicle.year,
-          totalTemplates: modelData.yearTemplates.length
+      // ⭐ getUserVehiclesEnriched와 동일한 로직
+      const defaultBattery = modelData.defaultBattery || {};
+
+      // YearTemplate 매칭
+      const templateForYear = modelData.yearTemplates?.find((template: any) =>
+        template.trimId === vehicle.trimId &&
+        template.years &&
+        template.years.includes(vehicle.year)
+      );
+
+      // Model variant 매칭 (연도별)
+      const variantForYear = trim.variants?.find(
+        (v: any) => Array.isArray(v.years) && v.years.includes(vehicle.year)
+      );
+      const firstVariant = trim.variants?.[0] || {};
+
+      let batteryManufacturer: string;
+      let batteryType: string;
+      let batteryCapacity: number;
+      let range: number;
+      let imageUrl: string;
+
+      if (templateForYear) {
+        // YearTemplate 존재 - YearTemplate 데이터 우선 사용
+        const templateVar: any = templateForYear.variants?.[0] || {};
+
+        batteryManufacturer = templateVar.supplier || (defaultBattery as any).supplier || (defaultBattery as any).manufacturer || '미제공';
+        batteryType = templateVar.cellType || defaultBattery.cellType || '미제공';
+        batteryCapacity = templateVar.batteryCapacity || (defaultBattery as any).capacity || 0;
+        range = templateVar.range || (defaultBattery as any).range || 0;
+
+        // ✅ 이미지: template.images.main 최우선
+        imageUrl = (templateForYear as any).images?.main ||
+                  templateVar.imageUrl ||
+                  (trim as any).imageUrl ||
+                  modelData.imageUrl ||
+                  '';
+
+        console.log(`📋 [BatteryInfo] YearTemplate 데이터 사용:`, {
+          source: 'yearTemplate',
+          supplier: batteryManufacturer,
+          range: range,
+          imageUrl: imageUrl
         });
+      } else {
+        // YearTemplate 없음 - Model variant 데이터 사용 (연도 매칭)
+        const selectedVar: any = variantForYear || firstVariant;
 
-        for (const template of modelData.yearTemplates) {
-          if (template.trimId === vehicle.trimId && template.years.includes(vehicle.year)) {
-            console.log(`✅ [BatteryInfo] YearTemplate 매칭:`, template);
+        batteryManufacturer = selectedVar.supplier || (defaultBattery as any).supplier || (defaultBattery as any).manufacturer || '미제공';
+        batteryType = selectedVar.cellType || defaultBattery.cellType || '미제공';
+        batteryCapacity = selectedVar.batteryCapacity || (defaultBattery as any).capacity || 0;
+        range = selectedVar.range || (defaultBattery as any).range || 0;
 
-            // YearTemplate의 첫 번째 variant 사용
-            if (template.variants && template.variants.length > 0) {
-              const templateVariant = template.variants[0];
+        imageUrl = (variantForYear as any)?.imageUrl ||
+                  (trim as any).imageUrl ||
+                  modelData.imageUrl ||
+                  '';
 
-              selectedVariant = {
-                trimId: vehicle.trimId,
-                trimName: template.trimName,
-                batteryCapacity: templateVariant?.batteryCapacity || 0,
-                range: templateVariant?.range || 0,
-                supplier: templateVariant?.supplier || '정보 없음',
-                cellType: templateVariant?.cellType || '정보 없음',
-                years: template.years.map(String),
-                driveType: 'RWD',
-                powerMax: templateVariant?.specifications?.power || '정보 없음',
-                topSpeed: templateVariant?.specifications?.topSpeed ? parseInt(templateVariant.specifications.topSpeed) : 0,
-                acceleration: templateVariant?.specifications?.acceleration ? parseFloat(templateVariant.specifications.acceleration) : 0,
-                specifications: templateVariant?.specifications || {},
-                _source: 'yearTemplate'
-              };
-
-              console.log(`✅ [BatteryInfo] YearTemplate 데이터 사용`);
-              break;
-            }
-          }
-        }
+        console.log(`📋 [BatteryInfo] Model 데이터 사용 (${vehicle.year}년):`, {
+          source: variantForYear ? 'modelVariant' : 'modelVariant_fallback',
+          variantMatched: !!variantForYear,
+          supplier: batteryManufacturer,
+          range: range,
+          imageUrl: imageUrl
+        });
       }
 
-      // YearTemplate에서 못 찾으면 모델 trims 데이터 사용
-      if (!selectedVariant) {
-        console.log(`⚠️ [BatteryInfo] YearTemplate 없음 - 모델 데이터 사용`);
-
-        // 현대/기아 등 표준 구조: trims[].trimId + trims[].variants[]
-        for (const trim of modelData.trims) {
-          if (
-            typeof trim === "object" &&
-            trim !== null &&
-            "trimId" in trim &&
-            "name" in trim &&
-            "variants" in trim
-          ) {
-            if (safeGetString(trim, "trimId") === vehicle.trimId) {
-              // variants에서 연식에 맞는 variant 찾기
-              const variants = safeGetArray(trim, "variants");
-
-              // 연도 매칭되는 variant 찾기
-              for (const variant of variants) {
-                if (
-                  typeof variant === "object" &&
-                  variant !== null &&
-                  variant.constructor === Object
-                ) {
-                  const variantRecord = variant as Record<string, unknown>;
-                  const years = safeGetArray(variantRecord, "years");
-                  if (isYearMatch(years, vehicle.year)) {
-                    selectedVariant = {
-                      ...variantRecord,
-                      trimId: safeGetString(trim as Record<string, unknown>, "trimId"),
-                      trimName: safeGetString(trim as Record<string, unknown>, "name"),
-                      driveType: safeGetString(trim as Record<string, unknown>, "driveType", "RWD"),
-                      _source: 'modelTrim'
-                    };
-                    break;
-                  }
-                }
-              }
-
-              // 연도 매칭 실패 시 첫 번째 variant 사용
-              if (!selectedVariant && variants.length > 0) {
-                const firstVariant = variants[0];
-                if (
-                  typeof firstVariant === "object" &&
-                  firstVariant !== null &&
-                  firstVariant.constructor === Object
-                ) {
-                  selectedVariant = {
-                    ...(firstVariant as Record<string, unknown>),
-                    trimId: safeGetString(trim as Record<string, unknown>, "trimId"),
-                    trimName: safeGetString(trim as Record<string, unknown>, "name"),
-                    driveType: safeGetString(trim as Record<string, unknown>, "driveType", "RWD"),
-                    _source: 'modelTrim_fallback'
-                  };
-                }
-              }
-
-              if (selectedVariant) break;
-            }
-          }
-        }
-      }
+      // selectedVariant 구성 (UI 표시용)
+      const selectedVariant: Record<string, unknown> = {
+        trimId: vehicle.trimId,
+        trimName: (trim as any).name || vehicle.trim,
+        batteryCapacity,
+        range,
+        supplier: batteryManufacturer,
+        cellType: batteryType,
+        years: [vehicle.year.toString()],
+        driveType: (trim as any).driveType || 'RWD',
+        powerMax: (templateForYear as any)?.variants?.[0]?.specifications?.power || (variantForYear as any)?.specifications?.power || '정보 없음',
+        topSpeed: 0,
+        acceleration: 0,
+        specifications: (templateForYear as any)?.variants?.[0]?.specifications || (variantForYear as any)?.specifications || {},
+        _imageUrl: imageUrl, // ⭐ 이미지 URL 저장
+        _source: templateForYear ? 'yearTemplate' : (variantForYear ? 'modelVariant' : 'modelVariant_fallback')
+      };
 
       // console.log(`🔍 매칭된 selectedVariant:`, selectedVariant);
 
@@ -522,22 +497,22 @@ export default function BatteryInfoScreen() {
                 </View>
               </View>
 
-              {/* 차량 이미지 카드 - ⭐ 동적 URL만 사용 */}
+              {/* 차량 이미지 카드 - ⭐ selectedVariant._imageUrl 사용 */}
               {(() => {
-                const dynamicImageUrl = generateDynamicImageUrl(batteryInfo.vehicle);
+                const imageUrl = safeGetString(batteryInfo.selectedVariant, "_imageUrl");
 
-                return dynamicImageUrl ? (
+                return imageUrl && imageUrl !== '정보 없음' ? (
                   <View style={styles.vehicleImageCard}>
                     <Image
-                      source={{ uri: dynamicImageUrl }}
+                      source={{ uri: imageUrl }}
                       style={styles.vehicleImage}
                       resizeMode="contain"
                       onLoad={() => {
-                        console.log("✅ [BatteryInfoScreen] 이미지 로드 성공:", dynamicImageUrl);
+                        console.log("✅ [BatteryInfoScreen] 이미지 로드 성공:", imageUrl);
                       }}
                       onError={(error) => {
                         console.error("❌ [BatteryInfoScreen] 이미지 로드 실패:", {
-                          url: dynamicImageUrl,
+                          url: imageUrl,
                           error: error.nativeEvent
                         });
                       }}
