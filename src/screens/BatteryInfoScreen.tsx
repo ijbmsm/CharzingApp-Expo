@@ -203,84 +203,104 @@ export default function BatteryInfoScreen() {
       //   JSON.stringify(modelData.trims, null, 2)
       // );
 
-      // 방법 1: Hyundai/KIA 구조 - trims 자체에 trimId가 있고 variants는 연식별
-      for (const trim of modelData.trims) {
-        // Type guard for Hyundai structure - 더 정확한 검증
-        if (
-          typeof trim === "object" &&
-          trim !== null &&
-          "trimId" in trim &&
-          "name" in trim &&
-          "driveType" in trim &&
-          "yearRange" in trim &&
-          "variants" in trim
-        ) {
-          if (safeGetString(trim, "trimId") === vehicle.trimId) {
-            // variants에서 연식에 맞는 variant 찾기
-            const variants = safeGetArray(trim, "variants");
-            for (const variant of variants) {
-              if (
-                typeof variant === "object" &&
-                variant !== null &&
-                variant.constructor === Object
-              ) {
-                const variantRecord = variant as Record<string, unknown>;
-                const years = safeGetArray(variantRecord, "years");
-                if (isYearMatch(years, vehicle.year)) {
-                  // Hyundai 구조에서는 variant에 trimId/trimName이 없으므로 추가
-                  selectedVariant = {
-                    ...variantRecord,
-                    trimId: safeGetString(
-                      trim as Record<string, unknown>,
-                      "trimId"
-                    ),
-                    trimName: safeGetString(
-                      trim as Record<string, unknown>,
-                      "name"
-                    ),
-                    driveType: safeGetString(
-                      trim as Record<string, unknown>,
-                      "driveType",
-                      "RWD"
-                    ),
-                  };
-                  break;
-                }
-              }
+      // ⭐ Phase 5.1.5: YearTemplate 우선 조회
+      if (modelData.yearTemplates && modelData.yearTemplates.length > 0) {
+        console.log(`🔍 [BatteryInfo] YearTemplate 검색:`, {
+          trimId: vehicle.trimId,
+          year: vehicle.year,
+          totalTemplates: modelData.yearTemplates.length
+        });
+
+        for (const template of modelData.yearTemplates) {
+          if (template.trimId === vehicle.trimId && template.years.includes(vehicle.year)) {
+            console.log(`✅ [BatteryInfo] YearTemplate 매칭:`, template);
+
+            // YearTemplate의 첫 번째 variant 사용
+            if (template.variants && template.variants.length > 0) {
+              const templateVariant = template.variants[0];
+
+              selectedVariant = {
+                trimId: vehicle.trimId,
+                trimName: template.trimName,
+                batteryCapacity: templateVariant?.batteryCapacity || 0,
+                range: templateVariant?.range || 0,
+                supplier: templateVariant?.supplier || '정보 없음',
+                cellType: templateVariant?.cellType || '정보 없음',
+                years: template.years.map(String),
+                driveType: 'RWD',
+                powerMax: templateVariant?.specifications?.power || '정보 없음',
+                topSpeed: templateVariant?.specifications?.topSpeed ? parseInt(templateVariant.specifications.topSpeed) : 0,
+                acceleration: templateVariant?.specifications?.acceleration ? parseFloat(templateVariant.specifications.acceleration) : 0,
+                specifications: templateVariant?.specifications || {},
+                _source: 'yearTemplate'
+              };
+
+              console.log(`✅ [BatteryInfo] YearTemplate 데이터 사용`);
+              break;
             }
-            if (selectedVariant) break;
           }
         }
       }
 
-      // 방법 2: Audi 구조 - trims[].variants[]에 trimId가 있음
+      // YearTemplate에서 못 찾으면 모델 trims 데이터 사용
       if (!selectedVariant) {
-        for (const trimGroup of modelData.trims) {
-          // Type guard for Audi structure
+        console.log(`⚠️ [BatteryInfo] YearTemplate 없음 - 모델 데이터 사용`);
+
+        // 현대/기아 등 표준 구조: trims[].trimId + trims[].variants[]
+        for (const trim of modelData.trims) {
           if (
-            typeof trimGroup === "object" &&
-            trimGroup !== null &&
-            "variants" in trimGroup &&
-            !("trimId" in trimGroup)
+            typeof trim === "object" &&
+            trim !== null &&
+            "trimId" in trim &&
+            "name" in trim &&
+            "variants" in trim
           ) {
-            const variants = safeGetArray(trimGroup, "variants");
-            for (const variant of variants) {
-              if (
-                typeof variant === "object" &&
-                variant !== null &&
-                variant.constructor === Object
-              ) {
-                const variantRecord = variant as Record<string, unknown>;
-                if (safeGetString(variantRecord, "trimId") === vehicle.trimId) {
+            if (safeGetString(trim, "trimId") === vehicle.trimId) {
+              // variants에서 연식에 맞는 variant 찾기
+              const variants = safeGetArray(trim, "variants");
+
+              // 연도 매칭되는 variant 찾기
+              for (const variant of variants) {
+                if (
+                  typeof variant === "object" &&
+                  variant !== null &&
+                  variant.constructor === Object
+                ) {
+                  const variantRecord = variant as Record<string, unknown>;
                   const years = safeGetArray(variantRecord, "years");
                   if (isYearMatch(years, vehicle.year)) {
-                    selectedVariant = variantRecord;
+                    selectedVariant = {
+                      ...variantRecord,
+                      trimId: safeGetString(trim as Record<string, unknown>, "trimId"),
+                      trimName: safeGetString(trim as Record<string, unknown>, "name"),
+                      driveType: safeGetString(trim as Record<string, unknown>, "driveType", "RWD"),
+                      _source: 'modelTrim'
+                    };
                     break;
                   }
                 }
               }
+
+              // 연도 매칭 실패 시 첫 번째 variant 사용
+              if (!selectedVariant && variants.length > 0) {
+                const firstVariant = variants[0];
+                if (
+                  typeof firstVariant === "object" &&
+                  firstVariant !== null &&
+                  firstVariant.constructor === Object
+                ) {
+                  selectedVariant = {
+                    ...(firstVariant as Record<string, unknown>),
+                    trimId: safeGetString(trim as Record<string, unknown>, "trimId"),
+                    trimName: safeGetString(trim as Record<string, unknown>, "name"),
+                    driveType: safeGetString(trim as Record<string, unknown>, "driveType", "RWD"),
+                    _source: 'modelTrim_fallback'
+                  };
+                }
+              }
+
+              if (selectedVariant) break;
             }
-            if (selectedVariant) break;
           }
         }
       }

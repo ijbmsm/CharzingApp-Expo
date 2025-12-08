@@ -4285,8 +4285,13 @@ class FirebaseService {
       cellType: string; // "NCM"
       manufacturer: string; // "LG Energy Solution"
       warranty: string; // "8년/16만km"
+      supplier?: string; // "SK온", "CATL" 등
     };
     trims: Array<{
+      trimId?: string;
+      name?: string;
+      driveType?: string;
+      yearRange?: { start: number; end: number };
       variants: Array<{
         trimId: string;
         trimName: string;
@@ -4297,46 +4302,114 @@ class FirebaseService {
         driveType: string;
         powerMax: string;
         topSpeed: number;
+        supplier?: string; // 배터리 제조사
+      }>;
+    }>;
+    yearTemplates?: Array<{
+      templateId: string;
+      years: number[];
+      trimId: string;
+      trimName: string;
+      images: {
+        main?: string;
+        front?: string;
+        side?: string;
+        rear?: string;
+      };
+      variants: Array<{
+        batteryCapacity: number;
+        range: number;
+        supplier: string;
+        cellType?: string;
+        specifications?: {
+          motor?: string;
+          power?: string;
+          torque?: string;
+          acceleration?: string;
+          chargingSpeed?: string;
+          topSpeed?: string;
+          efficiency?: string;
+        };
       }>;
     }>;
     createdAt?: any;
     updatedAt?: any;
   } | null> {
     try {
-      devLog.log(`🔍 모델 데이터 조회: vehicles/${brandId}/models/${modelId}`);
-      
-      // vehicles/{brandId}/models/{modelId} 문서 조회
+      devLog.log(`🔍 [getModelData] 모델 데이터 조회: vehicles/${brandId}/models/${modelId}`);
+
+      // 1. vehicles/{brandId}/models/{modelId} 문서 조회
       const modelDocRef = doc(this.db, 'vehicles', brandId, 'models', modelId);
       const modelDoc = await getDoc(modelDocRef);
-      
+
       if (!modelDoc.exists()) {
-        devLog.log(`❌ 모델 데이터를 찾을 수 없습니다: ${brandId}/${modelId}`);
+        devLog.log(`❌ [getModelData] 모델 데이터를 찾을 수 없습니다: ${brandId}/${modelId}`);
         return null;
       }
-      
+
       const modelData = modelDoc.data();
-      devLog.log(`✅ 모델 데이터 조회 성공:`, modelData);
-      
+      devLog.log(`✅ [getModelData] 모델 문서 조회 성공`);
+
+      // 2. YearTemplate 서브컬렉션 조회 (Phase 5.1.5)
+      const yearTemplatesRef = collection(this.db, 'vehicles', brandId, 'models', modelId, 'yearTemplates');
+      const yearTemplatesSnapshot = await getDocs(yearTemplatesRef);
+
+      const yearTemplates: Array<{
+        templateId: string;
+        years: number[];
+        trimId: string;
+        trimName: string;
+        images: {
+          main?: string;
+          front?: string;
+          side?: string;
+          rear?: string;
+        };
+        variants: Array<any>;
+      }> = [];
+
+      yearTemplatesSnapshot.forEach((templateDoc) => {
+        const templateData = templateDoc.data();
+        yearTemplates.push({
+          templateId: templateDoc.id,
+          years: templateData.years || [],
+          trimId: templateData.trimId || '',
+          trimName: templateData.trimName || '',
+          images: templateData.images || {},
+          variants: templateData.variants || [],
+        });
+      });
+
+      devLog.log(`📋 [getModelData] YearTemplate 조회 완료: ${yearTemplates.length}개`);
+
       // 실제 Firebase 구조로 타입 검증
       const requiredFields = ['name', 'englishName', 'imageUrl', 'defaultBattery', 'trims'];
       for (const field of requiredFields) {
         if (!modelData[field]) {
-          devLog.log(`⚠️ 필수 필드 누락: ${field}`);
+          devLog.log(`⚠️ [getModelData] 필수 필드 누락: ${field}`);
           return null;
         }
       }
-      
-      return modelData as {
+
+      return {
+        ...modelData,
+        yearTemplates, // ⭐ YearTemplate 추가
+      } as {
         name: string;
         englishName: string;
         imageUrl: string;
         defaultBattery: {
-          capacity: string; // "71kWh" 형태
-          cellType: string; // "NCM"
-          manufacturer: string; // "LG Energy Solution"
-          warranty: string; // "8년/16만km"
+          capacity: string;
+          cellType: string;
+          manufacturer: string;
+          warranty: string;
+          supplier?: string;
         };
         trims: Array<{
+          trimId?: string;
+          name?: string;
+          driveType?: string;
+          yearRange?: { start: number; end: number };
           variants: Array<{
             trimId: string;
             trimName: string;
@@ -4347,14 +4420,28 @@ class FirebaseService {
             driveType: string;
             powerMax: string;
             topSpeed: number;
+            supplier?: string;
           }>;
+        }>;
+        yearTemplates?: Array<{
+          templateId: string;
+          years: number[];
+          trimId: string;
+          trimName: string;
+          images: {
+            main?: string;
+            front?: string;
+            side?: string;
+            rear?: string;
+          };
+          variants: Array<any>;
         }>;
         createdAt?: any;
         updatedAt?: any;
       };
-      
+
     } catch (error) {
-      devLog.error(`❌ 모델 데이터 조회 실패: ${brandId}/${modelId}`, error);
+      devLog.error(`❌ [getModelData] 모델 데이터 조회 실패: ${brandId}/${modelId}`, error);
       return null;
     }
   }

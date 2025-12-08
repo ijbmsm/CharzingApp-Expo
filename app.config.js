@@ -197,14 +197,6 @@ export default {
     //  플러그인 (⭐ Kakao → build-properties 순서 중요)
     // ============================================================
     plugins: [
-      // ⚡ Firebase Crashlytics (dSYM 업로드를 위해)
-      [
-        "expo-firebase-crashlytics",
-        {
-          postExportBundle: true,
-        },
-      ],
-
       // ⚡ Kakao 플러그인은 가장 먼저
       [
         "@react-native-seoul/kakao-login",
