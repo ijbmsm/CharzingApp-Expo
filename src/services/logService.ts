@@ -227,11 +227,11 @@ class LogService {
   // 차량 관련 로그
   vehicle(
     action: string,
-    vehicleInfo?: { make?: string; model?: string; year?: number },
+    vehicleInfo?: { brandId?: string; modelId?: string; year?: number },
     userId?: string,
     data?: any
   ): void {
-    const vehicleStr = vehicleInfo ? `${vehicleInfo.make} ${vehicleInfo.model} ${vehicleInfo.year}` : '';
+    const vehicleStr = vehicleInfo ? `${vehicleInfo.brandId} ${vehicleInfo.modelId} ${vehicleInfo.year}` : '';
     const message = `Vehicle ${action}${vehicleStr ? ` (${vehicleStr})` : ''}`;
     this.info('VEHICLE', message, { action, vehicleInfo, ...data }, userId);
   }

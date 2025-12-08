@@ -20,13 +20,14 @@ import { NativeStackNavigationProp } from "@react-navigation/native-stack";
 import { RootStackParamList } from "../navigation/RootNavigator";
 import { Ionicons } from "@expo/vector-icons";
 import Header from "../components/Header";
-import VehicleAccordionSelector from "../components/VehicleAccordionSelector";
+import VehicleAccordionSelector, { CompletedVehicle } from "../components/VehicleAccordionSelector";
 import { useSelector } from "react-redux";
 import { RootState } from "../store";
 import firebaseService, {
   DiagnosisReservation,
   VehicleDiagnosisReport,
   UserVehicle,
+  EnrichedUserVehicle,
   VehicleDetails,
 } from "../services/firebaseService";
 import { getAuth } from "firebase/auth";
@@ -210,21 +211,6 @@ const VehicleCard: React.FC<VehicleCardProps> = ({ vehicle, onEdit }) => {
 };
 
 type HomeScreenNavigationProp = NativeStackNavigationProp<RootStackParamList>;
-
-interface CompletedVehicle {
-  // 표시용 이름 (기존 호환성)
-  make: string;
-  model: string;
-  trim: string;
-  year: number;
-  batteryCapacity?: number | string;
-  imageUrl?: string;
-
-  // Firestore 조회용 ID (동적 매칭 결과)
-  brandId: string;     // "hyundai", "kia", "tesla"
-  modelId: string;     // "IONIQ-5", "EV6", "MODEL-3"
-  trimId: string;      // "exclusive", "long-range"
-}
 
 export default function HomeScreen() {
   console.log("🏠 HomeScreen 렌더링됨 - 현재 시간:", new Date().toISOString());
@@ -540,7 +526,7 @@ export default function HomeScreen() {
       );
       if (updatedVehicle) {
         setSelectedVehicle(updatedVehicle);
-        console.log("✅ 선택된 차량 정보 자동 업데이트:", updatedVehicle.model);
+        console.log("✅ 선택된 차량 정보 자동 업데이트:", updatedVehicle.modelId);
       }
     }
   }, [userVehicles]);
@@ -705,7 +691,7 @@ export default function HomeScreen() {
   };
 
   // 차량 클릭 시 상세 모달 열기
-  const openVehicleDetail = (vehicle: UserVehicle) => {
+  const openVehicleDetail = (vehicle: EnrichedUserVehicle) => {
     setSelectedVehicle(vehicle);
     setShowVehicleDetail(true);
 
@@ -756,7 +742,7 @@ export default function HomeScreen() {
 
     Alert.alert(
       "차량 삭제",
-      `${selectedVehicle.year} ${selectedVehicle.make} ${selectedVehicle.model}을(를) 삭제하시겠습니까?`,
+      `${selectedVehicle.year} ${selectedVehicle.brandId} ${selectedVehicle.vehicleData.modelName}을(를) 삭제하시겠습니까?`,
       [
         {
           text: "취소",
@@ -929,7 +915,7 @@ export default function HomeScreen() {
       model: completedVehicle.model,
       year: completedVehicle.year,
       batteryCapacity: completedVehicle.batteryCapacity || "",
-      range: "",
+      range: completedVehicle.range || "",  // ✅ 연도별 주행거리
       trim: completedVehicle.trim,
       // ✅ Firestore 참조 필드 (필수)
       brandId: completedVehicle.brandId,
@@ -949,23 +935,15 @@ export default function HomeScreen() {
         // 수정 모드: 기존 차량 업데이트
         logger.vehicle(
           "edit_start",
-          { make: vehicle.make, model: vehicle.model, year: vehicle.year },
+          { brandId: vehicle.brandId, modelId: vehicle.modelId, year: vehicle.year },
           user?.uid
         );
 
         await firebaseService.updateUserVehicle(selectedVehicle.id, {
-          make: vehicle.make,
-          model: vehicle.model,
+          brandId: vehicle.brandId,
+          modelId: vehicle.modelId,
           year: vehicle.year,
-          trim: vehicle.trim,
-          batteryCapacity:
-            typeof vehicle.batteryCapacity === "number"
-              ? `${vehicle.batteryCapacity}kWh`
-              : vehicle.batteryCapacity || "",
-          range:
-            typeof vehicle.range === "number"
-              ? `${vehicle.range}km`
-              : vehicle.range || "",
+          trimId: vehicle.trimId,
         });
 
         logger.vehicle("edit_complete", undefined, user?.uid);
@@ -1005,7 +983,7 @@ export default function HomeScreen() {
         // 추가 모드: 새 차량 추가
         logger.vehicle(
           "add_start",
-          { make: vehicle.make, model: vehicle.model, year: vehicle.year },
+          { brandId: vehicle.brandId, modelId: vehicle.modelId, year: vehicle.year },
           user?.uid
         );
 
@@ -1022,7 +1000,7 @@ export default function HomeScreen() {
 
         logger.vehicle(
           "add_complete",
-          { make: vehicle.make, model: vehicle.model, year: vehicle.year },
+          { brandId: vehicle.brandId, modelId: vehicle.modelId, year: vehicle.year },
           user?.uid
         );
 
@@ -1407,8 +1385,8 @@ export default function HomeScreen() {
 
                   <View style={styles.vehicleDetailInfo}>
                     <Text style={styles.vehicleDetailName}>
-                      {selectedVehicle.year} {selectedVehicle.make}{" "}
-                      {selectedVehicle.model}
+                      {selectedVehicle.year} {selectedVehicle.brandId}{" "}
+                      {selectedVehicle.vehicleData.modelName}
                     </Text>
 
                     {selectedVehicle.nickname && (

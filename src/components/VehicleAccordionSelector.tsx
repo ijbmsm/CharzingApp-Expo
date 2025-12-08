@@ -31,11 +31,12 @@ export interface CompletedVehicle {
   trim: string;
   year: number;
   batteryCapacity?: number | string;
+  range?: number | string;  // ✅ 주행거리 추가
   imageUrl?: string;
-  
+
   // Firestore 조회용 ID (새로 추가)
   brandId: string;     // "audi"
-  modelId: string;     // "q8-e-tron"  
+  modelId: string;     // "q8-e-tron"
   trimId: string;      // "55-quattro"
 }
 
@@ -55,8 +56,18 @@ interface Trim {
   trimId: string;
   trimName: string;
   batteryCapacity?: number | string;
+  range?: number | string;  // ✅ 주행거리 추가
   driveType?: string;
   years: (number | string)[];
+  imageUrl?: string;
+  // ✅ 연도별 variants 추가
+  variants?: Array<{
+    years: number[];
+    capacity: number;
+    range: number;
+    imageUrl?: string;
+    note?: string;
+  }>;
 }
 
 const VehicleAccordionSelector: React.FC<VehicleAccordionSelectorProps> = ({
@@ -273,13 +284,29 @@ const VehicleAccordionSelector: React.FC<VehicleAccordionSelectorProps> = ({
       setIsCompleting(true);
       // console.log('🎯 차량 선택 완료 처리 시작');
 
+      // ✅ 선택된 연도에 해당하는 variant 찾기
+      const yearVariant = selectedTrim.variants?.find((v) =>
+        v.years && v.years.includes(selectedYear)
+      );
+
+      console.log('📊 선택된 연도 variant:', {
+        selectedYear,
+        variantFound: !!yearVariant,
+        capacity: yearVariant?.capacity || selectedTrim.batteryCapacity,
+        range: yearVariant?.range || selectedTrim.range
+      });
+
       const completedVehicle: CompletedVehicle = {
         make: selectedBrand.name,
         model: selectedModel.name,
         trim: selectedTrim.trimName,
         year: selectedYear,
-        batteryCapacity: selectedTrim.batteryCapacity,
-        imageUrl: selectedModel.imageUrl,
+        // ✅ 연도별 배터리 용량: variant → trim 기본값
+        batteryCapacity: yearVariant?.capacity || selectedTrim.batteryCapacity,
+        // ✅ 연도별 주행거리 추가
+        range: yearVariant?.range || selectedTrim.range,
+        // ✅ 이미지 우선순위: Variant 이미지 → Trim 이미지 → Model 이미지
+        imageUrl: yearVariant?.imageUrl || selectedTrim.imageUrl || selectedModel.imageUrl,
         brandId: selectedBrand.id,
         modelId: selectedModel.id,
         trimId: selectedTrim.trimId,
@@ -565,11 +592,6 @@ const VehicleAccordionSelector: React.FC<VehicleAccordionSelectorProps> = ({
               <Text style={[styles.listItemText, convertToLineSeedFont(styles.listItemText)]}>
                 {trim.trimName}
               </Text>
-              {(trim.batteryCapacity && Number(trim.batteryCapacity) > 0) && (
-                <Text style={[styles.trimSpec, convertToLineSeedFont(styles.trimSpec)]}>
-                  {trim.batteryCapacity}kWh
-                </Text>
-              )}
             </View>
             <Ionicons 
               name={selectedTrim?.trimId === trim.trimId ? "checkmark" : "chevron-forward"} 
@@ -613,7 +635,7 @@ const VehicleAccordionSelector: React.FC<VehicleAccordionSelectorProps> = ({
                 activeOpacity={0.8}
               >
                 <Text style={{ color: '#374151', fontSize: 14, fontWeight: '600', textAlign: 'center' }}>
-                  {yearNumber}
+                  {String(yearNumber)}
                 </Text>
               </TouchableOpacity>
             );
@@ -621,7 +643,7 @@ const VehicleAccordionSelector: React.FC<VehicleAccordionSelectorProps> = ({
         </View>
         
         {/* Inline Complete Button */}
-        {selectedYear && (
+        {selectedYear ? (
           <Animatable.View
             animation="zoomIn"
             duration={400}
@@ -641,12 +663,12 @@ const VehicleAccordionSelector: React.FC<VehicleAccordionSelectorProps> = ({
                   styles.inlineCompleteText,
                   convertToLineSeedFont(styles.inlineCompleteText)
                 ]}>
-                  {selectedBrand?.name} {selectedModel?.name} {selectedYear} 추가
+                  {selectedBrand?.name} {selectedModel?.name} {selectedYear ? String(selectedYear) : ''} 추가
                 </Text>
               </LinearGradient>
             </TouchableOpacity>
           </Animatable.View>
-        )}
+        ) : null}
       </View>
     );
   };

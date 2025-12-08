@@ -155,7 +155,8 @@ export interface FirebaseVariant {
   trimId?: string;
   trimName?: string;
   supplier?: string;        // "SK온"
-  
+  cellType?: string;        // "NCM"
+
   // 직접 필드 (일부 브랜드)
   acceleration?: string | number;  // "5.4초 (0-100km/h)" 또는 숫자
   power?: string;           // "401마력" 형태
@@ -166,7 +167,8 @@ export interface FirebaseVariant {
   driveType?: string;
   motor?: string;
   chargingSpeed?: string;
-  
+  imageUrl?: string;        // variant 이미지
+
   // specifications 객체 (현대/기아 등)
   specifications?: {
     acceleration?: string;   // "8.5초 (0-100km/h)"
@@ -175,7 +177,52 @@ export interface FirebaseVariant {
     efficiency?: string;    // "21.2kWh/100km"
     motor?: string;         // "단일 후륜 모터"
     chargingSpeed?: string; // "11kW (AC), 233kW (DC)"
+    chargingConnector?: string; // "CCS2"
   };
+}
+
+// ✅ Firebase YearTemplate 구조 (연도별 트림 템플릿)
+// 위치: /vehicles/{brandId}/models/{modelId}/yearTemplates/{templateId}
+export interface YearTemplate {
+  trimId: string;           // 트림 ID (예: "standard", "long-range")
+  trimName: string;         // 트림명 (예: "스탠다드", "롱 레인지")
+  name: string;             // 템플릿 이름 (예: "standard_2022_2023")
+  years: number[];          // 해당 연도들 (예: [2022, 2023])
+
+  // 이미지
+  images?: {
+    main?: string;          // 메인 이미지 URL
+  };
+
+  // 배터리 스펙 (YearTemplate 우선)
+  specs?: {
+    supplier?: string;      // 배터리 제조사 (예: "SK온", "SVOLT")
+    type?: string;          // 배터리 타입 (예: "NCM", "LFP")
+    voltage?: number;       // 전압 (예: 400)
+  };
+
+  // 연도별 variants
+  variants?: Array<{
+    years?: number[];       // 해당 연도들
+    batteryCapacity?: number; // 배터리 용량
+    range?: number;         // 주행거리
+    supplier?: string;      // 배터리 제조사
+    cellType?: string;      // 셀 타입
+    imageUrl?: string;      // 이미지 URL
+    specifications?: {
+      motor?: string;
+      power?: string;
+      torque?: string;
+      acceleration?: string;
+      topSpeed?: string;
+      efficiency?: string;
+      chargingSpeed?: string;
+      chargingConnector?: string;
+    };
+  }>;
+
+  createdAt?: Date | FieldValue;
+  updatedAt?: Date | FieldValue;
 }
 
 export interface DiagnosisReservation {
@@ -425,14 +472,40 @@ export interface VehicleTrimData {
 }
 
 export interface VehicleTrim {
+  // 기본 식별 정보
   trimId: string;
   trimName: string;
-  driveType: string;
-  years: string[];
-  batteryCapacity: string;
   brandId: string;
   modelId: string;
   modelName: string;
+  driveType: string;
+
+  // ✅ 배터리 정보 (charzing 웹과 동일)
+  batteryCapacity: number | string;
+  batteryManufacturer?: string;
+  batteryType?: string;
+  batteryWarranty?: string;
+  range?: number | string;
+
+  // ✅ 성능 정보 (charzing 웹과 동일)
+  powerMax?: string;
+  torqueMax?: string;
+  acceleration?: string;
+  topSpeed?: string;
+  efficiency?: string;
+
+  // ✅ 이미지 및 연도
+  imageUrl?: string;
+  years: string[];
+
+  // ✅ variants 배열 (연도별 데이터)
+  variants?: Array<{
+    years: number[];
+    capacity: number;
+    range: number;
+    imageUrl?: string;
+    note?: string;
+  }>;
 }
 
 // Firebase Functions 응답 타입 정의
@@ -3322,6 +3395,22 @@ class FirebaseService {
 
             const vehicleData = modelDoc.data();
 
+            // ✅ YearTemplates 조회 (getVehicleTrims와 동일한 로직)
+            const yearTemplatesRef = collection(modelDocRef, 'yearTemplates');
+            const yearTemplatesSnapshot = await getDocs(yearTemplatesRef);
+
+            const yearTemplatesByTrim = new Map<string, YearTemplate[]>();
+            yearTemplatesSnapshot.forEach((templateDoc) => {
+              const templateData = templateDoc.data() as YearTemplate;
+              const trimId = templateData.trimId;
+              if (trimId) {
+                if (!yearTemplatesByTrim.has(trimId)) {
+                  yearTemplatesByTrim.set(trimId, []);
+                }
+                yearTemplatesByTrim.get(trimId)!.push(templateData);
+              }
+            });
+
             // 트림 찾기
             const trim = vehicleData.trims?.find(
               (t: any) => t.trimId === userVehicle.trimId
@@ -3331,50 +3420,138 @@ class FirebaseService {
               throw new Error(`Trim not found: ${userVehicle.trimId}`);
             }
 
-            // 연도에 맞는 variant 찾기
-            const variant = trim.variants?.find(
-              (v: any) => Array.isArray(v.years) && v.years.includes(userVehicle.year.toString())
+            // ✅ YearTemplate 데이터로 enrichment (연도별 매칭)
+            const trimTemplates = yearTemplatesByTrim.get(trim.trimId) || [];
+
+            // ✅ 사용자가 선택한 연도에 맞는 YearTemplate 찾기
+            const templateForYear = trimTemplates.find((template) =>
+              template.years && template.years.includes(userVehicle.year)
             );
 
-            // ✅ 이미지 URL (이미지만 fallback 허용)
+            const defaultBattery = vehicleData.defaultBattery || {};
+
+            // ✅ 사용자가 선택한 연도에 맞는 Model variant 찾기
+            const variantForYear = trim.variants?.find(
+              (v: any) => Array.isArray(v.years) && v.years.includes(userVehicle.year)
+            );
+            const firstVariant = trim.variants?.[0] || {};
+
+            // ✅ 연도에 맞는 YearTemplate이 있으면 사용, 없으면 Model 데이터 사용
+            let batteryManufacturer: string;
+            let batteryType: string;
+            let batteryVoltage: number;
+            let batteryCapacity: number;
+            let range: number;
+            let chargingSpeed: string | undefined;
+            let chargingConnector: string | undefined;
+
+            if (templateForYear) {
+              // YearTemplate 존재 - YearTemplate 데이터 사용
+              const templateSpecs = templateForYear.specs || {};
+              const templateVariant = templateForYear.variants?.[0] || {};
+
+              batteryManufacturer = templateVariant.supplier || templateSpecs.supplier || '미제공';
+              batteryType = templateVariant.cellType || templateSpecs.type || '미제공';
+              batteryVoltage = templateSpecs.voltage || 400;
+              batteryCapacity = templateVariant.batteryCapacity || 0;
+              range = templateVariant.range || 0;
+              chargingSpeed = templateVariant.specifications?.chargingSpeed;
+              chargingConnector = templateVariant.specifications?.chargingConnector;
+
+              devLog.log(`✅ [JOIN] YearTemplate 사용 (${userVehicle.year}년):`, {
+                trimId: trim.trimId,
+                templateName: templateForYear.name,
+                supplier: batteryManufacturer,
+                range: range
+              });
+            } else {
+              // YearTemplate 없음 - Model variant 데이터 사용 (연도 매칭)
+              const selectedVariant = variantForYear || firstVariant;
+
+              batteryManufacturer = selectedVariant.supplier || defaultBattery.supplier || '미제공';
+              batteryType = selectedVariant.cellType || defaultBattery.type || '미제공';
+              batteryVoltage = selectedVariant.specifications?.voltage || defaultBattery.voltage || 400;
+              batteryCapacity = selectedVariant.batteryCapacity || defaultBattery.capacity || 0;
+              range = selectedVariant.range || defaultBattery.range || 0;
+              chargingSpeed = selectedVariant.specifications?.chargingSpeed;
+              chargingConnector = selectedVariant.specifications?.chargingConnector;
+
+              devLog.log(`📋 [JOIN] Model 데이터 사용 (${userVehicle.year}년):`, {
+                trimId: trim.trimId,
+                reason: 'YearTemplate 없음',
+                variantMatched: !!variantForYear,
+                supplier: batteryManufacturer,
+                range: range
+              });
+            }
+
+            // ✅ 이미지 URL (YearTemplate 우선, 웹과 동일한 로직)
             const { generateVehicleImageUrl } = require('@charzing/vehicle-utils');
 
-            // ✅ 올바른 형식의 imageUrl만 사용 (연도 폴더 포함 여부 검증)
-            const isValidImageUrl = (url: string | undefined): boolean => {
-              if (!url) return false;
-              // 올바른 형식: vehicle-images/BRAND/MODEL/YEAR/filename.png
-              return /vehicle-images\/[A-Z_]+\/[A-Z0-9-]+\/\d{4}\//.test(url);
-            };
+            let imageUrl: string;
 
-            const imageUrl = (isValidImageUrl(variant?.imageUrl) ? variant.imageUrl : null) ||
-                           (isValidImageUrl(vehicleData.imageUrl) ? vehicleData.imageUrl : null) ||
-                           generateVehicleImageUrl({
-                             brandId: userVehicle.brandId,
-                             modelId: userVehicle.modelId,
-                             year: userVehicle.year,
-                             trim: userVehicle.trimId
-                           });
+            if (templateForYear) {
+              // YearTemplate 있음 - YearTemplate 이미지 우선
+              const templateVariant = templateForYear.variants?.[0];
+              const templateImage = templateForYear.images?.main;
+
+              // ✅ 웹과 동일: templateImage를 variant.imageUrl보다 우선
+              // (variant.imageUrl은 연도별로 다를 수 있지만, template.images.main은 모든 연도에 공통)
+              imageUrl = templateImage ||
+                        templateVariant?.imageUrl ||
+                        trim.imageUrl ||
+                        vehicleData.imageUrl ||
+                        generateVehicleImageUrl({
+                          brandId: userVehicle.brandId,
+                          modelId: userVehicle.modelId,
+                          year: userVehicle.year
+                        });
+
+              devLog.log(`🖼️ [JOIN] YearTemplate 이미지 소스 (${userVehicle.year}년):`, {
+                templateImage: templateImage || '없음',
+                variantImageUrl: templateVariant?.imageUrl || '없음',
+                trimImageUrl: trim.imageUrl || '없음',
+                selectedImageUrl: imageUrl
+              });
+            } else {
+              // YearTemplate 없음 - trim 이미지 사용 (연도 매칭)
+              devLog.log(`🖼️ [JOIN] Model 이미지 소스 확인 (${userVehicle.year}년):`, {
+                trimId: trim.trimId,
+                variantImageUrl: variantForYear?.imageUrl || '없음',
+                trimImageUrl: trim.imageUrl || '없음',
+                modelImageUrl: vehicleData.imageUrl || '없음'
+              });
+
+              imageUrl = variantForYear?.imageUrl ||
+                        trim.imageUrl ||
+                        vehicleData.imageUrl ||
+                        generateVehicleImageUrl({
+                          brandId: userVehicle.brandId,
+                          modelId: userVehicle.modelId,
+                          year: userVehicle.year
+                        });
+            }
 
             // VehicleDetails 구성
             const vehicleDetails: VehicleDetails = {
               modelName: vehicleData.name || userVehicle.modelId,
               imageUrl: this.normalizeImageUrl(imageUrl),
               battery: {
-                capacity: variant?.capacity || trim.defaultBattery?.capacity || 0,
-                manufacturer: trim.batteryManufacturer || '',
-                cellType: trim.batteryType || '',
-                voltage: trim.batteryVoltage || 400
+                capacity: batteryCapacity,
+                manufacturer: batteryManufacturer,
+                cellType: batteryType,
+                voltage: batteryVoltage
               },
               performance: {
-                range: variant?.range || trim.defaultBattery?.range || 0,
-                power: parseFloat(trim.powerMax) || 0,
-                torque: parseFloat(trim.torqueMax) || 0,
-                acceleration: parseFloat(trim.acceleration) || 0,
-                topSpeed: parseFloat(trim.topSpeed) || 0,
+                range: range,
+                power: parseFloat(trim.powerMax || '0') || 0,
+                torque: parseFloat(trim.torqueMax || '0') || 0,
+                acceleration: parseFloat(trim.acceleration || '0') || 0,
+                topSpeed: parseFloat(trim.topSpeed || '0') || 0,
                 driveType: trim.driveType || '',
-                efficiency: parseFloat(trim.efficiency) || 0,
-                chargingSpeed: variant?.specifications?.chargingSpeed || '',
-                chargingConnector: variant?.specifications?.chargingConnector
+                efficiency: parseFloat(trim.efficiency || '0') || 0,
+                chargingSpeed: chargingSpeed || '',
+                chargingConnector: chargingConnector
               }
             };
 
@@ -3477,8 +3654,8 @@ class FirebaseService {
    * 차량 정보 업데이트
    */
   async updateUserVehicle(
-    vehicleId: string, 
-    updateData: Partial<Pick<UserVehicle, 'nickname' | 'isActive' | 'make' | 'model' | 'year' | 'trim' | 'batteryCapacity' | 'range'>>
+    vehicleId: string,
+    updateData: Partial<Pick<UserVehicle, 'nickname' | 'isActive' | 'year' | 'brandId' | 'modelId' | 'trimId'>>
   ): Promise<void> {
     try {
       devLog.log('🚗 차량 정보 업데이트:', vehicleId, updateData);
@@ -3653,98 +3830,189 @@ class FirebaseService {
   }
 
   /**
-   * 직접 Firestore에서 차량 트림 조회 (성능 개선)
-   * 단순 구조: /vehicles/{brandId}/models/{modelId} 문서 내 trims 배열
+   * 직접 Firestore에서 차량 트림 조회
+   *
+   * ✅ Phase 5.1.5-5.4: YearTemplate 우선 조회 로직
+   * - YearTemplate의 specs (supplier, type, voltage) 우선 사용
+   * - YearTemplate의 variants[0].range 우선 사용
+   * - 없으면 Model의 trims/defaultBattery에서 가져오기
    */
   async getVehicleTrims(brandId: string, modelId: string): Promise<VehicleTrim[]> {
     try {
-      devLog.log('🚗 직접 Firestore에서 차량 트림 조회:', { brandId, modelId });
-      
-      // 모델 문서 경로: /vehicles/{brandId}/models/{modelId}
+      devLog.log('🚗 차량 트림 조회 시작 (YearTemplate 우선):', { brandId, modelId });
+
+      // 1. 모델 문서 조회: /vehicles/{brandId}/models/{modelId}
       const modelDocRef = doc(this.db, 'vehicles', brandId, 'models', modelId);
       const modelDoc = await getDoc(modelDocRef);
-      
+
       if (!modelDoc.exists()) {
         devLog.log('⚠️ 모델 문서가 존재하지 않습니다:', { brandId, modelId });
         return [];
       }
-      
+
       const modelData = modelDoc.data();
-      devLog.log('🔍 모델 문서 데이터:', modelData);
-      
       const trims = modelData.trims || [];
-      devLog.log('🔍 추출된 트림 데이터:', trims);
-      
+
       if (!Array.isArray(trims) || trims.length === 0) {
-        devLog.log('⚠️ 트림 데이터가 없습니다:', { brandId, modelId, modelDataKeys: Object.keys(modelData) });
+        devLog.log('⚠️ 트림 데이터가 없습니다:', { brandId, modelId });
         return [];
       }
-      
-      // 실제 데이터 구조에 맞게 트림 데이터 변환
+
+      // 2. YearTemplate 조회: /vehicles/{brandId}/models/{modelId}/yearTemplates
+      const yearTemplatesRef = collection(this.db, 'vehicles', brandId, 'models', modelId, 'yearTemplates');
+      const yearTemplatesSnapshot = await getDocs(yearTemplatesRef);
+
+      // trimId별로 YearTemplate 배열을 저장 (연도별로 여러 템플릿이 있을 수 있음)
+      const yearTemplatesByTrim = new Map<string, YearTemplate[]>();
+      yearTemplatesSnapshot.forEach((templateDoc) => {
+        const templateData = templateDoc.data() as YearTemplate;
+        const trimId = templateData.trimId;
+        if (trimId) {
+          if (!yearTemplatesByTrim.has(trimId)) {
+            yearTemplatesByTrim.set(trimId, []);
+          }
+          yearTemplatesByTrim.get(trimId)!.push(templateData);
+        }
+      });
+
+      devLog.log(`📋 YearTemplate 조회 완료: ${yearTemplatesSnapshot.size}개 (트림별 ${yearTemplatesByTrim.size}개)`);
+
       const vehicleTrims: VehicleTrim[] = [];
-      
+
       trims.forEach((trim: any) => {
-        // ✅ 한국 브랜드 구조 (HYUNDAI, KIA) - charzing 웹과 동일
+        // 한국 브랜드 구조 (HYUNDAI, KIA, TESLA 등)
         if (trim.trimId && trim.name && trim.variants) {
           const variants = Array.isArray(trim.variants) ? trim.variants : [];
 
-          // ✅ yearRange 우선 사용 (Firestore에 저장된 트림 연도 범위)
-          const years: number[] = [];
+          // ✅ yearRange 추출
+          let startYear: number;
+          let endYear: number | undefined;
 
           if (trim.yearRange && trim.yearRange.start) {
-            const startYear = trim.yearRange.start;
-            const endYear = trim.yearRange.end || new Date().getFullYear();
-
-            for (let year = startYear; year <= endYear; year++) {
-              years.push(year);
-            }
-            devLog.log(`✅ Trim yearRange 사용: ${startYear} - ${endYear}`);
+            startYear = trim.yearRange.start;
+            endYear = trim.yearRange.end || undefined;
+            devLog.log(`✅ [${trim.name}] yearRange: ${startYear} - ${endYear || '현재'}`);
           } else {
             // Fallback: variant.years에서 계산
-            variants.forEach((variant: any) => {
+            const allYears = variants.flatMap((variant: any) => {
               if (Array.isArray(variant.years)) {
-                variant.years.forEach((year: any) => {
-                  const yearNum = typeof year === 'number' ? year : parseInt(String(year), 10);
-                  if (!isNaN(yearNum) && !years.includes(yearNum)) {
-                    years.push(yearNum);
-                  }
-                });
+                return variant.years.map((year: string | number) => parseInt(String(year), 10));
               }
-            });
+              return [];
+            }).filter((year: number) => !isNaN(year)).sort((a: number, b: number) => a - b);
 
-            devLog.log(`⚠️ variant.years에서 yearRange 계산: ${years.join(', ')}`);
+            startYear = allYears.length > 0 ? allYears[0] : new Date().getFullYear();
+            endYear = allYears.length > 0 ? allYears[allYears.length - 1] : undefined;
+            devLog.log(`⚠️ [${trim.name}] variant.years에서 yearRange 계산: ${startYear} - ${endYear || '현재'}`);
           }
 
-          // 첫 번째 variant에서 기본 정보 추출
+          // ✅ 이 트림의 YearTemplate 목록 가져오기
+          const trimTemplates = yearTemplatesByTrim.get(trim.trimId) || [];
+
+          // Fallback 데이터
           const firstVariant = variants[0] || {};
           const defaultBattery = modelData.defaultBattery || {};
 
-          // 🔍 디버그 로깅
-          devLog.log(`🔋 [${trim.name}] 배터리 정보 추출:`, {
-            defaultBatteryCapacity: defaultBattery.capacity,
-            firstVariantBatteryCapacity: firstVariant.batteryCapacity,
-            finalBatteryCapacity: defaultBattery.capacity || firstVariant.batteryCapacity || 0,
-            variantsLength: variants.length,
-            firstVariant: firstVariant
-          });
+          // ✅ 대표 배터리 정보 (첫 번째 템플릿 우선, 없으면 variant/defaultBattery)
+          const firstTemplate = trimTemplates[0];
+          const templateSpecs = firstTemplate?.specs || {};
+          const templateVariant = firstTemplate?.variants?.[0] || {};
+
+          const batteryManufacturer = templateSpecs.supplier || templateVariant.supplier || firstVariant.supplier || defaultBattery.supplier || '미제공';
+          const batteryType = templateSpecs.type || templateVariant.cellType || firstVariant.cellType || defaultBattery.type || '미제공';
+          const range = templateVariant.range || firstVariant.range || defaultBattery.range || 0;
 
           vehicleTrims.push({
+            // 기본 식별 정보
             trimId: trim.trimId,
             trimName: trim.name,
             brandId: brandId,
             modelId: modelId,
             modelName: modelData.name || modelId,
-            driveType: trim.driveType || firstVariant.driveType || 'FWD',
-            // ✅ defaultBattery.capacity 우선 사용
-            batteryCapacity: defaultBattery.capacity || firstVariant.batteryCapacity || 0,
-            years: years.map(y => y.toString())
+            driveType: trim.driveType || firstVariant.driveType || 'Unknown',
+
+            // ✅ 배터리 정보 (YearTemplate 우선)
+            batteryCapacity: firstVariant.batteryCapacity || defaultBattery.capacity || 0,
+            batteryManufacturer: batteryManufacturer,
+            batteryType: batteryType,
+            batteryWarranty: defaultBattery.warranty || '미제공',
+            range: range,
+
+            // ✅ 성능 정보
+            powerMax: firstVariant.specifications?.power || trim.powerMax || '미제공',
+            torqueMax: firstVariant.specifications?.torque || trim.torqueMax || '미제공',
+            acceleration: firstVariant.specifications?.acceleration || trim.acceleration || '미제공',
+            topSpeed: trim.topSpeed || '미제공',
+            efficiency: firstVariant.specifications?.efficiency || trim.efficiency || '미제공',
+
+            // ✅ 이미지 URL (YearTemplate 우선)
+            imageUrl: firstTemplate?.images?.main || modelData.imageUrl || undefined,
+
+            // ✅ 연도 범위
+            years: (() => {
+              const yearList: string[] = [];
+              for (let year = startYear; year <= (endYear || new Date().getFullYear()); year++) {
+                yearList.push(year.toString());
+              }
+              return yearList;
+            })(),
+
+            // ✅ variants 배열 (연도별 데이터 - YearTemplate 우선)
+            variants: (() => {
+              const allYears: number[] = [];
+              for (let year = startYear; year <= (endYear || new Date().getFullYear()); year++) {
+                allYears.push(year);
+              }
+
+              const generatedVariants = allYears.map((year) => {
+                // 이 연도에 해당하는 YearTemplate 찾기
+                const templateForYear = trimTemplates.find((template) =>
+                  template.years && template.years.includes(year)
+                );
+
+                if (templateForYear) {
+                  // YearTemplate 있으면 우선 사용
+                  const templateVar = templateForYear.variants?.[0];
+                  return {
+                    years: [year],
+                    capacity: templateVar?.batteryCapacity || defaultBattery.capacity || 0,
+                    range: templateVar?.range || defaultBattery.range || 0,
+                    imageUrl: templateForYear.images?.main || templateVar?.imageUrl,
+                    note: `YearTemplate: ${templateForYear.name}`
+                  };
+                } else {
+                  // YearTemplate 없으면 Model variant 사용
+                  const modelVariant = variants.find((v: any) =>
+                    Array.isArray(v.years) && v.years.includes(year) || v.years.includes(String(year))
+                  ) || firstVariant;
+
+                  return {
+                    years: [year],
+                    capacity: modelVariant.batteryCapacity || defaultBattery.capacity || 0,
+                    range: modelVariant.range || defaultBattery.range || 0,
+                    imageUrl: modelVariant.imageUrl,
+                    note: modelVariant.note
+                  };
+                }
+              });
+
+              devLog.log(`📊 [${trim.name}] variants 생성: ${generatedVariants.length}개 연도`);
+              return generatedVariants;
+            })()
+          });
+
+          devLog.log(`✅ [${trim.name}] 트림 데이터 추가 완료:`, {
+            batteryManufacturer,
+            batteryType,
+            range,
+            yearTemplatesFound: trimTemplates.length
           });
         }
       });
-      
+
       devLog.log(`✅ 차량 트림 조회 완료: ${vehicleTrims.length}개`, vehicleTrims);
       return vehicleTrims;
-      
+
     } catch (error) {
       devLog.error('❌ 차량 트림 조회 실패:', error);
       throw new Error('차량 트림 조회 중 오류가 발생했습니다.');
