@@ -212,7 +212,7 @@ const AuthenticatedMyPage: React.FC<{
               activeOpacity={0.7}
             >
               <View style={styles.actionIconContainer}>
-                <Ionicons name="calendar-outline" size={32} color="#6366F1" />
+                <Ionicons name="calendar" size={32} color="#6B7280" />
               </View>
               <Text style={styles.actionTitle}>내 예약</Text>
               <Text style={styles.actionSubtitle}>예약 내역 확인</Text>

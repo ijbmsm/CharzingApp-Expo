@@ -126,7 +126,6 @@ const ReservationScreen: React.FC = () => {
   const existingReservation = route.params?.reservation || null;
   
   // Tab Navigator에서 접근할 때는 params가 없을 수 있음
-  console.log('🔍 Route params:', route.params);
 
   // 예약 단계 관리
   const [currentStep, setCurrentStep] = useState<number>(1);
@@ -158,7 +157,7 @@ const ReservationScreen: React.FC = () => {
   
   // 모달 상태 변경 감지
   useEffect(() => {
-    console.log('📱 ReservationScreen 모달 상태 변경:', showReservationVehicleModal);
+    devLog.log('📱 ReservationScreen 모달 상태 변경:', showReservationVehicleModal);
   }, [showReservationVehicleModal]);
   
 
@@ -186,6 +185,27 @@ const ReservationScreen: React.FC = () => {
   const [serviceType, setServiceType] = useState<'standard' | 'premium' | null>(null);
   const [servicePrice, setServicePrice] = useState<number>(0);
 
+  // 🎉 할인 이벤트 설정 (Firestore에서 동적으로 로드)
+  const [pricingConfig, setPricingConfig] = useState({
+    discountEnabled: false,
+    discountRate: 0, // 퍼센트 단위 (10 = 10%)
+    standardPrice: 100000,
+    premiumPrice: 200000,
+    startDate: '',
+  });
+  const [isPricingLoaded, setIsPricingLoaded] = useState(false);
+
+  // 가격 계산 헬퍼
+  const getOriginalPrice = (type: 'standard' | 'premium') => {
+    return type === 'standard' ? pricingConfig.standardPrice : pricingConfig.premiumPrice;
+  };
+
+  const getDiscountedPrice = (type: 'standard' | 'premium') => {
+    const original = getOriginalPrice(type);
+    if (!pricingConfig.discountEnabled) return original;
+    return Math.floor(original * (1 - pricingConfig.discountRate / 100));
+  };
+
   // 🔥 예약 ID 상태 (중복 생성 방지)
   const [createdReservationId, setCreatedReservationId] = useState<string | null>(null);
 
@@ -195,10 +215,36 @@ const ReservationScreen: React.FC = () => {
   useEffect(() => {
     // 초기 위치 설정
     setUserLocation({ latitude: 37.5665, longitude: 126.9780 });
-    
-    // Analytics - 무한 리렌더링 문제 해결 전까지 비활성화
-    console.log('📊 ReservationScreen mounted');
-    // analyticsService.logScreenView('ReservationScreen', 'ReservationScreen').catch(console.error);
+  }, []);
+
+  // 가격 설정 로드 (Firestore)
+  useEffect(() => {
+    const loadPricingConfig = async () => {
+      try {
+        const { getFirestore, doc, getDoc } = await import('firebase/firestore');
+        const db = getFirestore();
+        const pricingRef = doc(db, 'settings', 'pricing');
+        const pricingSnap = await getDoc(pricingRef);
+
+        if (pricingSnap.exists()) {
+          const data = pricingSnap.data();
+          devLog.log('💰 Pricing config loaded:', data);
+          setPricingConfig({
+            discountEnabled: data.discountEnabled || false,
+            discountRate: data.discountRate || 0,
+            standardPrice: data.standardPrice || 100000,
+            premiumPrice: data.premiumPrice || 200000,
+            startDate: data.startDate || '',
+          });
+        }
+        setIsPricingLoaded(true);
+      } catch (error) {
+        devLog.error('❌ Error loading pricing config:', error);
+        setIsPricingLoaded(true);
+      }
+    };
+
+    loadPricingConfig();
   }, []);
 
   // 사용자 정보 자동 입력
@@ -955,13 +1001,11 @@ const ReservationScreen: React.FC = () => {
               visible={showReservationVehicleModal}
               editMode={false}
               onComplete={async (vehicle) => {
-                console.log('🎉 ReservationScreen VehicleAccordionSelector onComplete 호출됨!');
-                console.log('🚗 ReservationScreen에서 선택된 차량:', vehicle);
-                
+                devLog.log('🚗 ReservationScreen에서 선택된 차량:', vehicle);
+
                 try {
                   // 선택된 차량을 사용자 차량 목록에 추가
                   if (user?.uid) {
-                    console.log('💾 사용자 차량 목록에 추가 중 (참조만 저장)...');
 
                     // ✅ 참조만 저장 (vehicles 컬렉션과 JOIN 방식)
                     const vehicleId = await firebaseService.addUserVehicle({
@@ -973,20 +1017,13 @@ const ReservationScreen: React.FC = () => {
                       isActive: true,
                     });
 
-                    console.log('✅ 사용자 차량 추가 완료 (참조):', {
-                      vehicleId,
-                      brandId: vehicle.brandId,
-                      modelId: vehicle.modelId,
-                      year: vehicle.year,
-                      trimId: vehicle.trimId
-                    });
+                    devLog.log('✅ 사용자 차량 추가 완료 (참조):', vehicleId);
 
                     // 로컬 차량 목록도 업데이트
                     await loadUserVehicles();
-                    console.log('🔄 ReservationScreen 로컬 차량 목록 업데이트 완료');
                   }
                 } catch (error) {
-                  console.log('❌ 사용자 차량 추가 실패:', error);
+                  devLog.error('❌ 사용자 차량 추가 실패:', error);
                   // 에러가 발생해도 예약은 계속 진행
                 }
                 
@@ -1013,7 +1050,6 @@ const ReservationScreen: React.FC = () => {
                   }, 500);
                 }}
                 onClose={() => {
-                  console.log('🔒 ReservationScreen VehicleAccordionSelector 닫기');
                   setShowReservationVehicleModal(false);
                 }}
               />
@@ -1067,7 +1103,6 @@ const ReservationScreen: React.FC = () => {
                     backgroundColor: 'transparent',
                   }}
                   onPress={() => {
-                    console.log('🚗 ReservationScreen 차량 버튼 클릭 - 모달 열기');
                     setShowReservationVehicleModal(true);
                   }}
                   activeOpacity={1}
@@ -1356,7 +1391,13 @@ const ReservationScreen: React.FC = () => {
               {currentStep === 5 ? (
                 <View style={styles.serviceTypeSelection}>
                   <Text style={styles.serviceTypeLabel}>원하시는 서비스 타입을 선택해주세요</Text>
-                  
+
+                  {!isPricingLoaded ? (
+                    <View style={styles.loadingContainer}>
+                      <ActivityIndicator size="large" color="#06B6D4" />
+                      <Text style={styles.loadingText}>가격 정보를 불러오는 중...</Text>
+                    </View>
+                  ) : (
                   <View style={styles.serviceTypeOptions}>
                     <TouchableOpacity
                       style={[
@@ -1364,34 +1405,47 @@ const ReservationScreen: React.FC = () => {
                         serviceType === 'standard' && styles.serviceTypeOptionSelected
                       ]}
                       onPress={() => {
+                        const discountedPrice = getDiscountedPrice('standard');
                         setServiceType('standard');
-                        setServicePrice(100000);
+                        setServicePrice(discountedPrice);
                         setServiceData({
                           serviceType: 'standard',
-                          servicePrice: 100000,
+                          servicePrice: discountedPrice,
                         });
                       }}
                     >
-                      <View style={styles.serviceTypeHeader}>
-                        <Text style={[
-                          styles.serviceTypeName,
-                          serviceType === 'standard' && styles.serviceTypeNameSelected
-                        ]}>
-                          스탠다드
-                        </Text>
-                        <Text style={[
-                          styles.serviceTypePrice,
-                          serviceType === 'standard' && styles.serviceTypePriceSelected
-                        ]}>
-                          100,000원
-                        </Text>
-                      </View>
+                      {pricingConfig.discountEnabled && (
+                        <View style={styles.discountBadge}>
+                          <Text style={styles.discountBadgeText}>{pricingConfig.discountRate}% 할인</Text>
+                        </View>
+                      )}
                       <Text style={[
-                        styles.serviceTypeDescription,
-                        serviceType === 'standard' && styles.serviceTypeDescriptionSelected
+                        styles.serviceTypeName,
+                        serviceType === 'standard' && styles.serviceTypeNameSelected
                       ]}>
-                        기본 배터리 진단 서비스
+                        스탠다드
                       </Text>
+                      <View style={styles.serviceTypeFooter}>
+                        <Text style={[
+                          styles.serviceTypeDescription,
+                          serviceType === 'standard' && styles.serviceTypeDescriptionSelected
+                        ]}>
+                          기본 배터리 진단 서비스
+                        </Text>
+                        <View style={styles.priceContainer}>
+                          {pricingConfig.discountEnabled && (
+                            <Text style={styles.originalPrice}>
+                              {getOriginalPrice('standard').toLocaleString()}원
+                            </Text>
+                          )}
+                          <Text style={[
+                            styles.serviceTypePrice,
+                            serviceType === 'standard' && styles.serviceTypePriceSelected
+                          ]}>
+                            {getDiscountedPrice('standard').toLocaleString()}원
+                          </Text>
+                        </View>
+                      </View>
                     </TouchableOpacity>
                     
                     <TouchableOpacity
@@ -1400,36 +1454,50 @@ const ReservationScreen: React.FC = () => {
                         serviceType === 'premium' && styles.serviceTypeOptionSelected
                       ]}
                       onPress={() => {
+                        const discountedPrice = getDiscountedPrice('premium');
                         setServiceType('premium');
-                        setServicePrice(200000);
+                        setServicePrice(discountedPrice);
                         setServiceData({
                           serviceType: 'premium',
-                          servicePrice: 200000,
+                          servicePrice: discountedPrice,
                         });
                       }}
                     >
-                      <View style={styles.serviceTypeHeader}>
-                        <Text style={[
-                          styles.serviceTypeName,
-                          serviceType === 'premium' && styles.serviceTypeNameSelected
-                        ]}>
-                          프리미엄
-                        </Text>
-                        <Text style={[
-                          styles.serviceTypePrice,
-                          serviceType === 'premium' && styles.serviceTypePriceSelected
-                        ]}>
-                          200,000원
-                        </Text>
-                      </View>
+                      {pricingConfig.discountEnabled && (
+                        <View style={styles.discountBadge}>
+                          <Text style={styles.discountBadgeText}>{pricingConfig.discountRate}% 할인</Text>
+                        </View>
+                      )}
                       <Text style={[
-                        styles.serviceTypeDescription,
-                        serviceType === 'premium' && styles.serviceTypeDescriptionSelected
+                        styles.serviceTypeName,
+                        serviceType === 'premium' && styles.serviceTypeNameSelected
                       ]}>
-                        기술분석 배터리 진단
+                        프리미엄
                       </Text>
+                      <View style={styles.serviceTypeFooter}>
+                        <Text style={[
+                          styles.serviceTypeDescription,
+                          serviceType === 'premium' && styles.serviceTypeDescriptionSelected
+                        ]}>
+                          기술분석 배터리 진단
+                        </Text>
+                        <View style={styles.priceContainer}>
+                          {pricingConfig.discountEnabled && (
+                            <Text style={styles.originalPrice}>
+                              {getOriginalPrice('premium').toLocaleString()}원
+                            </Text>
+                          )}
+                          <Text style={[
+                            styles.serviceTypePrice,
+                            serviceType === 'premium' && styles.serviceTypePriceSelected
+                          ]}>
+                            {getDiscountedPrice('premium').toLocaleString()}원
+                          </Text>
+                        </View>
+                      </View>
                     </TouchableOpacity>
                   </View>
+                  )}
                 </View>
               ) : (
                 serviceData && (
@@ -2230,6 +2298,7 @@ const styles = StyleSheet.create({
     gap: 12,
   },
   serviceTypeOption: {
+    position: 'relative',
     padding: 16,
     borderRadius: 12,
     borderWidth: 2,
@@ -2240,35 +2309,65 @@ const styles = StyleSheet.create({
     borderColor: '#06B6D4',
     backgroundColor: '#F0FDF4',
   },
-  serviceTypeHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 8,
+  discountBadge: {
+    position: 'absolute',
+    top: -8,
+    right: 12,
+    backgroundColor: '#06B6D4',
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 12,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 3,
+  },
+  discountBadgeText: {
+    fontSize: 12,
+    fontWeight: '700',
+    color: '#FFFFFF',
   },
   serviceTypeName: {
     fontSize: 18,
     fontWeight: '700',
     color: '#1F2937',
+    marginBottom: 12,
   },
   serviceTypeNameSelected: {
     color: '#06B6D4',
   },
-  serviceTypePrice: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: '#6B7280',
-  },
-  serviceTypePriceSelected: {
-    color: '#06B6D4',
+  serviceTypeFooter: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'flex-end',
   },
   serviceTypeDescription: {
     fontSize: 14,
     color: '#6B7280',
     lineHeight: 20,
+    flex: 1,
   },
   serviceTypeDescriptionSelected: {
     color: '#059669',
+  },
+  priceContainer: {
+    alignItems: 'flex-end',
+  },
+  originalPrice: {
+    fontSize: 12,
+    fontWeight: '500',
+    color: '#9CA3AF',
+    textDecorationLine: 'line-through',
+    marginBottom: 2,
+  },
+  serviceTypePrice: {
+    fontSize: 16,
+    fontWeight: '700',
+    color: '#1F2937',
+  },
+  serviceTypePriceSelected: {
+    color: '#1F2937',
   },
 });
 

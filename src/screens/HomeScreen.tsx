@@ -26,24 +26,19 @@ import { RootState } from "../store";
 import firebaseService, {
   DiagnosisReservation,
   VehicleDiagnosisReport,
-  UserVehicle,
   EnrichedUserVehicle,
-  VehicleDetails,
 } from "../services/firebaseService";
 import { getAuth } from "firebase/auth";
 import logger from "../services/logService";
 import analyticsService from "../services/analyticsService";
 import devLog from "../utils/devLog";
 import {
-  handleError,
   handleFirebaseError,
-  showUserError,
 } from "../services/errorHandler";
 import { convertToLineSeedFont } from "../styles/fonts";
 import * as Animatable from "react-native-animatable";
 import {
   SkeletonVehicleCard,
-  SkeletonImage,
 } from "../components/skeleton";
 import { scale, verticalScale, moderateScale } from 'react-native-size-matters';
 
@@ -70,11 +65,11 @@ const VehicleCard: React.FC<VehicleCardProps> = ({ vehicle, onEdit }) => {
             source={{ uri: vehicleData.imageUrl }}
             style={styles.vehicleImage}
             onLoad={() => {
-              console.log("✅ [VehicleCard] 이미지 로드 성공:", vehicleData.imageUrl);
+              devLog.log("✅ [VehicleCard] 이미지 로드 성공:", vehicleData.imageUrl);
               setImageLoaded(true);
             }}
             onError={(error) => {
-              console.error("❌ [VehicleCard] 이미지 로드 실패:", {
+              devLog.error("❌ [VehicleCard] 이미지 로드 실패:", {
                 url: vehicleData.imageUrl,
                 error: error.nativeEvent
               });
@@ -213,7 +208,6 @@ const VehicleCard: React.FC<VehicleCardProps> = ({ vehicle, onEdit }) => {
 type HomeScreenNavigationProp = NativeStackNavigationProp<RootStackParamList>;
 
 export default function HomeScreen() {
-  console.log("🏠 HomeScreen 렌더링됨 - 현재 시간:", new Date().toISOString());
   const navigation = useNavigation<HomeScreenNavigationProp>();
   const { user, isAuthenticated, autoLoginEnabled } = useSelector(
     (state: RootState) => state.auth
@@ -371,6 +365,24 @@ export default function HomeScreen() {
     }
   };
 
+  // ✅ 공유 Firebase Auth 초기화 헬퍼 (중복 polling 제거)
+  const waitForFirebaseAuth = async (): Promise<boolean> => {
+    const auth = getAuth();
+    if (auth.currentUser) {
+      return true; // 이미 초기화됨
+    }
+
+    devLog.log("⚠️ Firebase Auth currentUser 초기화 중, 1초 대기...");
+    await new Promise((resolve) => setTimeout(resolve, 1000));
+
+    if (!auth.currentUser) {
+      devLog.log("❌ Firebase Auth currentUser 최종 확인 실패");
+      return false;
+    }
+
+    return true;
+  };
+
   // 사용자 차량 목록 조회 (메모리 누수 방지)
   const loadUserVehicles = async (isMountedRef: { current: boolean }) => {
     if (!isAuthenticated || !user) {
@@ -383,46 +395,9 @@ export default function HomeScreen() {
     if (!isMountedRef.current) return;
 
     try {
-      console.log("🔄 loadUserVehicles 시작 - userId:", user.uid);
+      devLog.log("🔄 loadUserVehicles 시작 - userId:", user.uid);
       if (isMountedRef.current) {
         setVehiclesLoading(true);
-      }
-
-      // Firebase Auth 초기화 상태 확인 (잠시 대기 후 재시도)
-      const auth = getAuth();
-      if (!auth.currentUser) {
-        devLog.log(
-          "⚠️ 차량 목록 로드: Firebase Auth currentUser 초기화 중, 잠시 대기..."
-        );
-        await new Promise((resolve) => setTimeout(resolve, 500));
-
-        // 재시도 후에도 없으면 로그인 실패로 간주 (Apple 사용자만)
-        if (!auth.currentUser && user.provider === "apple") {
-          devLog.log(
-            "❌ Apple 사용자: Firebase Auth currentUser 최종 확인 실패, 차량 목록 로드 건너뜀"
-          );
-          if (isMountedRef.current) {
-            setUserVehicles([]);
-            setVehiclesLoading(false);
-
-            // Apple 토큰 만료 안내 (한 번만 표시)
-            setTimeout(() => {
-              Alert.alert(
-                "로그인 세션 만료",
-                "Apple 로그인 세션이 만료되었습니다.\n데이터를 불러오려면 다시 로그인해주세요.",
-                [
-                  { text: "취소", style: "cancel" },
-                  {
-                    text: "다시 로그인",
-                    onPress: () =>
-                      navigation.navigate("Login", { showBackButton: true }),
-                  },
-                ]
-              );
-            }, 1000);
-          }
-          return;
-        }
       }
 
       logger.userAction("load_user_vehicles", user.uid);
@@ -430,15 +405,10 @@ export default function HomeScreen() {
       // ✅ Application-level JOIN: userVehicles + vehicles
       const vehicles = await firebaseService.getUserVehiclesEnriched(user.uid);
 
-      console.log("✅ loadUserVehicles 완료 - 차량 수:", vehicles.length);
-      console.log(
-        "📋 로드된 차량 목록:",
-        vehicles.map((v) => `${v.year} ${v.brandId} ${v.modelId} (${v.vehicleData.modelName})`)
-      );
+      devLog.log("✅ loadUserVehicles 완료 - 차량 수:", vehicles.length);
 
       if (isMountedRef.current) {
         setUserVehicles(vehicles);
-        console.log("📱 HomeScreen 차량 상태 업데이트 완료");
         logger.debug(
           "VEHICLE",
           "User vehicles loaded successfully",
@@ -466,41 +436,24 @@ export default function HomeScreen() {
   // 화면에 포커스될 때 차량 데이터가 없으면 로딩 (캐싱)
   useFocusEffect(
     React.useCallback(() => {
-      console.log(
-        "👁️ HomeScreen 포커스 이벤트 - isAuthenticated:",
-        isAuthenticated,
-        "user:",
-        !!user,
-        "userVehicles.length:",
-        userVehicles.length
-      );
-
       // 이미 차량 데이터가 있으면 다시 로딩하지 않음
       if (isAuthenticated && user && isMountedRef.current && userVehicles.length === 0) {
-        console.log("🔄 HomeScreen 포커스 - 차량 목록 최초 로딩 시작");
-
+        devLog.log("🔄 HomeScreen 포커스 - 차량 목록 최초 로딩 시작");
         setVehiclesLoading(true);
         loadUserVehicles(isMountedRef);
-      } else if (userVehicles.length > 0) {
-        console.log("✅ 차량 데이터가 이미 있어서 로딩 스킵");
       }
     }, [isAuthenticated, user, userVehicles.length])
   );
 
   // 차량 데이터 강제 새로고침 함수
   const forceRefreshVehicles = React.useCallback(async () => {
-    console.log(
-      "🔄 forceRefreshVehicles 함수 시작, isMountedRef:",
-      isMountedRef.current
-    );
     if (isMountedRef.current) {
       setVehiclesLoading(true);
       try {
-        console.log("🔄 loadUserVehicles 호출 중...");
         await loadUserVehicles(isMountedRef);
-        console.log("✅ 차량 목록 강제 새로고침 완료");
+        devLog.log("✅ 차량 목록 강제 새로고침 완료");
       } catch (error) {
-        console.error("❌ 차량 목록 새로고침 에러:", error);
+        devLog.error("❌ 차량 목록 새로고침 에러:", error);
         handleFirebaseError(error, {
           screenName: "HomeScreen",
           actionName: "refresh_vehicle_list",
@@ -510,10 +463,6 @@ export default function HomeScreen() {
           setVehiclesLoading(false);
         }
       }
-    } else {
-      console.log(
-        "⚠️ forceRefreshVehicles: isMountedRef.current가 false라서 스킵"
-      );
     }
   }, []);
 
@@ -526,7 +475,6 @@ export default function HomeScreen() {
       );
       if (updatedVehicle) {
         setSelectedVehicle(updatedVehicle);
-        console.log("✅ 선택된 차량 정보 자동 업데이트:", updatedVehicle.modelId);
       }
     }
   }, [userVehicles]);
@@ -540,24 +488,6 @@ export default function HomeScreen() {
           setVehicleReport(null);
         }
         return;
-      }
-
-      // Firebase Auth가 완전히 초기화될 때까지 잠시 대기
-      const auth = getAuth();
-      if (!auth.currentUser) {
-        devLog.log("⚠️ Firebase Auth currentUser 아직 초기화 중, 잠시 대기...");
-        // 1초 정도 대기 후 다시 시도
-        await new Promise((resolve) => setTimeout(resolve, 1000));
-
-        // 재시도 후에도 currentUser가 없으면 로그인 실패로 간주
-        if (!auth.currentUser && isMountedRef.current) {
-          devLog.log(
-            "❌ Firebase Auth currentUser 최종 확인 실패, 예약 정보 로드 건너뜀"
-          );
-          setLatestReservation(null);
-          setVehicleReport(null);
-          return;
-        }
       }
 
       if (isMountedRef.current) {
@@ -601,19 +531,32 @@ export default function HomeScreen() {
       }
     };
 
-    loadLatestReservation();
-    loadUserVehicles(isMountedRef);
+    // ✅ 최적화: Firebase Auth 초기화를 한 번만 체크하고, 두 함수를 병렬로 실행
+    const loadData = async () => {
+      // Firebase Auth 초기화 대기 (한 번만)
+      const isAuthReady = await waitForFirebaseAuth();
+      if (!isAuthReady) {
+        devLog.log("❌ Firebase Auth 초기화 실패, 데이터 로드 건너뜀");
+        return;
+      }
+
+      // ✅ 두 함수를 병렬로 실행하여 로딩 시간 단축
+      await Promise.all([
+        loadLatestReservation(),
+        loadUserVehicles(isMountedRef)
+      ]);
+    };
+
+    loadData();
   }, [isAuthenticated, user]);
 
   // Pull-to-refresh 함수
   const onRefresh = async () => {
-    console.log("🔄 Pull-to-refresh 시작");
     if (!isMountedRef.current) return;
 
     try {
       if (isMountedRef.current) {
         setRefreshing(true);
-        console.log("📱 새로고침 상태 활성화");
       }
 
       logger.userAction("refresh_home_screen", user?.uid);
@@ -679,7 +622,6 @@ export default function HomeScreen() {
 
       await Promise.all(promises);
 
-      console.log("✅ Pull-to-refresh 완료");
       logger.debug("UI", "Home screen refresh completed", undefined, user?.uid);
     } catch (error) {
       logger.error("UI", "Home screen refresh failed", { error }, user?.uid);
@@ -890,7 +832,7 @@ export default function HomeScreen() {
         // 새로운 통합 예약 화면으로 이동
         navigation.navigate("Reservation");
       } catch (error) {
-        console.error('예약 체크 실패:', error);
+        devLog.error('예약 체크 실패:', error);
         // 에러 발생 시에도 예약 화면으로 진행
         navigation.navigate("Reservation");
       }
@@ -925,12 +867,6 @@ export default function HomeScreen() {
     try {
       if (!user) return;
 
-      console.log("🚗 handleSelectVehicle 호출됨:", {
-        vehicleModalEditMode,
-        selectedVehicle: selectedVehicle?.id,
-        vehicle: `${vehicle.year} ${vehicle.make} ${vehicle.model}`,
-      });
-
       if (vehicleModalEditMode && selectedVehicle) {
         // 수정 모드: 기존 차량 업데이트
         logger.vehicle(
@@ -947,12 +883,10 @@ export default function HomeScreen() {
         });
 
         logger.vehicle("edit_complete", undefined, user?.uid);
-        console.log("🔄 차량 업데이트 완료, 모달 닫기 시작");
 
         setShowVehicleModal(false);
         setVehicleModalEditMode(false);
 
-        console.log("🔄 차량 목록 직접 새로고침 시작");
         // isMountedRef와 무관하게 직접 차량 목록 새로고침
         try {
           setVehiclesLoading(true);
@@ -960,13 +894,8 @@ export default function HomeScreen() {
             user.uid
           );
           setUserVehicles(updatedVehicles);
-          console.log(
-            "✅ 차량 목록 직접 새로고침 완료:",
-            updatedVehicles.length,
-            "개"
-          );
         } catch (error) {
-          console.error("❌ 차량 목록 새로고침 실패:", error);
+          devLog.error("❌ 차량 목록 새로고침 실패:", error);
         } finally {
           setVehiclesLoading(false);
         }
@@ -1006,7 +935,6 @@ export default function HomeScreen() {
 
         setShowVehicleModal(false);
 
-        console.log("🔄 차량 목록 직접 새로고침 시작 (추가 모드)");
         // isMountedRef와 무관하게 직접 차량 목록 새로고침
         try {
           setVehiclesLoading(true);
@@ -1014,13 +942,8 @@ export default function HomeScreen() {
             user.uid
           );
           setUserVehicles(updatedVehicles);
-          console.log(
-            "✅ 차량 목록 직접 새로고침 완료 (추가 모드):",
-            updatedVehicles.length,
-            "개"
-          );
         } catch (error) {
-          console.error("❌ 차량 목록 새로고침 실패 (추가 모드):", error);
+          devLog.error("❌ 차량 목록 새로고침 실패 (추가 모드):", error);
         } finally {
           setVehiclesLoading(false);
         }
@@ -1185,6 +1108,15 @@ export default function HomeScreen() {
           />
         }
       >
+        {/* Outline Test 버튼 (개발/테스트용) - 숨김 */}
+        {/* <TouchableOpacity
+          style={styles.outlineTestButton}
+          onPress={() => navigation.navigate('OutlineTest' as any)}
+        >
+          <Ionicons name="car-sport-outline" size={20} color="#FFFFFF" />
+          <Text style={styles.outlineTestButtonText}>차량 Outline 테스트</Text>
+        </TouchableOpacity> */}
+
         {/* 메인 상태 섹션 - "내 지갑" 스타일 */}
         <Animatable.View
           animation="fadeInUp"
@@ -2301,5 +2233,29 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: "#666",
     fontWeight: "500",
+  }),
+  // Outline Test 버튼 스타일
+  outlineTestButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    marginHorizontal: 16,
+    marginTop: 16,
+    marginBottom: 8,
+    paddingVertical: 12,
+    paddingHorizontal: 16,
+    backgroundColor: '#8B5CF6',
+    borderRadius: 12,
+    shadowColor: '#8B5CF6',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.2,
+    shadowRadius: 4,
+    elevation: 3,
+  },
+  outlineTestButtonText: convertToLineSeedFont({
+    fontSize: 15,
+    fontWeight: '600',
+    color: '#FFFFFF',
   }),
 });

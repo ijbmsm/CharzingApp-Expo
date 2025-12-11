@@ -23,6 +23,18 @@ config.resolver.alias = {
   '@charzing/vehicle-utils': vehicleUtilsPath,
 };
 
+// ✅ SVG Transformer 설정 추가
+const { transformer, resolver } = config;
+config.transformer = {
+  ...transformer,
+  babelTransformerPath: require.resolve('react-native-svg-transformer'),
+};
+config.resolver = {
+  ...resolver,
+  assetExts: resolver.assetExts.filter((ext) => ext !== 'svg'),
+  sourceExts: [...resolver.sourceExts, 'svg'],
+};
+
 // Metro 서버 커스터마이즈
 config.server = {
   ...config.server,

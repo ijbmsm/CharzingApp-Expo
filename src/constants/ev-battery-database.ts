@@ -5137,7 +5137,7 @@ export const getAvailableYearsForModel = (brandId: string, modelId: string): str
   if (batteryHistory.length === 0) return [];
   
   const years = batteryHistory.map(item => item.startYear.toString());
-  return [...new Set(years)].sort((a, b) => parseInt(b) - parseInt(a)); // 내림차순 정렬
+  return Array.from(new Set(years)).sort((a, b) => parseInt(b) - parseInt(a)); // 내림차순 정렬
 };
 
 // 모든 모델의 연식 정보를 통합해서 조회 (같은 모델명의 다른 트림들 포함)

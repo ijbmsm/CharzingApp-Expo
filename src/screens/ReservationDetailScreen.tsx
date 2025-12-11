@@ -17,6 +17,7 @@ import { Timestamp, FieldValue } from 'firebase/firestore';
 import Header from '../components/Header';
 import firebaseService, { DiagnosisReservation, VehicleDiagnosisReport } from '../services/firebaseService';
 import { RootStackParamList } from '../navigation/RootNavigator';
+import devLog from '../utils/devLog';
 
 // Date 필드가 string으로 변환된 reservation 타입
 type SerializableReservation = Omit<DiagnosisReservation, 'requestedDate' | 'createdAt' | 'updatedAt'> & {
@@ -41,6 +42,7 @@ const ReservationDetailScreen: React.FC = () => {
   const [reportLoading, setReportLoading] = useState(false);
   const [currentReservation, setCurrentReservation] = useState(reservation);
   const [shouldResetOnBack, setShouldResetOnBack] = useState(false);
+  const [isPolicyExpanded, setIsPolicyExpanded] = useState(false);
 
   // 완료된 예약에 대한 진단 리포트 조회
   useEffect(() => {
@@ -55,7 +57,7 @@ const ReservationDetailScreen: React.FC = () => {
       const report = await firebaseService.getReservationVehicleDiagnosisReport(currentReservation.id);
       setVehicleReport(report);
     } catch (error) {
-      console.error('진단 리포트 조회 실패:', error);
+      devLog.error('진단 리포트 조회 실패:', error);
     } finally {
       setReportLoading(false);
     }
@@ -90,17 +92,60 @@ const ReservationDetailScreen: React.FC = () => {
 
   const handleModifyReservation = () => {
     const permission = getModifyPermission();
-    
+
     if (!permission.canModify) {
       Alert.alert('수정 불가', permission.reason || '예약을 수정할 수 없습니다.');
       return;
     }
 
     // 예약 수정 화면으로 이동 (ReservationScreen을 수정 모드로 사용)
-    navigation.navigate('Reservation', { 
-      editMode: true, 
-      existingReservation: currentReservation 
+    navigation.navigate('Reservation', {
+      editMode: true,
+      existingReservation: currentReservation
     });
+  };
+
+  const handleCancelReservation = () => {
+    const permission = getModifyPermission();
+
+    if (!permission.canCancel) {
+      Alert.alert('취소 불가', permission.reason || '예약을 취소할 수 없습니다.');
+      return;
+    }
+
+    // 취소 확인 Alert
+    Alert.alert(
+      '예약 취소',
+      '정말 예약을 취소하시겠습니까?\n취소된 예약은 복구할 수 없습니다.',
+      [
+        { text: '아니오', style: 'cancel' },
+        {
+          text: '예, 취소합니다',
+          style: 'destructive',
+          onPress: async () => {
+            try {
+              setIsLoading(true);
+              await firebaseService.cancelDiagnosisReservation(currentReservation.id);
+
+              // 현재 화면의 예약 상태를 업데이트
+              setCurrentReservation(prev => ({
+                ...prev,
+                status: 'cancelled',
+              }));
+              setShouldResetOnBack(true);
+
+              Alert.alert('알림', '예약이 취소되었습니다.');
+            } catch (error) {
+              devLog.error('예약 취소 실패:', error);
+              const errorMessage = error instanceof Error ? error.message : '예약 취소에 실패했습니다.';
+              Alert.alert('오류', errorMessage);
+            } finally {
+              setIsLoading(false);
+            }
+          }
+        }
+      ]
+    );
   };
 
   const handleStartDiagnosis = () => {
@@ -165,7 +210,7 @@ const ReservationDetailScreen: React.FC = () => {
 
               Alert.alert('알림', '담당이 취소되었습니다. 예약이 대기 상태로 변경되었습니다.');
             } catch (error) {
-              console.error('담당 취소 실패:', error);
+              devLog.error('담당 취소 실패:', error);
               const errorMessage = error instanceof Error ? error.message : '담당 취소에 실패했습니다.';
               Alert.alert('오류', errorMessage);
             } finally {
@@ -300,7 +345,11 @@ const ReservationDetailScreen: React.FC = () => {
         onBackPress={handleBackPress}
       />
       
-      <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
+      <ScrollView
+        style={styles.content}
+        contentContainerStyle={styles.scrollContent}
+        showsVerticalScrollIndicator={false}
+      >
         {/* 통합된 예약 정보 카드 */}
         <View style={styles.receiptCard}>
           {/* 상태 헤더 */}
@@ -458,21 +507,100 @@ const ReservationDetailScreen: React.FC = () => {
           </View>
         )}
 
+        {/* 예약 취소 및 환불 정책 - 아코디언 */}
+        {(currentReservation.status === 'pending' ||
+          currentReservation.status === 'pending_payment' ||
+          currentReservation.status === 'confirmed') && (
+          <View style={styles.accordionContainer}>
+            <TouchableOpacity
+              style={styles.accordionHeader}
+              onPress={() => setIsPolicyExpanded(!isPolicyExpanded)}
+              activeOpacity={0.7}
+            >
+              <Text style={styles.accordionTitle}>취소 및 환불 안내</Text>
+              <Ionicons
+                name={isPolicyExpanded ? 'chevron-up' : 'chevron-down'}
+                size={20}
+                color="#6B7280"
+              />
+            </TouchableOpacity>
+
+            {isPolicyExpanded && (
+              <View style={styles.accordionContent}>
+                {/* 결제 기한 (pending_payment 상태일 때 강조) */}
+                <View style={styles.policyBox}>
+                  <Text style={styles.policySubtitle}>결제 기한</Text>
+                  <Text style={styles.policyText}>
+                    • 예약 후 1시간 이내 결제하지 않으면 자동 취소됩니다.{'\n'}
+                    • 취소 시 예약 정보가 모두 삭제됩니다.
+                  </Text>
+                </View>
+
+                {/* 취소 및 환불 기준 */}
+                <View style={styles.policyBox}>
+                  <Text style={styles.policySubtitle}>취소 및 환불 기준</Text>
+                  <Text style={styles.policyText}>
+                    • 진단 예약 시간 6시간 이전 취소: 100% 환불{'\n'}
+                    • 진단 예약 시간 6시간 이내 취소 또는 현장 미방문: 50% 환불{'\n'}
+                    • 연락두절 또는 고의적 서비스 방해: 환불 불가{'\n'}
+                    • 차량 판매 등 불가피한 사유: 증빙서류 제출 시 50% 환불{'\n'}
+                    • 회사 귀책(진단사 일정, 장비 고장 등): 100% 환불
+                  </Text>
+                </View>
+
+                {/* 예약 변경 */}
+                <View style={styles.policyBox}>
+                  <Text style={styles.policySubtitle}>예약 변경</Text>
+                  <Text style={styles.policyText}>
+                    • 예약 변경은 1회에 한하여 가능합니다.{'\n'}
+                    • 변경 요청은 예약 시간 6시간 이전에만 접수됩니다.{'\n'}
+                    • 변경 후 재취소 시 동일한 환불 기준이 적용됩니다.
+                  </Text>
+                </View>
+
+                {/* 환불 절차 */}
+                <View style={[styles.policyBox, { marginBottom: 0 }]}>
+                  <Text style={styles.policySubtitle}>환불 절차</Text>
+                  <Text style={styles.policyText}>
+                    • 고객센터(info@charzing.kr) 또는 앱 내 문의를 통해 접수{'\n'}
+                    • 접수일 기준 3영업일 이내 환불 처리{'\n'}
+                    • 결제 수단과 동일한 방법으로 환불{'\n'}
+                    • 카드사 정책에 따라 실제 환불 시점은 다소 차이 있을 수 있음
+                  </Text>
+                </View>
+              </View>
+            )}
+          </View>
+        )}
 
       </ScrollView>
 
       {/* 하단 액션 버튼 */}
 
-      {/* 결제 필요 상태일 때 결제 버튼 */}
+      {/* 결제 필요 상태일 때 결제 버튼 + 하단 취소 텍스트 */}
       {currentReservation.status === 'pending_payment' && (
         <SafeAreaView style={styles.bottomSafeArea} edges={['bottom']}>
-          <View style={styles.bottomActionBar}>
+          <View style={styles.bottomContainer}>
             <TouchableOpacity
-              style={styles.paymentButton}
+              style={styles.primaryButton}
               onPress={handlePayment}
               activeOpacity={0.8}
+              disabled={isLoading}
             >
-              <Text style={styles.paymentButtonText}>결제하기</Text>
+              <Text style={styles.primaryButtonText}>결제하기</Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              style={styles.cancelTextButton}
+              onPress={handleCancelReservation}
+              activeOpacity={0.6}
+              disabled={isLoading}
+            >
+              {isLoading ? (
+                <ActivityIndicator size="small" color="#9CA3AF" />
+              ) : (
+                <Text style={styles.cancelTextButtonText}>예약 취소</Text>
+              )}
             </TouchableOpacity>
           </View>
         </SafeAreaView>
@@ -520,6 +648,27 @@ const ReservationDetailScreen: React.FC = () => {
           </SafeAreaView>
         )}
 
+      {/* 일반 예약 (pending, confirmed) 취소 텍스트 */}
+      {!currentReservation.assignedTo &&
+        (currentReservation.status === 'pending' || currentReservation.status === 'confirmed') && (
+          <SafeAreaView style={styles.bottomSafeArea} edges={['bottom']}>
+            <View style={styles.bottomContainer}>
+              <TouchableOpacity
+                style={styles.cancelTextButton}
+                onPress={handleCancelReservation}
+                activeOpacity={0.6}
+                disabled={isLoading}
+              >
+                {isLoading ? (
+                  <ActivityIndicator size="small" color="#9CA3AF" />
+                ) : (
+                  <Text style={styles.cancelTextButtonText}>예약 취소</Text>
+                )}
+              </TouchableOpacity>
+            </View>
+          </SafeAreaView>
+        )}
+
     </SafeAreaView>
   );
 };
@@ -532,6 +681,9 @@ const styles = StyleSheet.create({
   content: {
     flex: 1,
     paddingHorizontal: 16,
+  },
+  scrollContent: {
+    paddingBottom: 100, // 하단 버튼 영역 + 여유 공간
   },
   statusBadge: {
     paddingHorizontal: 16,
@@ -898,20 +1050,73 @@ const styles = StyleSheet.create({
   bottomUnassignText: {
     color: '#EF4444',
   },
-  // 결제 버튼 스타일
-  paymentButton: {
+  // 아코디언 컨테이너 (카드 없음)
+  accordionContainer: {
+    marginVertical: 8,
+  },
+  accordionHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingVertical: 12,
+    paddingHorizontal: 4,
+  },
+  accordionTitle: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#6B7280',
+  },
+  accordionContent: {
+    paddingTop: 8,
+  },
+  policyBox: {
+    backgroundColor: '#F9FAFB',
+    borderRadius: 8,
+    padding: 12,
+    marginBottom: 12,
+  },
+  policySubtitle: {
+    fontSize: 13,
+    fontWeight: '600',
+    color: '#374151',
+    marginBottom: 8,
+  },
+  policyText: {
+    fontSize: 12,
+    color: '#6B7280',
+    lineHeight: 18,
+  },
+  // 하단 컨테이너 (세로 배치)
+  bottomContainer: {
+    paddingHorizontal: 20,
+    paddingVertical: 12,
+    backgroundColor: '#FFFFFF',
+    borderTopWidth: 1,
+    borderTopColor: '#F3F4F6',
+  },
+  // 주요 CTA 버튼
+  primaryButton: {
     backgroundColor: '#06B6D4',
     borderRadius: 12,
     paddingVertical: 16,
-    paddingHorizontal: 24,
     alignItems: 'center',
     justifyContent: 'center',
-    flex: 1,
   },
-  paymentButtonText: {
+  primaryButtonText: {
     color: '#FFFFFF',
     fontSize: 16,
     fontWeight: '600',
+  },
+  // 취소 텍스트 링크 버튼
+  cancelTextButton: {
+    paddingVertical: 12,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  cancelTextButtonText: {
+    color: '#9CA3AF',
+    fontSize: 14,
+    fontWeight: '500',
   },
 });
 

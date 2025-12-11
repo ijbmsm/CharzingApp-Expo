@@ -2268,17 +2268,21 @@ class FirebaseService {
     switch (reservation.status) {
       case 'pending':
         return { canModify: true, canCancel: true };
-        
+
+      case 'pending_payment':
+        // 결제 대기 중인 예약은 언제든 취소 가능 (잘못 예약한 경우)
+        return { canModify: true, canCancel: true };
+
       case 'confirmed':
         if (isPastDeadline) {
-          return { 
-            canModify: false, 
-            canCancel: false, 
-            reason: '예약 시간 2시간 전까지만 수정/취소 가능합니다.' 
+          return {
+            canModify: false,
+            canCancel: false,
+            reason: '예약 시간 2시간 전까지만 수정/취소 가능합니다.'
           };
         }
         return { canModify: true, canCancel: true };
-        
+
       case 'in_progress':
         return { 
           canModify: false, 

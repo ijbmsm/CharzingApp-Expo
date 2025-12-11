@@ -24,6 +24,7 @@ import LoginScreen from '../screens/LoginScreen';
 import SplashScreen from '../screens/SplashScreen';
 import SignupCompleteScreen from '../screens/SignupCompleteScreen';
 import BatteryInfoScreen from '../screens/BatteryInfoScreen';
+import OutlineTestScreen from '../screens/OutlineTestScreen';
 
 // 새로운 예약 플로우 화면들
 import ReservationScreen from '../screens/ReservationScreen';
@@ -159,6 +160,8 @@ export type RootStackParamList = {
       requestedDate: string | Date;
     };
   };
+  // Outline Test 화면
+  OutlineTest: undefined;
 };
 
 export type MainTabParamList = {
@@ -506,6 +509,10 @@ export default function RootNavigator() {
         <Stack.Screen
           name="PaymentFailure"
           component={PaymentFailureScreen}
+        />
+        <Stack.Screen
+          name="OutlineTest"
+          component={OutlineTestScreen}
         />
       </Stack.Navigator>
     </NavigationContainer>

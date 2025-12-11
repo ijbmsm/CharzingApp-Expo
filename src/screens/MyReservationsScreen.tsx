@@ -18,6 +18,7 @@ import Header from '../components/Header';
 import { RootState } from '../store';
 import firebaseService, { DiagnosisReservation } from '../services/firebaseService';
 import { RootStackParamList } from '../navigation/RootNavigator';
+import devLog from '../utils/devLog';
 
 type NavigationProp = StackNavigationProp<RootStackParamList>;
 
@@ -48,9 +49,9 @@ const MyReservationsScreen: React.FC = () => {
       const userReservations = await firebaseService.getUserDiagnosisReservations(user.uid);
 
       // 🔍 예약 상태 로깅
-      console.log('📋 [MyReservations] 불러온 예약 목록:', userReservations.length, '개');
+      devLog.log('📋 [MyReservations] 불러온 예약 목록:', userReservations.length, '개');
       userReservations.forEach((reservation, index) => {
-        console.log(`📋 [MyReservations] 예약 ${index + 1}:`, {
+        devLog.log(`📋 [MyReservations] 예약 ${index + 1}:`, {
           id: reservation.id,
           status: reservation.status,
           paymentStatus: reservation.paymentStatus,
@@ -65,7 +66,7 @@ const MyReservationsScreen: React.FC = () => {
       }
     } catch (error) {
       if (isMounted) {
-        console.error('예약 목록 불러오기 실패:', error);
+        devLog.error('예약 목록 불러오기 실패:', error);
         Alert.alert('오류', '예약 목록을 불러올 수 없습니다.');
       }
     }
@@ -197,7 +198,7 @@ const MyReservationsScreen: React.FC = () => {
     const currentStep = getStepFromStatus(item.status);
 
     // 🔍 렌더링 시 상태 로깅
-    console.log('🎨 [MyReservations] 렌더링:', {
+    devLog.log('🎨 [MyReservations] 렌더링:', {
       id: item.id?.slice(0, 8),
       status: item.status,
       statusText: getStatusText(item.status),
@@ -241,7 +242,7 @@ const MyReservationsScreen: React.FC = () => {
           </View>
           
           <View style={styles.receiptRow}>
-            <Text style={styles.receiptLabel}>예약자ㅇ</Text>
+            <Text style={styles.receiptLabel}>예약자</Text>
             <Text style={styles.receiptValue}>{item.userName || '-'}</Text>
           </View>
           
@@ -305,7 +306,7 @@ const MyReservationsScreen: React.FC = () => {
       // 3️⃣ 결제 대기 예약이 없으면 정상적으로 진행
       navigation.navigate('DiagnosisReservation');
     } catch (error) {
-      console.error('예약 체크 실패:', error);
+      devLog.error('예약 체크 실패:', error);
       // 에러 발생 시에도 예약 화면으로 진행
       navigation.navigate('DiagnosisReservation');
     }

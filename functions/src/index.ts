@@ -3134,20 +3134,20 @@ export const tossWebhook = functions
   });
 
 /**
- * TTL Cleanup - pending_payment 예약 24시간 후 자동 삭제 (Step 4)
+ * TTL Cleanup - pending_payment 예약 1시간 후 자동 삭제 (Step 4)
  *
  * @description
- * 매일 자동 실행되어 24시간 지난 미결제 예약을 정리
- * - pending_payment 상태가 24시간 넘으면 cancelled로 변경
+ * 매 시간마다 자동 실행되어 1시간 지난 미결제 예약을 정리
+ * - pending_payment 상태가 1시간 넘으면 cancelled로 변경
  * - DB 오염 방지 및 시간대 재사용 가능
  *
  * @trigger Cloud Scheduler (Pub/Sub)
- * @schedule 매일 새벽 3시 (KST) - "0 18 * * *" (UTC)
+ * @schedule 매시 정각 (KST) - "0 * * * *" (UTC)
  * @region us-central1, asia-northeast3
  *
  * @example Cloud Scheduler 설정
  * Topic: cleanup-pending-payments
- * Schedule: 0 18 * * * (UTC = 새벽 3시 KST)
+ * Schedule: 0 * * * * (UTC = 매시 정각)
  * Timezone: UTC
  */
 export const cleanupPendingPayments = functions
@@ -3162,18 +3162,18 @@ export const cleanupPendingPayments = functions
     console.log('🧹 Starting TTL Cleanup for pending_payment reservations...');
 
     try {
-      // 1️⃣ 24시간 전 타임스탬프 계산
-      const twentyFourHoursAgo = admin.firestore.Timestamp.fromMillis(
-        Date.now() - 24 * 60 * 60 * 1000
+      // 1️⃣ 1시간 전 타임스탬프 계산
+      const oneHourAgo = admin.firestore.Timestamp.fromMillis(
+        Date.now() - 1 * 60 * 60 * 1000
       );
 
-      console.log('⏰ Cutoff time:', twentyFourHoursAgo.toDate().toISOString());
+      console.log('⏰ Cutoff time:', oneHourAgo.toDate().toISOString());
 
-      // 2️⃣ pending_payment 상태이면서 24시간 지난 예약 찾기
+      // 2️⃣ pending_payment 상태이면서 1시간 지난 예약 찾기
       const expiredReservationsSnapshot = await db
         .collection('diagnosisReservations')
         .where('status', '==', 'pending_payment')
-        .where('createdAt', '<', twentyFourHoursAgo)
+        .where('createdAt', '<', oneHourAgo)
         .get();
 
       if (expiredReservationsSnapshot.empty) {
