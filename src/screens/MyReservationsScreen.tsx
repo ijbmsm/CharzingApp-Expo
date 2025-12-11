@@ -145,15 +145,18 @@ const MyReservationsScreen: React.FC = () => {
     currentStepLabelColor: '#06B6D4',
   };
 
-  const renderStepIndicator = (params: any) => {
+  const renderStepIndicator = (params: { position: number; stepStatus?: number }) => {
     const icons: Array<keyof typeof Ionicons.glyphMap> = ['document-text-outline', 'calendar-outline', 'checkmark-circle-outline'];
-    const isActive = params.position <= params.stepStatus;
-    
+    const isActive = params.stepStatus !== undefined && params.position <= params.stepStatus;
+
+    // position이 배열 범위를 벗어나지 않도록 보장
+    const iconName = icons[params.position] || 'document-text-outline';
+
     return (
-      <Ionicons 
-        name={icons[params.position]} 
-        size={16} 
-        color={isActive ? '#FFFFFF' : '#9CA3AF'} 
+      <Ionicons
+        name={iconName}
+        size={16}
+        color={isActive ? '#FFFFFF' : '#9CA3AF'}
       />
     );
   };
@@ -229,7 +232,7 @@ const MyReservationsScreen: React.FC = () => {
               currentPosition={currentStep}
               labels={labels}
               stepCount={3}
-              renderStepIndicator={(params) => renderStepIndicator({...params, stepStatus: currentStep})}
+              renderStepIndicator={(params: { position: number }) => renderStepIndicator({...params, stepStatus: currentStep})}
             />
           </View>
         )}

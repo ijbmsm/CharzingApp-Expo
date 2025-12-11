@@ -1023,14 +1023,16 @@ export default function HomeScreen() {
 
           <View style={styles.carouselServiceFeatures}>
             {item.features.map((feature, featureIndex) => (
-              <View key={featureIndex} style={styles.carouselFeatureItem}>
-                <Ionicons
-                  name="checkmark-circle"
-                  size={16}
-                  color={item.color}
-                />
-                <Text style={styles.carouselFeatureText}>{feature}</Text>
-              </View>
+              <React.Fragment key={featureIndex}>
+                <View style={styles.carouselFeatureItem}>
+                  <Ionicons
+                    name="checkmark-circle"
+                    size={16}
+                    color={item.color}
+                  />
+                  <Text style={styles.carouselFeatureText}>{feature}</Text>
+                </View>
+              </React.Fragment>
             ))}
           </View>
 
