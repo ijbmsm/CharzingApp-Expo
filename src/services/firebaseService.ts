@@ -147,6 +147,12 @@ export interface FirebaseTrim {
   variants: FirebaseVariant[];
 }
 
+// 배터리 옵션 (복수 배터리 제조사 지원)
+export interface BatteryOption {
+  supplier: string;     // 배터리 제조사
+  condition?: string;   // VIN 패턴, 생산 시기 등 조건
+}
+
 // Firebase Firestore 변형 구조
 export interface FirebaseVariant {
   years?: string[];
@@ -154,8 +160,9 @@ export interface FirebaseVariant {
   range?: number;
   trimId?: string;
   trimName?: string;
-  supplier?: string;        // "SK온"
-  cellType?: string;        // "NCM"
+  supplier?: string;              // 단일 배터리 제조사 (기존 호환)
+  batteryOptions?: BatteryOption[]; // 복수 배터리 제조사 (optional, supplier와 상호 배타적)
+  cellType?: string;              // "NCM"
 
   // 직접 필드 (일부 브랜드)
   acceleration?: string | number;  // "5.4초 (0-100km/h)" 또는 숫자

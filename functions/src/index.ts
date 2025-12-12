@@ -10,6 +10,9 @@ import { FieldValue } from 'firebase-admin/firestore';
 // 차량 데이터 업로드 함수 import
 export { uploadVehiclesToFirestore } from './uploadVehicles';
 
+// SMS 알림 유틸리티
+import { sendSMS, validateSMSConfig } from './utils/naver-sens-sms';
+
 // Firebase Admin 초기화 (중복 초기화 방지)
 if (admin.apps.length === 0) {
   admin.initializeApp();
@@ -3293,5 +3296,135 @@ export const cleanupPendingPayments = functions
       });
 
       throw error; // Cloud Scheduler 재시도를 위해 throw
+    }
+  });
+
+/**
+ * 새 예약 생성 시 관리자에게 SMS 알림 전송
+ * Firestore 트리거: diagnosisReservations 컬렉션에 새 문서 생성 시 실행
+ *
+ * 특징:
+ * - 백그라운드 트리거로 사용자 경험에 영향 없음
+ * - 예약 생성 후 비동기적으로 SMS 발송
+ * - 실패 시에도 예약 생성에는 영향 없음
+ */
+export const notifyReservationCreated = functions
+  .region('asia-northeast3')
+  .runWith({
+    memory: '256MB',
+    timeoutSeconds: 30,
+  })
+  .firestore
+  .document('diagnosisReservations/{reservationId}')
+  .onCreate(async (snapshot, context) => {
+    const reservationId = context.params.reservationId;
+    const data = snapshot.data();
+
+    console.log(`📲 새 예약 생성됨 (SMS 알림 발송 시작): ${reservationId}`);
+
+    // Sentry 브레드크럼 추가
+    Sentry.addBreadcrumb({
+      category: 'notification',
+      message: 'SMS notification triggered',
+      level: 'info',
+      data: {
+        reservationId,
+        userId: data.userId,
+      },
+    });
+
+    try {
+      // 환경 변수 검증
+      const config = validateSMSConfig();
+
+      // 예약 정보 추출
+      const customerName = data.userName || '정보 없음';
+      const customerPhone = data.userPhone || '정보 없음';
+      const vehicleBrand = data.vehicleBrand || '';
+      const vehicleModel = data.vehicleModel || '';
+      const vehicleYear = data.vehicleYear || '';
+      const serviceType = data.serviceType || '일반 진단';
+      const servicePrice = data.servicePrice || 0;
+
+      // 예약 날짜 포맷팅
+      let requestedDateStr = '정보 없음';
+      if (data.requestedDate) {
+        const requestedDate = data.requestedDate.toDate();
+        const year = requestedDate.getFullYear();
+        const month = String(requestedDate.getMonth() + 1).padStart(2, '0');
+        const day = String(requestedDate.getDate()).padStart(2, '0');
+        const hours = String(requestedDate.getHours()).padStart(2, '0');
+        const minutes = String(requestedDate.getMinutes()).padStart(2, '0');
+        requestedDateStr = `${year}-${month}-${day} ${hours}:${minutes}`;
+      }
+
+      // SMS 메시지 구성 (이모지 제거 - Naver SENS API 제약)
+      const message = [
+        '[차징 예약 알림]',
+        '',
+        `예약 ID: ${reservationId.slice(0, 8)}`,
+        `고객명: ${customerName}`,
+        `연락처: ${customerPhone}`,
+        `차량: ${vehicleBrand} ${vehicleModel} ${vehicleYear}`,
+        `희망일시: ${requestedDateStr}`,
+        `서비스: ${serviceType} (${servicePrice.toLocaleString()}원)`,
+      ].join('\n');
+
+      // SMS 발송 (여러 관리자에게 동시 발송)
+      const sendPromises = config.adminPhones.map(async (phone) => {
+        try {
+          await sendSMS(
+            {
+              to: phone,
+              content: message,
+            },
+            config.serviceId,
+            config.accessKey,
+            config.secretKey,
+            config.senderPhone
+          );
+          console.log(`✅ SMS 알림 발송 완료: ${reservationId} → ${phone}`);
+          return { phone, success: true };
+        } catch (error) {
+          console.error(`❌ SMS 발송 실패 (${phone}):`, error);
+          return { phone, success: false, error };
+        }
+      });
+
+      // 모든 SMS 발송 완료 대기
+      const results = await Promise.allSettled(sendPromises);
+      const successCount = results.filter(r => r.status === 'fulfilled' && r.value.success).length;
+
+      console.log(`📊 SMS 발송 결과: ${successCount}/${config.adminPhones.length} 성공`);
+
+      // Sentry 성공 기록
+      Sentry.addBreadcrumb({
+        category: 'notification',
+        message: `SMS notification sent to ${successCount}/${config.adminPhones.length} recipients`,
+        level: 'info',
+        data: {
+          reservationId,
+          recipients: config.adminPhones,
+          successCount,
+        },
+      });
+
+    } catch (error) {
+      // SMS 발송 실패는 로그만 남기고 예약 생성에는 영향 없음
+      console.error('❌ SMS 알림 발송 실패:', {
+        reservationId,
+        error: error instanceof Error ? error.message : String(error),
+      });
+
+      // Sentry 에러 캡처
+      Sentry.captureException(error, {
+        tags: {
+          source: 'notifyReservationCreated',
+          reservationId,
+        },
+        level: 'warning', // Critical이 아님 - SMS 실패해도 예약은 정상 생성됨
+      });
+
+      // 에러를 throw하지 않음으로써 예약 생성 트랜잭션에 영향을 주지 않음
     }
   });
