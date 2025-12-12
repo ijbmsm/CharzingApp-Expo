@@ -209,5 +209,36 @@ range = selectedVariant.range || ...;
 
 ---
 
-**마지막 업데이트**: 2025-12-08
+## 🔗 관련 프로젝트
+
+Charzing 서비스는 4개의 프로젝트로 구성되어 있습니다:
+
+### 1. **CharzingApp-Expo** (현재 프로젝트)
+- **위치**: `/Users/sungmin/CharzingApp-Expo`
+- **역할**: 모바일 앱 (React Native + Expo)
+- **주요 기능**: 차량 등록, 진단 예약, 배터리 정보 조회
+
+### 2. **charzing-admin**
+- **위치**: `/Users/sungmin/charzing-admin`
+- **역할**: 관리자 대시보드 (Next.js 15)
+- **주요 기능**: 사용자/예약/리포트 관리, 차량 데이터 CRUD
+- **문서**: `/Users/sungmin/charzing-admin/CLAUDE.md`
+
+### 3. **charzing** (웹 앱)
+- **위치**: `/Users/sungmin/Desktop/project/react/charzing`
+- **역할**: 사용자 웹 앱 (Next.js) + Firebase Functions
+- **주요 기능**: 웹 진단 예약, 리포트 조회
+- **문서**: `/Users/sungmin/Desktop/project/react/charzing/CLAUDE.md`
+- **Firebase Functions**: 차량 데이터 조회 API
+
+### 4. **charzing-vehicle-utils**
+- **위치**: `/Users/sungmin/charzing-vehicle-utils`
+- **역할**: 공유 유틸리티 라이브러리
+- **주요 기능**: 차량 데이터 변환, 동적 Firestore 매핑
+- **문서**: `/Users/sungmin/charzing-vehicle-utils/README.md`
+
+---
+
+**마지막 업데이트**: 2025-12-12
+**버전**: 1.1.11
 **작성**: Claude Code
