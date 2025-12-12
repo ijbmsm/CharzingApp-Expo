@@ -4083,9 +4083,30 @@ class FirebaseService {
       const vehicleData = vehicleDoc.data();
       devLog.log(`✅ 차량 데이터 조회: ${brandId}/${modelId}`, vehicleData);
 
+      // ✅ YearTemplate 조회 (우선순위 1)
+      const yearTemplatesRef = collection(this.db, 'vehicles', brandId, 'models', modelId!, 'yearTemplates');
+      const yearTemplatesSnapshot = await getDocs(yearTemplatesRef);
+
+      const yearTemplatesByTrimAndYear = new Map<string, YearTemplate>();
+      yearTemplatesSnapshot.forEach((templateDoc) => {
+        const templateData = templateDoc.data() as YearTemplate;
+        const trimId = templateData.trimId;
+        const years = templateData.years || [];
+
+        if (trimId && years) {
+          // 각 연도에 대해 매핑 (연도별 빠른 조회를 위해)
+          years.forEach(templateYear => {
+            const key = `${trimId}_${templateYear}`;
+            yearTemplatesByTrimAndYear.set(key, templateData);
+          });
+        }
+      });
+
+      devLog.log(`📋 YearTemplate 조회 완료: ${yearTemplatesSnapshot.size}개 템플릿, ${yearTemplatesByTrimAndYear.size}개 매핑`);
+
       // 기본 배터리 정보
       const defaultBattery = vehicleData.defaultBattery || {};
-      
+
       // 연도 매칭 헬퍼 함수 - years 배열의 두 가지 형식 모두 지원
       // 1. ["2022", "2023", "2024"] - 정상
       // 2. ["2018 2019 2020 2021"] - 하나의 문자열에 여러 연도 (잘못된 데이터)
@@ -4104,26 +4125,39 @@ class FirebaseService {
         });
       };
 
-      // 트림별 상세 정보 찾기 - 브랜드별 다른 구조 지원
+      // ✅ 표준 구조: trims에 trimId, name, driveType, yearRange, variants 있음
       let matchedTrim = null;
       let matchedVariant = null;
+      let matchedFromYearTemplate = false;
 
       if (vehicleData.trims && Array.isArray(vehicleData.trims)) {
-        // 방법 1: Hyundai/KIA 구조 - trims에 trimId와 name이 있고, variants는 연식별
+        // 트림 매칭
         for (const t of vehicleData.trims) {
-          if (t.trimId && t.name && t.driveType && t.yearRange && t.variants) {
-            // Hyundai 스타일 확인됨
+          if (t.trimId && t.name && t.variants) {
+            // 트림명 매칭 (trim 파라미터 없으면 첫 번째 트림 사용)
             if (!trim || t.name?.toLowerCase() === trim.toLowerCase() || t.trimId === trim) {
               matchedTrim = t;
 
-              // 연도별 variant 매칭
-              if (t.variants && Array.isArray(t.variants)) {
-                matchedVariant = t.variants.find((v: FirebaseVariant) => {
-                  return isYearMatch(v.years, year);
-                });
+              // ✅ 우선순위 1: YearTemplate에서 먼저 찾기
+              const templateKey = `${t.trimId}_${year}`;
+              const yearTemplate = yearTemplatesByTrimAndYear.get(templateKey);
 
-                if (!matchedVariant) {
-                  matchedVariant = t.variants[0]; // 연도 매칭 실패 시 첫 번째 variant
+              if (yearTemplate && yearTemplate.variants && yearTemplate.variants.length > 0) {
+                devLog.log(`✅ YearTemplate에서 variant 발견: ${templateKey}`);
+                matchedVariant = yearTemplate.variants[0];
+                matchedFromYearTemplate = true;
+              } else {
+                // ✅ 우선순위 2: 트림의 variants에서 연도 매칭
+                devLog.log(`⚠️ YearTemplate 없음, 트림 variants 조회: ${t.trimId}`);
+                if (t.variants && Array.isArray(t.variants)) {
+                  matchedVariant = t.variants.find((v: FirebaseVariant) => {
+                    return isYearMatch(v.years, year);
+                  });
+
+                  // 연도 매칭 실패 시 첫 번째 variant 사용
+                  if (!matchedVariant) {
+                    matchedVariant = t.variants[0];
+                  }
                 }
               }
               break;
@@ -4131,57 +4165,13 @@ class FirebaseService {
           }
         }
 
-        // 방법 2: Audi/BMW/Mercedes 구조 - trimGroup.variants[]에 trimId와 trimName이 있음
-        if (!matchedVariant) {
-          for (const trimGroup of vehicleData.trims) {
-            if (trimGroup.variants && Array.isArray(trimGroup.variants) && !trimGroup.trimId) {
-              // Audi 스타일 확인됨
-              for (const v of trimGroup.variants) {
-                if (v.trimId && v.trimName) {
-                  // 트림 매칭 확인
-                  const trimMatches = !trim ||
-                                     v.trimName?.toLowerCase() === trim.toLowerCase() ||
-                                     v.trimId === trim;
-
-                  // 연도 매칭 확인 (헬퍼 함수 사용)
-                  const yearMatches = isYearMatch(v.years, year);
-
-                  if (trimMatches && yearMatches) {
-                    matchedVariant = v;
-                    break;
-                  }
-                }
-              }
-
-              if (matchedVariant) break;
-            }
-          }
-
-          // Audi 스타일에서 트림은 매칭되었지만 연도가 안 맞는 경우
-          if (!matchedVariant && trim) {
-            for (const trimGroup of vehicleData.trims) {
-              if (trimGroup.variants && Array.isArray(trimGroup.variants) && !trimGroup.trimId) {
-                for (const v of trimGroup.variants) {
-                  if (v.trimId && v.trimName) {
-                    const trimMatches = v.trimName?.toLowerCase() === trim.toLowerCase() ||
-                                       v.trimId === trim;
-                    if (trimMatches) {
-                      matchedVariant = v; // 트림만 맞으면 사용
-                      break;
-                    }
-                  }
-                }
-                if (matchedVariant) break;
-              }
-            }
-          }
-        }
-
-        // 여전히 못 찾았으면 첫 번째 variant 사용
-        if (!matchedVariant) {
-          if (vehicleData.trims[0]?.variants && vehicleData.trims[0].variants.length > 0) {
-            matchedVariant = vehicleData.trims[0].variants[0];
-            matchedTrim = vehicleData.trims[0];
+        // Fallback: 트림을 못 찾았으면 첫 번째 트림 사용
+        if (!matchedVariant && vehicleData.trims.length > 0) {
+          const firstTrim = vehicleData.trims[0];
+          if (firstTrim.variants && firstTrim.variants.length > 0) {
+            matchedTrim = firstTrim;
+            matchedVariant = firstTrim.variants[0];
+            devLog.log(`⚠️ Fallback: 첫 번째 트림 사용 (${firstTrim.name})`);
           }
         }
       }
@@ -4229,12 +4219,13 @@ class FirebaseService {
         modelName: vehicleData.name || model, // 실제 Firebase 모델명 사용
         imageUrl: this.normalizeImageUrl(matchedVariant?.imageUrl || vehicleData.imageUrl), // variant 이미지 우선, 없으면 기본 이미지
         battery: {
-          capacity: matchedVariant?.batteryCapacity || 
+          capacity: matchedVariant?.batteryCapacity ||
                    (typeof defaultBattery.capacity === 'string' ? parseInt(defaultBattery.capacity.replace('kWh', '')) : defaultBattery.capacity) || 0,
-          manufacturer: matchedVariant?.supplier || 
-                       defaultBattery.manufacturer || 
+          manufacturer: matchedVariant?.batteryOptions?.map((opt: BatteryOption) => opt.supplier).join(', ') ||
+                       matchedVariant?.supplier ||
+                       defaultBattery.manufacturer ||
                        defaultBattery.supplier || '알 수 없음',
-          cellType: defaultBattery.cellType || 
+          cellType: defaultBattery.cellType ||
                    defaultBattery.type || '알 수 없음',
           voltage: defaultBattery.voltage || 0
         },
