@@ -221,7 +221,16 @@ export default function BatteryInfoScreen() {
         // YearTemplate 존재 - YearTemplate 데이터 우선 사용
         const templateVar: any = templateForYear.variants?.[0] || {};
 
-        batteryManufacturer = templateVar.supplier || (defaultBattery as any).supplier || (defaultBattery as any).manufacturer || '미제공';
+        // ✅ 복수 배터리 제조사 처리
+        if (templateVar.batteryOptions && Array.isArray(templateVar.batteryOptions)) {
+          batteryManufacturer = templateVar.batteryOptions
+            .map((opt: any) => opt.supplier)
+            .filter(Boolean)
+            .join(', ') || '미제공';
+        } else {
+          batteryManufacturer = templateVar.supplier || (defaultBattery as any).supplier || (defaultBattery as any).manufacturer || '미제공';
+        }
+
         batteryType = templateVar.cellType || defaultBattery.cellType || '미제공';
         batteryCapacity = templateVar.batteryCapacity || (defaultBattery as any).capacity || 0;
         range = templateVar.range || (defaultBattery as any).range || 0;
@@ -236,6 +245,7 @@ export default function BatteryInfoScreen() {
         console.log(`📋 [BatteryInfo] YearTemplate 데이터 사용:`, {
           source: 'yearTemplate',
           supplier: batteryManufacturer,
+          hasBatteryOptions: !!templateVar.batteryOptions,
           range: range,
           imageUrl: imageUrl
         });
@@ -243,7 +253,16 @@ export default function BatteryInfoScreen() {
         // YearTemplate 없음 - Model variant 데이터 사용 (연도 매칭)
         const selectedVar: any = variantForYear || firstVariant;
 
-        batteryManufacturer = selectedVar.supplier || (defaultBattery as any).supplier || (defaultBattery as any).manufacturer || '미제공';
+        // ✅ 복수 배터리 제조사 처리
+        if (selectedVar.batteryOptions && Array.isArray(selectedVar.batteryOptions)) {
+          batteryManufacturer = selectedVar.batteryOptions
+            .map((opt: any) => opt.supplier)
+            .filter(Boolean)
+            .join(', ') || '미제공';
+        } else {
+          batteryManufacturer = selectedVar.supplier || (defaultBattery as any).supplier || (defaultBattery as any).manufacturer || '미제공';
+        }
+
         batteryType = selectedVar.cellType || defaultBattery.cellType || '미제공';
         batteryCapacity = selectedVar.batteryCapacity || (defaultBattery as any).capacity || 0;
         range = selectedVar.range || (defaultBattery as any).range || 0;
@@ -257,6 +276,7 @@ export default function BatteryInfoScreen() {
           source: variantForYear ? 'modelVariant' : 'modelVariant_fallback',
           variantMatched: !!variantForYear,
           supplier: batteryManufacturer,
+          hasBatteryOptions: !!selectedVar.batteryOptions,
           range: range,
           imageUrl: imageUrl
         });

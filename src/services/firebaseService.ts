@@ -3461,7 +3461,16 @@ class FirebaseService {
               const templateSpecs = templateForYear.specs || {};
               const templateVariant = templateForYear.variants?.[0] || {};
 
-              batteryManufacturer = templateVariant.supplier || templateSpecs.supplier || '미제공';
+              // ✅ 복수 배터리 제조사 처리
+              if (templateVariant.batteryOptions && Array.isArray(templateVariant.batteryOptions)) {
+                batteryManufacturer = templateVariant.batteryOptions
+                  .map((opt: any) => opt.supplier)
+                  .filter(Boolean)
+                  .join(', ') || '미제공';
+              } else {
+                batteryManufacturer = templateVariant.supplier || templateSpecs.supplier || '미제공';
+              }
+
               batteryType = templateVariant.cellType || templateSpecs.type || '미제공';
               batteryVoltage = templateSpecs.voltage || 400;
               batteryCapacity = templateVariant.batteryCapacity || 0;
@@ -3473,13 +3482,23 @@ class FirebaseService {
                 trimId: trim.trimId,
                 templateName: templateForYear.name,
                 supplier: batteryManufacturer,
+                hasBatteryOptions: !!templateVariant.batteryOptions,
                 range: range
               });
             } else {
               // YearTemplate 없음 - Model variant 데이터 사용 (연도 매칭)
               const selectedVariant = variantForYear || firstVariant;
 
-              batteryManufacturer = selectedVariant.supplier || defaultBattery.supplier || '미제공';
+              // ✅ 복수 배터리 제조사 처리
+              if (selectedVariant.batteryOptions && Array.isArray(selectedVariant.batteryOptions)) {
+                batteryManufacturer = selectedVariant.batteryOptions
+                  .map((opt: any) => opt.supplier)
+                  .filter(Boolean)
+                  .join(', ') || '미제공';
+              } else {
+                batteryManufacturer = selectedVariant.supplier || defaultBattery.supplier || '미제공';
+              }
+
               batteryType = selectedVariant.cellType || defaultBattery.type || '미제공';
               batteryVoltage = selectedVariant.specifications?.voltage || defaultBattery.voltage || 400;
               batteryCapacity = selectedVariant.batteryCapacity || defaultBattery.capacity || 0;
@@ -3492,6 +3511,7 @@ class FirebaseService {
                 reason: 'YearTemplate 없음',
                 variantMatched: !!variantForYear,
                 supplier: batteryManufacturer,
+                hasBatteryOptions: !!selectedVariant.batteryOptions,
                 range: range
               });
             }
