@@ -16,55 +16,51 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import MultipleImagePicker from './MultipleImagePicker';
 
+export interface VinCheckData {
+  registrationImageUris: string[];  // 자동차 등록증 사진 (선택)
+  vinImageUris: string[];           // 차대번호 사진 (필수)
+  isVinVerified: boolean;           // 자동차 등록증 확인 체크
+  hasNoIllegalModification: boolean;
+  hasNoFloodDamage: boolean;
+  vinIssue: string;
+  modificationIssue: string;
+  floodIssue: string;
+}
+
 interface VinCheckBottomSheetProps {
   visible: boolean;
   onClose: () => void;
-  onConfirm: (
-    imageUris: string[],
-    isVinVerified: boolean,
-    hasNoIllegalModification: boolean,
-    hasNoFloodDamage: boolean,
-    issues: {
-      vinIssue?: string;
-      modificationIssue?: string;
-      floodIssue?: string;
-    }
-  ) => void;
-  initialImageUris?: string[];
-  initialIsVinVerified?: boolean;
-  initialHasNoIllegalModification?: boolean;
-  initialHasNoFloodDamage?: boolean;
-  initialVinIssue?: string;
-  initialModificationIssue?: string;
-  initialFloodIssue?: string;
+  onSave: (data: VinCheckData) => void;
+  initialData?: Partial<VinCheckData>;
 }
 
 const VinCheckBottomSheet: React.FC<VinCheckBottomSheetProps> = ({
   visible,
   onClose,
-  onConfirm,
-  initialImageUris = [],
-  initialIsVinVerified,
-  initialHasNoIllegalModification,
-  initialHasNoFloodDamage,
-  initialVinIssue = '',
-  initialModificationIssue = '',
-  initialFloodIssue = '',
+  onSave,
+  initialData = {},
 }) => {
   const insets = useSafeAreaInsets();
-  const [imageUris, setImageUris] = useState<string[]>(initialImageUris);
+
+  // 사진 (배열)
+  const [registrationImageUris, setRegistrationImageUris] = useState<string[]>(initialData.registrationImageUris || []);
+  const [vinImageUris, setVinImageUris] = useState<string[]>(initialData.vinImageUris || []);
+
+  // 상태
   const [vinStatus, setVinStatus] = useState<'good' | 'problem' | undefined>(
-    initialIsVinVerified === true ? 'good' : initialIsVinVerified === false ? 'problem' : undefined
+    initialData.isVinVerified === true ? 'good' : initialData.isVinVerified === false ? 'problem' : undefined
   );
   const [modificationStatus, setModificationStatus] = useState<'good' | 'problem' | undefined>(
-    initialHasNoIllegalModification === true ? 'good' : initialHasNoIllegalModification === false ? 'problem' : undefined
+    initialData.hasNoIllegalModification === true ? 'good' : initialData.hasNoIllegalModification === false ? 'problem' : undefined
   );
   const [floodStatus, setFloodStatus] = useState<'good' | 'problem' | undefined>(
-    initialHasNoFloodDamage === true ? 'good' : initialHasNoFloodDamage === false ? 'problem' : undefined
+    initialData.hasNoFloodDamage === true ? 'good' : initialData.hasNoFloodDamage === false ? 'problem' : undefined
   );
-  const [vinIssue, setVinIssue] = useState(initialVinIssue);
-  const [modificationIssue, setModificationIssue] = useState(initialModificationIssue);
-  const [floodIssue, setFloodIssue] = useState(initialFloodIssue);
+
+  // 문제 설명
+  const [vinIssue, setVinIssue] = useState(initialData.vinIssue || '');
+  const [modificationIssue, setModificationIssue] = useState(initialData.modificationIssue || '');
+  const [floodIssue, setFloodIssue] = useState(initialData.floodIssue || '');
 
   // 애니메이션 값
   const vinAnimation = useRef(new Animated.Value(0)).current;
@@ -74,15 +70,16 @@ const VinCheckBottomSheet: React.FC<VinCheckBottomSheetProps> = ({
   // 모달이 열릴 때마다 초기값 설정
   useEffect(() => {
     if (visible) {
-      setImageUris(initialImageUris);
-      setVinStatus(initialIsVinVerified === true ? 'good' : initialIsVinVerified === false ? 'problem' : undefined);
-      setModificationStatus(initialHasNoIllegalModification === true ? 'good' : initialHasNoIllegalModification === false ? 'problem' : undefined);
-      setFloodStatus(initialHasNoFloodDamage === true ? 'good' : initialHasNoFloodDamage === false ? 'problem' : undefined);
-      setVinIssue(initialVinIssue);
-      setModificationIssue(initialModificationIssue);
-      setFloodIssue(initialFloodIssue);
+      setRegistrationImageUris(initialData.registrationImageUris || []);
+      setVinImageUris(initialData.vinImageUris || []);
+      setVinStatus(initialData.isVinVerified === true ? 'good' : initialData.isVinVerified === false ? 'problem' : undefined);
+      setModificationStatus(initialData.hasNoIllegalModification === true ? 'good' : initialData.hasNoIllegalModification === false ? 'problem' : undefined);
+      setFloodStatus(initialData.hasNoFloodDamage === true ? 'good' : initialData.hasNoFloodDamage === false ? 'problem' : undefined);
+      setVinIssue(initialData.vinIssue || '');
+      setModificationIssue(initialData.modificationIssue || '');
+      setFloodIssue(initialData.floodIssue || '');
     }
-  }, [visible, initialImageUris, initialIsVinVerified, initialHasNoIllegalModification, initialHasNoFloodDamage, initialVinIssue, initialModificationIssue, initialFloodIssue]);
+  }, [visible, initialData]);
 
   // 애니메이션 효과
   useEffect(() => {
@@ -109,125 +106,116 @@ const VinCheckBottomSheet: React.FC<VinCheckBottomSheetProps> = ({
     }).start();
   }, [floodStatus]);
 
-  const handleImagesAdded = (newUris: string[]) => {
-    setImageUris((prev) => [...prev, ...newUris]);
-  };
-
-  const handleImageRemoved = (index: number) => {
-    setImageUris((prev) => prev.filter((_, i) => i !== index));
-  };
-
-  const handleImageEdited = (index: number, newUri: string) => {
-    setImageUris((prev) => prev.map((uri, i) => i === index ? newUri : uri));
-  };
-
-  const handleConfirm = () => {
-    if (imageUris.length > 0 && vinStatus && modificationStatus && floodStatus) {
-      onConfirm(
-        imageUris,
-        vinStatus === 'good',
-        modificationStatus === 'good',
-        floodStatus === 'good',
-        {
-          vinIssue: vinStatus === 'problem' ? vinIssue : undefined,
-          modificationIssue: modificationStatus === 'problem' ? modificationIssue : undefined,
-          floodIssue: floodStatus === 'problem' ? floodIssue : undefined,
-        }
-      );
+  const handleSave = () => {
+    if (vinImageUris.length > 0 && vinStatus && modificationStatus && floodStatus) {
+      onSave({
+        registrationImageUris,
+        vinImageUris,
+        isVinVerified: vinStatus === 'good',
+        hasNoIllegalModification: modificationStatus === 'good',
+        hasNoFloodDamage: floodStatus === 'good',
+        vinIssue: vinStatus === 'problem' ? vinIssue : '',
+        modificationIssue: modificationStatus === 'problem' ? modificationIssue : '',
+        floodIssue: floodStatus === 'problem' ? floodIssue : '',
+      });
       onClose();
     }
   };
 
-  const isComplete = imageUris.length > 0 && vinStatus && modificationStatus && floodStatus;
+  // 필수: 차대번호 사진 + 3개 상태 모두 선택
+  const isComplete = vinImageUris.length > 0 && vinStatus && modificationStatus && floodStatus;
 
   const renderStatusButtons = (
+    label: string,
     currentStatus: 'good' | 'problem' | undefined,
-    onStatusChange: (status: 'good' | 'problem') => void
-  ) => (
-    <View style={styles.statusRow}>
-      <TouchableOpacity
-        style={[
-          styles.statusButton,
-          currentStatus === 'good' && styles.statusButtonSelected,
-        ]}
-        onPress={() => onStatusChange('good')}
-        activeOpacity={0.7}
-      >
-        <Ionicons
-          name="checkmark-circle"
-          size={20}
-          color={currentStatus === 'good' ? '#06B6D4' : '#9CA3AF'}
-        />
-        <Text
-          style={[
-            styles.statusButtonText,
-            currentStatus === 'good' && styles.statusButtonTextSelected,
-          ]}
-        >
-          양호
-        </Text>
-      </TouchableOpacity>
-
-      <TouchableOpacity
-        style={[
-          styles.statusButton,
-          currentStatus === 'problem' && styles.statusButtonSelected,
-        ]}
-        onPress={() => onStatusChange('problem')}
-        activeOpacity={0.7}
-      >
-        <Ionicons
-          name="alert-circle"
-          size={20}
-          color={currentStatus === 'problem' ? '#06B6D4' : '#9CA3AF'}
-        />
-        <Text
-          style={[
-            styles.statusButtonText,
-            currentStatus === 'problem' && styles.statusButtonTextSelected,
-          ]}
-        >
-          문제 있음
-        </Text>
-      </TouchableOpacity>
-    </View>
-  );
-
-  const renderIssueInput = (
+    onStatusChange: (status: 'good' | 'problem') => void,
     animation: Animated.Value,
-    value: string,
-    onChangeText: (text: string) => void,
-    placeholder: string
+    issueValue: string,
+    onIssueChange: (text: string) => void
   ) => (
-    <Animated.View
-      style={[
-        styles.issueContainer,
-        {
-          maxHeight: animation.interpolate({
-            inputRange: [0, 1],
-            outputRange: [0, 200],
-          }),
-          opacity: animation,
-          marginTop: animation.interpolate({
-            inputRange: [0, 1],
-            outputRange: [0, 12],
-          }),
-        },
-      ]}
-    >
-      <TextInput
-        style={[styles.textInput, { minHeight: 80 }]}
-        placeholder={placeholder}
-        placeholderTextColor="#9CA3AF"
-        value={value}
-        onChangeText={onChangeText}
-        multiline
-        textAlignVertical="top"
-        returnKeyType="done"
-        blurOnSubmit={true}
-        onSubmitEditing={Keyboard.dismiss}
-      />
-    </Animated.View>
+    <View style={styles.inputGroup}>
+      <Text style={styles.inputLabel}>{label} *</Text>
+
+      <View style={styles.statusRow}>
+        <TouchableOpacity
+          style={[
+            styles.statusButton,
+            currentStatus === 'good' && styles.statusButtonSelected,
+          ]}
+          onPress={() => onStatusChange('good')}
+          activeOpacity={0.7}
+        >
+          <Ionicons
+            name="checkmark-circle"
+            size={20}
+            color={currentStatus === 'good' ? '#06B6D4' : '#9CA3AF'}
+          />
+          <Text
+            style={[
+              styles.statusButtonText,
+              currentStatus === 'good' && styles.statusButtonTextSelected,
+            ]}
+          >
+            양호
+          </Text>
+        </TouchableOpacity>
+
+        <TouchableOpacity
+          style={[
+            styles.statusButton,
+            currentStatus === 'problem' && styles.statusButtonSelected,
+          ]}
+          onPress={() => onStatusChange('problem')}
+          activeOpacity={0.7}
+        >
+          <Ionicons
+            name="alert-circle"
+            size={20}
+            color={currentStatus === 'problem' ? '#06B6D4' : '#9CA3AF'}
+          />
+          <Text
+            style={[
+              styles.statusButtonText,
+              currentStatus === 'problem' && styles.statusButtonTextSelected,
+            ]}
+          >
+            문제 있음
+          </Text>
+        </TouchableOpacity>
+      </View>
+
+      {currentStatus === 'problem' && (
+        <Animated.View
+          style={[
+            styles.issueContainer,
+            {
+              maxHeight: animation.interpolate({
+                inputRange: [0, 1],
+                outputRange: [0, 200],
+              }),
+              opacity: animation,
+              marginTop: animation.interpolate({
+                inputRange: [0, 1],
+                outputRange: [0, 12],
+              }),
+            },
+          ]}
+        >
+          <TextInput
+            style={[styles.textInput, { minHeight: 80 }]}
+            placeholder="문제 내용을 입력하세요"
+            placeholderTextColor="#9CA3AF"
+            value={issueValue}
+            onChangeText={onIssueChange}
+            multiline
+            textAlignVertical="top"
+            returnKeyType="done"
+            blurOnSubmit={true}
+            onSubmitEditing={Keyboard.dismiss}
+          />
+        </Animated.View>
+      )}
+    </View>
   );
 
   return (
@@ -255,7 +243,7 @@ const VinCheckBottomSheet: React.FC<VinCheckBottomSheetProps> = ({
           {/* Header */}
           <View style={styles.header}>
             <TouchableOpacity onPress={onClose} style={styles.closeButton}>
-              <Ionicons name="close" size={28} color="#1F2937" />
+              <Ionicons name="close" size={24} color="#1F2937" />
             </TouchableOpacity>
             <Text style={styles.headerTitle}>차대번호 및 상태 확인</Text>
             <View style={styles.placeholder} />
@@ -268,63 +256,69 @@ const VinCheckBottomSheet: React.FC<VinCheckBottomSheetProps> = ({
             showsVerticalScrollIndicator={false}
             keyboardShouldPersistTaps="handled"
           >
-            {/* 차대번호 사진 */}
+            {/* 자동차 등록증 사진 (선택) */}
+            <View style={styles.inputGroup}>
+              <Text style={styles.inputLabel}>자동차 등록증 사진 (선택)</Text>
+              <MultipleImagePicker
+                imageUris={registrationImageUris}
+                onImagesAdded={(uris) => setRegistrationImageUris((prev) => [...prev, ...uris])}
+                onImageRemoved={(index) => setRegistrationImageUris((prev) => prev.filter((_, i) => i !== index))}
+                onImageEdited={(index, uri) => setRegistrationImageUris((prev) => prev.map((u, i) => i === index ? uri : u))}
+                label="자동차 등록증"
+              />
+            </View>
+
+            {/* 차대번호 사진 (필수) */}
             <View style={styles.inputGroup}>
               <Text style={styles.inputLabel}>차대번호 사진 *</Text>
               <MultipleImagePicker
-                imageUris={imageUris}
-                onImagesAdded={handleImagesAdded}
-                onImageRemoved={handleImageRemoved}
-                onImageEdited={handleImageEdited}
+                imageUris={vinImageUris}
+                onImagesAdded={(uris) => setVinImageUris((prev) => [...prev, ...uris])}
+                onImageRemoved={(index) => setVinImageUris((prev) => prev.filter((_, i) => i !== index))}
+                onImageEdited={(index, uri) => setVinImageUris((prev) => prev.map((u, i) => i === index ? uri : u))}
                 label="차대번호 사진"
               />
             </View>
 
-            {/* 차대번호 동일성 확인 */}
-            <View style={styles.inputGroup}>
-              <Text style={styles.inputLabel}>차대번호 동일성 확인 *</Text>
-              {renderStatusButtons(vinStatus, setVinStatus)}
-              {vinStatus === 'problem' && renderIssueInput(
-                vinAnimation,
-                vinIssue,
-                setVinIssue,
-                "문제 내용을 입력하세요"
-              )}
-            </View>
+            {/* 자동차 등록증 확인 */}
+            {renderStatusButtons(
+              '자동차 등록증',
+              vinStatus,
+              setVinStatus,
+              vinAnimation,
+              vinIssue,
+              setVinIssue
+            )}
 
-            {/* 불법 구조변경 */}
-            <View style={styles.inputGroup}>
-              <Text style={styles.inputLabel}>불법 구조변경 없음 *</Text>
-              {renderStatusButtons(modificationStatus, setModificationStatus)}
-              {modificationStatus === 'problem' && renderIssueInput(
-                modificationAnimation,
-                modificationIssue,
-                setModificationIssue,
-                "문제 내용을 입력하세요"
-              )}
-            </View>
+            {/* 불법 구조변경 없음 */}
+            {renderStatusButtons(
+              '불법 구조변경 없음',
+              modificationStatus,
+              setModificationStatus,
+              modificationAnimation,
+              modificationIssue,
+              setModificationIssue
+            )}
 
-            {/* 침수 이력 */}
-            <View style={styles.inputGroup}>
-              <Text style={styles.inputLabel}>침수 이력 없음 *</Text>
-              {renderStatusButtons(floodStatus, setFloodStatus)}
-              {floodStatus === 'problem' && renderIssueInput(
-                floodAnimation,
-                floodIssue,
-                setFloodIssue,
-                "문제 내용을 입력하세요"
-              )}
-            </View>
+            {/* 침수 이력 없음 */}
+            {renderStatusButtons(
+              '침수 이력 없음',
+              floodStatus,
+              setFloodStatus,
+              floodAnimation,
+              floodIssue,
+              setFloodIssue
+            )}
           </ScrollView>
 
           {/* Footer */}
-          <View style={[styles.footer, { paddingBottom: insets.bottom }]}>
+          <View style={[styles.footer, { paddingBottom: 8 + insets.bottom }]}>
             <TouchableOpacity
               style={[
                 styles.confirmButton,
                 !isComplete && styles.confirmButtonDisabled,
               ]}
-              onPress={handleConfirm}
+              onPress={handleSave}
               disabled={!isComplete}
             >
               <Text style={styles.confirmButtonText}>저장</Text>
@@ -379,6 +373,16 @@ const styles = StyleSheet.create({
     color: '#1F2937',
     marginBottom: 8,
   },
+  textInput: {
+    backgroundColor: '#FFFFFF',
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: '#E5E7EB',
+    paddingHorizontal: 12,
+    paddingVertical: 12,
+    fontSize: 15,
+    color: '#1F2937',
+  },
   statusRow: {
     flexDirection: 'row',
     gap: 8,
@@ -410,22 +414,14 @@ const styles = StyleSheet.create({
   issueContainer: {
     overflow: 'hidden',
   },
-  textInput: {
-    backgroundColor: '#FFFFFF',
-    borderRadius: 8,
-    borderWidth: 1,
-    borderColor: '#E5E7EB',
-    paddingHorizontal: 12,
-    paddingVertical: 12,
-    fontSize: 15,
-    color: '#1F2937',
-  },
   footer: {
     position: 'absolute',
     bottom: 0,
     left: 0,
     right: 0,
-    padding: 16,
+    paddingHorizontal: 16,
+    paddingTop: 16,
+    paddingBottom: 8,
     backgroundColor: '#FFFFFF',
     borderTopWidth: 1,
     borderTopColor: '#E5E7EB',

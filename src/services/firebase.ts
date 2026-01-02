@@ -1,17 +1,35 @@
 // Firebase 웹 SDK (Expo 호환)
 import { Auth } from 'firebase/auth';
-import { getFirestore, collection } from 'firebase/firestore';
-import { getStorage } from 'firebase/storage';
+import { Firestore, getFirestore, collection } from 'firebase/firestore';
+import { FirebaseStorage, getStorage } from 'firebase/storage';
 import { getApp } from 'firebase/app';
 import { firebaseFacade } from './firebase/config';
 
-// 이미 초기화된 Firebase 앱 사용
-const app = getApp();
+// Lazy initialization으로 Firebase가 준비될 때까지 대기
+let _db: Firestore | null = null;
+let _storage: FirebaseStorage | null = null;
 
 // 🔧 수정: Auth는 별도 persistence 설정으로 초기화되므로 직접 가져오지 않음
-// Firebase 인스턴스들 (Auth 제외)
-export const db = getFirestore(app);
-export const storage = getStorage(app);
+// Firebase 인스턴스들 (Auth 제외) - Lazy initialization
+export const db = new Proxy({} as Firestore, {
+  get(target, prop) {
+    if (!_db) {
+      const app = getApp();
+      _db = getFirestore(app);
+    }
+    return (_db as any)[prop];
+  }
+});
+
+export const storage = new Proxy({} as FirebaseStorage, {
+  get(target, prop) {
+    if (!_storage) {
+      const app = getApp();
+      _storage = getStorage(app);
+    }
+    return (_storage as any)[prop];
+  }
+});
 
 // Auth는 Firebase Facade에서 persistence와 함께 초기화된 후 가져옴
 export const getAuthInstance = (): Auth => {
@@ -22,9 +40,11 @@ export const getAuthInstance = (): Auth => {
   return auth;
 };
 
-// Firestore 컬렉션 참조
+// Firestore 컬렉션 참조 - Lazy initialization
 export const collections = {
-  users: collection(db, 'users'),
+  get users() {
+    return collection(db, 'users');
+  },
   // 필요한 컬렉션 추가
 };
 

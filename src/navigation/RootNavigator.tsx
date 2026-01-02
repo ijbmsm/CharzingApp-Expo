@@ -25,6 +25,7 @@ import SplashScreen from '../screens/SplashScreen';
 import SignupCompleteScreen from '../screens/SignupCompleteScreen';
 import BatteryInfoScreen from '../screens/BatteryInfoScreen';
 import OutlineTestScreen from '../screens/OutlineTestScreen';
+import MyCouponsScreen from '../screens/MyCouponsScreen';
 
 // 새로운 예약 플로우 화면들
 import ReservationScreen from '../screens/ReservationScreen';
@@ -162,6 +163,8 @@ export type RootStackParamList = {
   };
   // Outline Test 화면
   OutlineTest: undefined;
+  // 내 쿠폰 화면
+  MyCoupons: undefined;
 };
 
 export type MainTabParamList = {
@@ -513,6 +516,13 @@ export default function RootNavigator() {
         <Stack.Screen
           name="OutlineTest"
           component={OutlineTestScreen}
+        />
+        <Stack.Screen
+          name="MyCoupons"
+          component={MyCouponsScreen}
+          options={{
+            headerShown: false,
+          }}
         />
       </Stack.Navigator>
     </NavigationContainer>

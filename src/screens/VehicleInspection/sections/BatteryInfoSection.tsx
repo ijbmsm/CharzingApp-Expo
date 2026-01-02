@@ -13,14 +13,10 @@ export const BatteryInfoSection: React.FC = () => {
 
   // Input refs for focus management
   const cellCountRef = useRef<TextInput>(null);
-  const normalChargeRef = useRef<TextInput>(null);
-  const fastChargeRef = useRef<TextInput>(null);
 
   const batterySOH = watch('batteryInfo.batterySOH');
   const batteryCellCount = watch('batteryInfo.batteryCellCount');
   const batteryCells = watch('batteryInfo.batteryCells');
-  const normalChargeCount = watch('batteryInfo.normalChargeCount');
-  const fastChargeCount = watch('batteryInfo.fastChargeCount');
   const defaultCellVoltage = watch('batteryInfo.defaultCellVoltage');
 
   // 배터리 셀 개수가 변경되면 배터리 셀 배열 자동 생성
@@ -104,9 +100,8 @@ export const BatteryInfoSection: React.FC = () => {
               value={value ? String(value) : ''}
               onChangeText={(text) => onChange(parseInt(text) || 0)}
               keyboardType="number-pad"
-              returnKeyType="next"
-              blurOnSubmit={false}
-              onSubmitEditing={() => normalChargeRef.current?.focus()}
+              returnKeyType="done"
+              onSubmitEditing={Keyboard.dismiss}
             />
           )}
         />
@@ -151,49 +146,6 @@ export const BatteryInfoSection: React.FC = () => {
           </View>
         </>
       )}
-
-      {/* 일반 충전 횟수 */}
-      <View style={styles.inputContainer}>
-        <Text style={styles.inputLabel}>일반 충전 횟수</Text>
-        <Controller
-          control={control}
-          name="batteryInfo.normalChargeCount"
-          render={({ field: { value, onChange } }) => (
-            <TextInput
-              ref={normalChargeRef}
-              style={styles.textInput}
-              placeholder="일반 충전 횟수를 입력하세요"
-              value={value ? String(value) : ''}
-              onChangeText={(text) => onChange(parseInt(text) || 0)}
-              keyboardType="number-pad"
-              returnKeyType="next"
-              blurOnSubmit={false}
-              onSubmitEditing={() => fastChargeRef.current?.focus()}
-            />
-          )}
-        />
-      </View>
-
-      {/* 급속 충전 횟수 */}
-      <View style={styles.inputContainer}>
-        <Text style={styles.inputLabel}>급속 충전 횟수</Text>
-        <Controller
-          control={control}
-          name="batteryInfo.fastChargeCount"
-          render={({ field: { value, onChange } }) => (
-            <TextInput
-              ref={fastChargeRef}
-              style={styles.textInput}
-              placeholder="급속 충전 횟수를 입력하세요"
-              value={value ? String(value) : ''}
-              onChangeText={(text) => onChange(parseInt(text) || 0)}
-              keyboardType="number-pad"
-              returnKeyType="done"
-              onSubmitEditing={Keyboard.dismiss}
-            />
-          )}
-        />
-      </View>
 
       <BatteryCellGridModal
         visible={isCellModalVisible}

@@ -54,7 +54,7 @@ export const GlassBottomSheet: React.FC<GlassBottomSheetProps> = ({
     }
   }, [visible, initialData]);
 
-  const handleStatusChange = (key: string, status: 'good' | 'problem') => {
+  const handleStatusChange = (key: string, status: 'good' | 'problem' | undefined) => {
     setData((prev) => ({
       ...prev,
       [key]: {

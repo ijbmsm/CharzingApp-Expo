@@ -114,12 +114,12 @@ export function useAutoSave({
 }
 
 /**
- * 데이터 내 모든 이미지 URI 처리
+ * 데이터 내 모든 이미지 URI 처리 (v2 구조)
  * - 로컬 이미지 → FileSystem에 복사
  * - Firebase URL → 그대로 유지
  */
 async function saveImagesInData(data: any, userId: string): Promise<void> {
-  // VehicleInfo 이미지
+  // ========== 1. VehicleInfo 이미지 ==========
   if (data.vehicleInfo?.dashboardImageUris?.length > 0) {
     data.vehicleInfo.dashboardImageUris = await imageStorage.saveImages(
       userId,
@@ -135,84 +135,87 @@ async function saveImagesInData(data: any, userId: string): Promise<void> {
     );
   }
 
-  // MajorDevices 이미지 (조향, 제동) - 타입 안전하게 처리
-  if (data.majorDevices) {
-    const devices: any = data.majorDevices;
-    if (devices.steering) {
-      await saveDeviceImages(devices.steering, userId, 'steering');
+  // ========== 2. VinCheck 이미지 ==========
+  if (data.vinCheck?.registrationImageUris?.length > 0) {
+    data.vinCheck.registrationImageUris = await imageStorage.saveImages(
+      userId,
+      data.vinCheck.registrationImageUris,
+      'registration'
+    );
+  }
+  if (data.vinCheck?.vinImageUris?.length > 0) {
+    data.vinCheck.vinImageUris = await imageStorage.saveImages(
+      userId,
+      data.vinCheck.vinImageUris,
+      'vinCheck'
+    );
+  }
+
+  // ========== 3. Exterior (v2 구조) ==========
+  if (data.exterior) {
+    // 외판 기본 사진
+    if (data.exterior.basePhotos) {
+      await saveBasePhotos(data.exterior.basePhotos, userId, 'ext_base');
     }
-    if (devices.braking) {
-      await saveDeviceImages(devices.braking, userId, 'braking');
+    // bodyPanel (각 항목에 issueImageUris 포함)
+    if (data.exterior.bodyPanel) {
+      await saveInspectionItems(data.exterior.bodyPanel, userId, 'bodyPanel');
+    }
+    // frame
+    if (data.exterior.frame) {
+      await saveInspectionItems(data.exterior.frame, userId, 'frame');
+    }
+    // glass
+    if (data.exterior.glass) {
+      await saveInspectionItems(data.exterior.glass, userId, 'glass');
+    }
+    // lamp
+    if (data.exterior.lamp) {
+      await saveInspectionItems(data.exterior.lamp, userId, 'lamp');
     }
   }
 
-  // VehicleExterior 이미지 - 타입 안전하게 처리
-  if (data.vehicleExterior) {
-    const exterior: any = data.vehicleExterior;
-    if (exterior.paintThickness) {
-      for (let i = 0; i < exterior.paintThickness.length; i++) {
-        const item = exterior.paintThickness[i];
-        if (item.imageUris?.length > 0) {
-          item.imageUris = await imageStorage.saveImages(userId, item.imageUris, `paint_${i}`);
-        }
-      }
+  // ========== 4. Interior (v2 구조) ==========
+  if (data.interior) {
+    // 내장재 (materials: basePhoto + issueImageUris)
+    if (data.interior.materials) {
+      await saveInspectionItemsWithBasePhoto(data.interior.materials, userId, 'materials');
     }
-    if (exterior.tireTread) {
-      for (let i = 0; i < exterior.tireTread.length; i++) {
-        const item = exterior.tireTread[i];
-        if (item.imageUris?.length > 0) {
-          item.imageUris = await imageStorage.saveImages(userId, item.imageUris, `tire_${i}`);
-        }
-      }
-    }
-    if (exterior.tiresAndWheels?.imageUris?.length > 0) {
-      exterior.tiresAndWheels.imageUris = await imageStorage.saveImages(
-        userId,
-        exterior.tiresAndWheels.imageUris,
-        'tires_wheels'
-      );
+    // 기능 (functions: issueImageUris만)
+    if (data.interior.functions) {
+      await saveInspectionItems(data.interior.functions, userId, 'functions');
     }
   }
 
-  // VehicleUndercarriage 이미지 - 타입 안전하게 처리
-  if (data.vehicleUndercarriage) {
-    const undercarriage: any = data.vehicleUndercarriage;
-    if (undercarriage.batteryPack?.imageUris?.length > 0) {
-      undercarriage.batteryPack.imageUris = await imageStorage.saveImages(
-        userId,
-        undercarriage.batteryPack.imageUris,
-        'battery_pack'
-      );
+  // ========== 5. TireAndWheel (v2 구조) ==========
+  if (data.tireAndWheel) {
+    // 타이어 (tire: basePhoto + issueImageUris)
+    if (data.tireAndWheel.tire) {
+      await saveInspectionItemsWithBasePhoto(data.tireAndWheel.tire, userId, 'tire');
     }
-    if (undercarriage.suspension?.imageUris?.length > 0) {
-      undercarriage.suspension.imageUris = await imageStorage.saveImages(
-        userId,
-        undercarriage.suspension.imageUris,
-        'suspension'
-      );
+    // 휠 (wheel: basePhoto + issueImageUris)
+    if (data.tireAndWheel.wheel) {
+      await saveInspectionItemsWithBasePhoto(data.tireAndWheel.wheel, userId, 'wheel');
     }
   }
 
-  // VehicleInterior 이미지 - 타입 안전하게 처리
-  if (data.vehicleInterior) {
-    const interior: any = data.vehicleInterior;
-    if (interior.interiorCondition?.imageUris?.length > 0) {
-      interior.interiorCondition.imageUris = await imageStorage.saveImages(
-        userId,
-        interior.interiorCondition.imageUris,
-        'interior'
-      );
+  // ========== 6. Undercarriage (v2 구조) ==========
+  if (data.undercarriage) {
+    // 배터리 팩 (batteryPack: basePhoto + issueImageUris)
+    if (data.undercarriage.batteryPack) {
+      await saveInspectionItemsWithBasePhoto(data.undercarriage.batteryPack, userId, 'batteryPack');
     }
-    if (interior.airConditioner?.imageUris?.length > 0) {
-      interior.airConditioner.imageUris = await imageStorage.saveImages(
-        userId,
-        interior.airConditioner.imageUris,
-        'air_conditioner'
-      );
+    // 서스펜션 (suspension: issueImageUris만)
+    if (data.undercarriage.suspension) {
+      await saveInspectionItems(data.undercarriage.suspension, userId, 'suspension');
+    }
+    // 브레이크 (brake: issueImageUris만)
+    if (data.undercarriage.brake) {
+      await saveInspectionItems(data.undercarriage.brake, userId, 'brake');
     }
   }
 
-  // Other 이미지
+  // ========== 7. Other 이미지 ==========
   if (data.other?.items) {
     for (let i = 0; i < data.other.items.length; i++) {
       const item = data.other.items[i];
@@ -221,24 +224,57 @@ async function saveImagesInData(data: any, userId: string): Promise<void> {
       }
     }
   }
+
+  // ========== 8. 진단사 서명 ==========
+  if (data.diagnosticianConfirmation?.signatureDataUrl) {
+    // base64 서명은 그대로 유지 (별도 처리 필요 없음)
+  }
 }
 
 /**
- * 주요 장치 이미지 저장 헬퍼
+ * 기본 사진 객체 저장 (exterior.basePhotos 등)
  */
-async function saveDeviceImages(deviceData: any, userId: string, category: string): Promise<void> {
-  const keys = Object.keys(deviceData);
-  for (const key of keys) {
-    const item = deviceData[key];
-    if (item?.imageUri) {
-      const saved = await imageStorage.saveImages(userId, [item.imageUri], `${category}_${key}`);
-      item.imageUri = saved[0];
+async function saveBasePhotos(basePhotos: Record<string, string | undefined>, userId: string, prefix: string): Promise<void> {
+  for (const [key, uri] of Object.entries(basePhotos)) {
+    if (uri && typeof uri === 'string' && uri.startsWith('file://')) {
+      const saved = await imageStorage.saveImages(userId, [uri], `${prefix}_${key}`);
+      if (saved[0]) {
+        basePhotos[key] = saved[0];
+      }
     }
   }
 }
 
 /**
- * 🔥 Draft 내 이미지 개수 추적 (섹션별)
+ * 검사 항목 이미지 저장 (issueImageUris만 있는 경우)
+ */
+async function saveInspectionItems(items: Record<string, any>, userId: string, prefix: string): Promise<void> {
+  for (const [key, item] of Object.entries(items)) {
+    if (item?.issueImageUris?.length > 0) {
+      item.issueImageUris = await imageStorage.saveImages(userId, item.issueImageUris, `${prefix}_${key}_issue`);
+    }
+  }
+}
+
+/**
+ * 검사 항목 이미지 저장 (basePhoto + issueImageUris 있는 경우)
+ */
+async function saveInspectionItemsWithBasePhoto(items: Record<string, any>, userId: string, prefix: string): Promise<void> {
+  for (const [key, item] of Object.entries(items)) {
+    // basePhoto 저장
+    if (item?.basePhoto && typeof item.basePhoto === 'string' && item.basePhoto.startsWith('file://')) {
+      const saved = await imageStorage.saveImages(userId, [item.basePhoto], `${prefix}_${key}_base`);
+      item.basePhoto = saved[0];
+    }
+    // issueImageUris 저장
+    if (item?.issueImageUris?.length > 0) {
+      item.issueImageUris = await imageStorage.saveImages(userId, item.issueImageUris, `${prefix}_${key}_issue`);
+    }
+  }
+}
+
+/**
+ * 🔥 Draft 내 이미지 개수 추적 (v2 구조)
  */
 function countImagesInDraft(draft: any): Record<string, number> {
   const counts: Record<string, number> = {};
@@ -247,38 +283,29 @@ function countImagesInDraft(draft: any): Record<string, number> {
   counts.dashboard = draft.vehicleInfo?.dashboardImageUris?.length || 0;
   counts.vin = draft.vehicleInfo?.vehicleVinImageUris?.length || 0;
 
-  // MajorDevices (각 장치별 imageUri 카운트)
-  let steeringCount = 0;
-  let brakingCount = 0;
+  // VinCheck
+  counts.registration = draft.vinCheck?.registrationImageUris?.length || 0;
+  counts.vinCheck = draft.vinCheck?.vinImageUris?.length || 0;
 
-  if (draft.majorDevices?.steering) {
-    steeringCount = Object.values(draft.majorDevices.steering).filter((item: any) => item?.imageUri).length;
-  }
-  if (draft.majorDevices?.braking) {
-    brakingCount = Object.values(draft.majorDevices.braking).filter((item: any) => item?.imageUri).length;
-  }
+  // Exterior (v2)
+  counts.exteriorBase = draft.exterior?.basePhotos ? Object.values(draft.exterior.basePhotos).filter(Boolean).length : 0;
+  counts.bodyPanel = countInspectionImages(draft.exterior?.bodyPanel);
+  counts.frame = countInspectionImages(draft.exterior?.frame);
+  counts.glass = countInspectionImages(draft.exterior?.glass);
+  counts.lamp = countInspectionImages(draft.exterior?.lamp);
 
-  counts.steering = steeringCount;
-  counts.braking = brakingCount;
+  // Interior (v2)
+  counts.materials = countInspectionImagesWithBase(draft.interior?.materials);
+  counts.functions = countInspectionImages(draft.interior?.functions);
 
-  // VehicleExterior
-  counts.paintThickness = draft.vehicleExterior?.paintThickness?.reduce(
-    (sum: number, item: any) => sum + (item.imageUris?.length || 0),
-    0
-  ) || 0;
-  counts.tireTread = draft.vehicleExterior?.tireTread?.reduce(
-    (sum: number, item: any) => sum + (item.imageUris?.length || 0),
-    0
-  ) || 0;
-  counts.tiresWheels = draft.vehicleExterior?.tiresAndWheels?.imageUris?.length || 0;
+  // TireAndWheel (v2)
+  counts.tire = countInspectionImagesWithBase(draft.tireAndWheel?.tire);
+  counts.wheel = countInspectionImagesWithBase(draft.tireAndWheel?.wheel);
 
-  // VehicleUndercarriage
-  counts.batteryPack = draft.vehicleUndercarriage?.batteryPack?.imageUris?.length || 0;
-  counts.suspension = draft.vehicleUndercarriage?.suspension?.imageUris?.length || 0;
-
-  // VehicleInterior
-  counts.interior = draft.vehicleInterior?.interiorCondition?.imageUris?.length || 0;
-  counts.airConditioner = draft.vehicleInterior?.airConditioner?.imageUris?.length || 0;
+  // Undercarriage (v2)
+  counts.batteryPack = countInspectionImagesWithBase(draft.undercarriage?.batteryPack);
+  counts.suspension = countInspectionImages(draft.undercarriage?.suspension);
+  counts.brake = countInspectionImages(draft.undercarriage?.brake);
 
   // Other
   counts.other = draft.other?.items?.reduce(
@@ -287,4 +314,26 @@ function countImagesInDraft(draft: any): Record<string, number> {
   ) || 0;
 
   return counts;
+}
+
+/**
+ * issueImageUris만 있는 검사 항목의 이미지 카운트
+ */
+function countInspectionImages(items: Record<string, any> | undefined): number {
+  if (!items) return 0;
+  return Object.values(items).reduce((sum: number, item: any) => {
+    return sum + (item?.issueImageUris?.length || 0);
+  }, 0);
+}
+
+/**
+ * basePhoto + issueImageUris 있는 검사 항목의 이미지 카운트
+ */
+function countInspectionImagesWithBase(items: Record<string, any> | undefined): number {
+  if (!items) return 0;
+  return Object.values(items).reduce((sum: number, item: any) => {
+    const baseCount = item?.basePhoto ? 1 : 0;
+    const issueCount = item?.issueImageUris?.length || 0;
+    return sum + baseCount + issueCount;
+  }, 0);
 }

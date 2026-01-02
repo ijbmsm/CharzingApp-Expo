@@ -16,6 +16,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { scale, verticalScale, moderateScale } from 'react-native-size-matters';
 import { PaintThicknessInspection } from '../../../services/firebaseService';
 import MultipleImagePicker from '../../MultipleImagePicker';
+import StatusButtons from '../common/StatusButtons';
 
 interface PaintThicknessBottomSheetProps {
   visible: boolean;
@@ -202,7 +203,7 @@ const PaintThicknessBottomSheet: React.FC<PaintThicknessBottomSheetProps> = ({
     }));
   };
 
-  const handleStatusChange = (key: string, status: 'good' | 'problem') => {
+  const handleStatusChange = (key: string, status: 'good' | 'problem' | undefined) => {
     setPaintData(prev => ({
       ...prev,
       [key]: {
@@ -359,43 +360,11 @@ const PaintThicknessBottomSheet: React.FC<PaintThicknessBottomSheetProps> = ({
                   </View>
 
                   {/* 상태 선택 */}
-                  <View style={styles.statusRow}>
-                    <TouchableOpacity
-                      style={[
-                        styles.statusButton,
-                        data.status === 'good' && styles.statusButtonGoodSelected,
-                      ]}
-                      onPress={() => handleStatusChange(location.key, 'good')}
-                      activeOpacity={0.7}
-                    >
-                      <Text
-                        style={[
-                          styles.statusButtonText,
-                          data.status === 'good' && styles.statusButtonTextSelected,
-                        ]}
-                      >
-                        양호
-                      </Text>
-                    </TouchableOpacity>
-
-                    <TouchableOpacity
-                      style={[
-                        styles.statusButton,
-                        data.status === 'problem' && styles.statusButtonProblemSelected,
-                      ]}
-                      onPress={() => handleStatusChange(location.key, 'problem')}
-                      activeOpacity={0.7}
-                    >
-                      <Text
-                        style={[
-                          styles.statusButtonText,
-                          data.status === 'problem' && styles.statusButtonTextSelected,
-                        ]}
-                      >
-                        문제 있음
-                      </Text>
-                    </TouchableOpacity>
-                  </View>
+                  <StatusButtons
+                    status={data.status}
+                    onStatusChange={(status) => handleStatusChange(location.key, status)}
+                    problemLabel="문제 있음"
+                  />
 
                   {/* 문제 있음일 때만 표시 */}
                   {data.status === 'problem' && (
@@ -575,37 +544,6 @@ const styles = StyleSheet.create({
     fontSize: 15,
     fontWeight: '600',
     color: '#6B7280',
-  },
-  statusRow: {
-    flexDirection: 'row',
-    gap: 12,
-  },
-  statusButton: {
-    flex: 1,
-    height: 60,
-    borderRadius: 8,
-    borderWidth: 2,
-    borderColor: '#E5E7EB',
-    backgroundColor: '#FFFFFF',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  statusButtonGoodSelected: {
-    backgroundColor: '#06B6D4',
-    borderColor: '#06B6D4',
-  },
-  statusButtonProblemSelected: {
-    backgroundColor: '#EF4444',
-    borderColor: '#EF4444',
-  },
-  statusButtonText: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: '#6B7280',
-  },
-  statusButtonTextSelected: {
-    color: '#FFFFFF',
-    fontWeight: '700',
   },
   imageSection: {
     marginTop: 12,

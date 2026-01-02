@@ -15,6 +15,8 @@ const getDefaultValues = (): InspectionFormData => ({
         carKeyCount: '2',
       },
       vinCheck: {
+        registrationImageUris: [],
+        vinImageUris: [],
         isVinVerified: false,
         hasNoIllegalModification: false,
         hasNoFloodDamage: false,
@@ -25,30 +27,39 @@ const getDefaultValues = (): InspectionFormData => ({
       batteryInfo: {
         batterySOH: '100',
         batteryCellCount: 0,
-        normalChargeCount: 0,
-        fastChargeCount: 0,
         batteryCells: [],
         defaultCellVoltage: 3.7,
       },
-      majorDevices: {},
-      vehicleExterior: {
-        vehicleExterior: {},
-        bodyPanel: [],
-        tiresAndWheels: {},
-      },
-      vehicleUndercarriage: {
-        suspensionArms: {},
-        underBatteryPack: {},
-        steering: {},
-        braking: {},
-      },
-      vehicleInterior: {
-        interior: {},
-        airconMotor: {},
-        options: {},
-        lighting: {},
+
+      // ========== 검사 v2 구조 ==========
+      // 4. 외부 검사
+      exterior: {
+        basePhotos: {},
+        bodyPanel: {},
+        frame: {},
         glass: {},
+        lamp: {},
       },
+      // 5. 내부 검사
+      interior: {
+        basePhotos: {},
+        materials: {},
+        functions: {},
+      },
+      // 6. 타이어 & 휠
+      tireAndWheel: {
+        tire: {},
+        wheel: {},
+      },
+      // 7. 하체 검사
+      undercarriage: {
+        batteryPack: {},
+        suspensionBasePhotos: {},
+        suspension: {},
+        brakeBasePhotos: {},
+        brake: {},
+      },
+      // 8. 기타 사항
       other: {
         items: [],
       },

@@ -14,12 +14,14 @@ export interface ConfirmPaymentRequest {
     detailAddress: string;
     serviceType: string;
     notes?: string;
+    referralCodeUsed?: string;
   };
   customerInfo: {
     name: string;
     phone: string;
     email?: string;
   };
+  userCouponId?: string; // 사용자가 선택한 쿠폰 ID
 }
 
 export interface ConfirmPaymentResponse {

@@ -3,13 +3,14 @@ import { View, Text, TouchableOpacity, TextInput, StyleSheet, Keyboard } from 'r
 import { Ionicons } from '@expo/vector-icons';
 import { scale, verticalScale } from 'react-native-size-matters';
 import MultipleImagePicker from '../MultipleImagePicker';
+import StatusButtons from './common/StatusButtons';
 
 interface InspectionItemProps {
   label: string;
   status?: 'good' | 'problem';
   imageUris?: string[];
   issueDescription?: string;
-  onStatusChange: (status: 'good' | 'problem') => void;
+  onStatusChange: (status: 'good' | 'problem' | undefined) => void;
   onImagesAdded: (uris: string[]) => void;
   onImageRemoved: (index: number) => void;
   onImageEdited?: (index: number, newUri: string) => void;
@@ -46,42 +47,11 @@ export const InspectionItem: React.FC<InspectionItemProps> = ({
       <Text style={styles.itemLabel}>{label}</Text>
 
       {/* 양호/문제있음 버튼 */}
-      <View style={styles.statusRow}>
-        <TouchableOpacity
-          style={[
-            styles.statusButton,
-            status === 'good' && styles.statusButtonGoodSelected,
-          ]}
-          onPress={() => onStatusChange('good')}
-          activeOpacity={0.7}
-        >
-          <Text
-            style={[
-              styles.statusButtonText,
-              status === 'good' && styles.statusButtonTextSelected,
-            ]}
-          >
-            양호
-          </Text>
-        </TouchableOpacity>
-        <TouchableOpacity
-          style={[
-            styles.statusButton,
-            status === 'problem' && styles.statusButtonProblemSelected,
-          ]}
-          onPress={() => onStatusChange('problem')}
-          activeOpacity={0.7}
-        >
-          <Text
-            style={[
-              styles.statusButtonText,
-              status === 'problem' && styles.statusButtonTextSelected,
-            ]}
-          >
-            문제 있음
-          </Text>
-        </TouchableOpacity>
-      </View>
+      <StatusButtons
+        status={status}
+        onStatusChange={onStatusChange}
+        problemLabel="문제 있음"
+      />
 
       {/* 문제있음 선택 시에만 표시 */}
       {status === 'problem' && (
@@ -132,37 +102,6 @@ const styles = StyleSheet.create({
     fontWeight: '700',
     color: '#1F2937',
     marginBottom: scale(12),
-  },
-  statusRow: {
-    flexDirection: 'row',
-    gap: scale(12),
-  },
-  statusButton: {
-    flex: 1,
-    height: 60,
-    borderRadius: 8,
-    borderWidth: 2,
-    borderColor: '#E5E7EB',
-    backgroundColor: '#FFFFFF',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  statusButtonGoodSelected: {
-    backgroundColor: '#06B6D4',
-    borderColor: '#06B6D4',
-  },
-  statusButtonProblemSelected: {
-    backgroundColor: '#EF4444',
-    borderColor: '#EF4444',
-  },
-  statusButtonText: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: '#6B7280',
-  },
-  statusButtonTextSelected: {
-    color: '#FFFFFF',
-    fontWeight: '700',
   },
   imageSection: {
     marginTop: scale(12),

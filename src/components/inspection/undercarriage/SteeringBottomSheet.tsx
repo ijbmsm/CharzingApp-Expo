@@ -52,7 +52,7 @@ export const SteeringBottomSheet: React.FC<SteeringBottomSheetProps> = ({
     }
   }, [visible, initialData]);
 
-  const handleStatusChange = (key: string, status: 'good' | 'problem') => {
+  const handleStatusChange = (key: string, status: 'good' | 'problem' | undefined) => {
     setData((prev) => ({
       ...prev,
       [key]: {

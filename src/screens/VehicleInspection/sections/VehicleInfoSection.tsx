@@ -6,7 +6,7 @@ import { scale, verticalScale } from 'react-native-size-matters';
 import { InspectionFormData } from '../types';
 import VehicleModelBottomSheet from '../../../components/VehicleModelBottomSheet';
 import DashboardInfoBottomSheet from '../../../components/DashboardInfoBottomSheet';
-import VinCheckBottomSheet from '../../../components/VinCheckBottomSheet';
+import VinCheckBottomSheet, { VinCheckData } from '../../../components/VinCheckBottomSheet';
 import InputButton from '../../../components/InputButton';
 
 export const VehicleInfoSection: React.FC = () => {
@@ -22,8 +22,8 @@ export const VehicleInfoSection: React.FC = () => {
   const mileage = watch('vehicleInfo.mileage');
   const dashboardImageUris = watch('vehicleInfo.dashboardImageUris');
   const dashboardStatus = watch('vehicleInfo.dashboardStatus');
-  const vehicleVinImageUris = watch('vehicleInfo.vehicleVinImageUris');
   const carKeyCount = watch('vehicleInfo.carKeyCount');
+  const vinCheck = watch('vinCheck');
 
   const handleVehicleSelect = (data: {
     brand: string;
@@ -51,25 +51,6 @@ export const VehicleInfoSection: React.FC = () => {
     setIsDashboardInfoModalVisible(false);
   };
 
-  const handleVinCheckSave = (data: {
-    vehicleVinImageUris: string[];
-    isVinVerified: boolean;
-    hasNoIllegalModification: boolean;
-    hasNoFloodDamage: boolean;
-    vinIssue?: string;
-    modificationIssue?: string;
-    floodIssue?: string;
-  }) => {
-    setValue('vehicleInfo.vehicleVinImageUris', data.vehicleVinImageUris, { shouldValidate: true });
-    setValue('vinCheck.isVinVerified', data.isVinVerified, { shouldValidate: true });
-    setValue('vinCheck.hasNoIllegalModification', data.hasNoIllegalModification, { shouldValidate: true });
-    setValue('vinCheck.hasNoFloodDamage', data.hasNoFloodDamage, { shouldValidate: true });
-    setValue('vinCheck.vinIssue', data.vinIssue || '', { shouldValidate: true });
-    setValue('vinCheck.modificationIssue', data.modificationIssue || '', { shouldValidate: true });
-    setValue('vinCheck.floodIssue', data.floodIssue || '', { shouldValidate: true });
-    setIsVinCheckModalVisible(false);
-  };
-
   const getVehicleDisplayText = () => {
     if (!vehicleBrand || !vehicleName) return '';
     let text = `${vehicleBrand} ${vehicleName}`;
@@ -86,8 +67,41 @@ export const VehicleInfoSection: React.FC = () => {
     return !!(dashboardImageUris && dashboardImageUris.length > 0 && dashboardStatus);
   };
 
+  const handleVinCheckSave = (data: VinCheckData) => {
+    setValue('vinCheck.registrationImageUris', data.registrationImageUris, { shouldValidate: true });
+    setValue('vinCheck.vinImageUris', data.vinImageUris, { shouldValidate: true });
+    setValue('vinCheck.isVinVerified', data.isVinVerified, { shouldValidate: true });
+    setValue('vinCheck.hasNoIllegalModification', data.hasNoIllegalModification, { shouldValidate: true });
+    setValue('vinCheck.hasNoFloodDamage', data.hasNoFloodDamage, { shouldValidate: true });
+    setValue('vinCheck.vinIssue', data.vinIssue, { shouldValidate: true });
+    setValue('vinCheck.modificationIssue', data.modificationIssue, { shouldValidate: true });
+    setValue('vinCheck.floodIssue', data.floodIssue, { shouldValidate: true });
+    setIsVinCheckModalVisible(false);
+  };
+
   const isVinCheckCompleted = () => {
-    return !!(vehicleVinImageUris && vehicleVinImageUris.length > 0);
+    // 차대번호 사진 필수 + 3개 상태 모두 선택
+    const hasVinPhoto = vinCheck?.vinImageUris && vinCheck.vinImageUris.length > 0;
+    const completedCount = [
+      vinCheck?.isVinVerified !== undefined,
+      vinCheck?.hasNoIllegalModification !== undefined,
+      vinCheck?.hasNoFloodDamage !== undefined,
+    ].filter(Boolean).length;
+    return hasVinPhoto && completedCount === 3;
+  };
+
+  const getVinCheckDisplayText = () => {
+    if (!vinCheck?.vinImageUris || vinCheck.vinImageUris.length === 0) return undefined;
+    const parts: string[] = [];
+    if (vinCheck.vinImageUris.length > 0) parts.push(`차대번호 ${vinCheck.vinImageUris.length}장`);
+    if (vinCheck.registrationImageUris && vinCheck.registrationImageUris.length > 0) parts.push(`등록증 ${vinCheck.registrationImageUris.length}장`);
+    const completedCount = [
+      vinCheck?.isVinVerified !== undefined,
+      vinCheck?.hasNoIllegalModification !== undefined,
+      vinCheck?.hasNoFloodDamage !== undefined,
+    ].filter(Boolean).length;
+    if (completedCount > 0) parts.push(`${completedCount}/3 확인`);
+    return parts.join(', ');
   };
 
   return (
@@ -169,7 +183,7 @@ export const VehicleInfoSection: React.FC = () => {
       <InputButton
         label="차대번호 및 상태 확인"
         isCompleted={isVinCheckCompleted()}
-        value={vehicleVinImageUris && vehicleVinImageUris.length > 0 ? `${vehicleVinImageUris.length}장` : undefined}
+        value={getVinCheckDisplayText()}
         onPress={() => setIsVinCheckModalVisible(true)}
       />
 
@@ -201,24 +215,17 @@ export const VehicleInfoSection: React.FC = () => {
       <VinCheckBottomSheet
         visible={isVinCheckModalVisible}
         onClose={() => setIsVinCheckModalVisible(false)}
-        onConfirm={(imageUris, isVinVerified, hasNoIllegalModification, hasNoFloodDamage, issues) => {
-          handleVinCheckSave({
-            vehicleVinImageUris: imageUris,
-            isVinVerified,
-            hasNoIllegalModification,
-            hasNoFloodDamage,
-            vinIssue: issues.vinIssue,
-            modificationIssue: issues.modificationIssue,
-            floodIssue: issues.floodIssue,
-          });
+        onSave={handleVinCheckSave}
+        initialData={{
+          registrationImageUris: vinCheck?.registrationImageUris || [],
+          vinImageUris: vinCheck?.vinImageUris || [],
+          isVinVerified: vinCheck?.isVinVerified,
+          hasNoIllegalModification: vinCheck?.hasNoIllegalModification,
+          hasNoFloodDamage: vinCheck?.hasNoFloodDamage,
+          vinIssue: vinCheck?.vinIssue,
+          modificationIssue: vinCheck?.modificationIssue,
+          floodIssue: vinCheck?.floodIssue,
         }}
-        initialImageUris={vehicleVinImageUris || []}
-        initialIsVinVerified={watch('vinCheck.isVinVerified')}
-        initialHasNoIllegalModification={watch('vinCheck.hasNoIllegalModification')}
-        initialHasNoFloodDamage={watch('vinCheck.hasNoFloodDamage')}
-        initialVinIssue={watch('vinCheck.vinIssue')}
-        initialModificationIssue={watch('vinCheck.modificationIssue')}
-        initialFloodIssue={watch('vinCheck.floodIssue')}
       />
     </View>
   );

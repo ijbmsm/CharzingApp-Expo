@@ -82,6 +82,7 @@ export interface UserProfile {
   mergedInto?: string;             // ✅ Guest → 회원 연결 시 회원 UID
   address?: string;
   role?: 'user' | 'admin'; // 사용자 권한 (기본값: user)
+  referralCode?: string;           // ✅ 추천인 코드 (CHZ-XXXX 형식)
   isRegistrationComplete: boolean;
   createdAt: Date | FieldValue;
   updatedAt: Date | FieldValue;
@@ -213,7 +214,8 @@ export interface YearTemplate {
     years?: number[];       // 해당 연도들
     batteryCapacity?: number; // 배터리 용량
     range?: number;         // 주행거리
-    supplier?: string;      // 배터리 제조사
+    supplier?: string;      // 배터리 제조사 (단일, 기존 호환)
+    batteryOptions?: BatteryOption[]; // 복수 배터리 제조사 (optional)
     cellType?: string;      // 셀 타입
     imageUrl?: string;      // 이미지 URL
     specifications?: {
@@ -3464,7 +3466,7 @@ class FirebaseService {
               // ✅ 복수 배터리 제조사 처리
               if (templateVariant.batteryOptions && Array.isArray(templateVariant.batteryOptions)) {
                 batteryManufacturer = templateVariant.batteryOptions
-                  .map((opt: any) => opt.supplier)
+                  .map((opt) => opt.supplier)
                   .filter(Boolean)
                   .join(', ') || '미제공';
               } else {

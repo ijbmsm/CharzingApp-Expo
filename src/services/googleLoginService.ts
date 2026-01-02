@@ -1,5 +1,5 @@
 import { GoogleSignin, statusCodes } from '@react-native-google-signin/google-signin';
-import { getAuth, signInWithCredential, GoogleAuthProvider } from 'firebase/auth';
+import { getAuth, signInWithCustomToken } from 'firebase/auth';
 import Constants from 'expo-constants';
 import firebaseService from './firebaseService';
 import logger from './logService';
@@ -119,41 +119,47 @@ class GoogleLoginService {
 
       devLog.log('✅ Google Sign-In 성공:', userInfo.user.email);
 
-      // Firebase Auth로 먼저 로그인
-      devLog.log('🔑 Firebase Auth 로그인 중...');
+      // 🔥 Custom Token 방식으로 변경: Cloud Functions로 Google ID Token 전송
+      devLog.log('🔑 Cloud Functions에 Google ID Token 전송 중...');
+
+      const response = await fetch('https://asia-northeast3-charzing-d1600.cloudfunctions.net/googleLoginHttp', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          googleIdToken: userInfo.idToken,
+        }),
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'Custom Token 생성 실패');
+      }
+
+      const { customToken, userInfo: serverUserInfo, isExistingUser } = await response.json();
+      devLog.log('✅ Custom Token 받음:', { isExistingUser });
+
+      // Custom Token으로 Firebase Auth 로그인
+      devLog.log('🔑 Custom Token으로 Firebase Auth 로그인 중...');
       const auth = getAuth();
-      const userCredential = await signInWithCredential(
-        auth, 
-        GoogleAuthProvider.credential(userInfo.idToken)
-      );
-      const firebaseUser = userCredential.user;
+      const { user: firebaseUser } = await signInWithCustomToken(auth, customToken);
+      devLog.log('✅ Firebase Auth 로그인 완료:', firebaseUser.uid);
 
-      // ID Token 강제 갱신
-      devLog.log('🔄 ID Token 강제 갱신 중...');
-      const newIdToken = await firebaseUser.getIdToken(true);
-      devLog.log('✅ 새 ID Token 발급 완료, 길이:', newIdToken.length);
+      // 신규/기존 사용자 판별 (서버 응답 사용)
+      const isNewUser = !isExistingUser;
 
-      // 신규/기존 사용자 판별
-      let isNewUser = false;
-      try {
-        devLog.log('📝 사용자 프로필 확인 중...');
-
-        // 기존 사용자 정보 확인
-        const existingProfile = await firebaseService.getUserProfile(firebaseUser.uid);
-
-        if (!existingProfile) {
-          // 신규 사용자 - SignupComplete 화면으로 이동 필요
-          isNewUser = true;
-          devLog.log('✅ 신규 사용자 확인:', firebaseUser.uid);
-        } else {
-          // 기존 사용자 - 로그인 시간만 업데이트
-          devLog.log('✅ 기존 사용자 확인, displayName:', existingProfile.displayName);
+      if (!isNewUser) {
+        // 기존 사용자 - 로그인 시간만 업데이트
+        devLog.log('✅ 기존 사용자 확인, UID:', firebaseUser.uid);
+        try {
           await firebaseService.updateUserLastLogin(firebaseUser.uid);
+        } catch (error) {
+          devLog.log('⚠️ 로그인 시간 업데이트 실패 (무시):', error);
         }
-      } catch (error) {
-        devLog.log('⚠️ 사용자 프로필 확인 에러:', error);
-        // 프로필 조회 실패 시 신규 사용자로 간주
-        isNewUser = true;
+      } else {
+        // 신규 사용자 - SignupComplete 화면으로 이동 필요
+        devLog.log('✅ 신규 사용자 확인:', firebaseUser.uid);
       }
 
       // 인증 상태를 AsyncStorage에 저장

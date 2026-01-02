@@ -9,6 +9,7 @@ export interface ReservationInfo {
   requestedDate: string;  // ISO string
   serviceType: 'standard' | 'premium';
   notes?: string;
+  referralCodeUsed?: string;  // 추천 코드 (선택)
 }
 
 export interface ConfirmPaymentRequest {

@@ -24,6 +24,7 @@ import firebaseService from '../services/firebaseService';
 import authPersistenceService from '../services/authPersistenceService';
 import { RootStackParamList } from '../navigation/RootNavigator';
 import { Ionicons } from '@expo/vector-icons';
+import * as Clipboard from 'expo-clipboard';
 import devLog from '../utils/devLog';
 
 type NavigationProp = StackNavigationProp<RootStackParamList>;
@@ -44,6 +45,9 @@ const AuthenticatedMyPage: React.FC<{
   const [editingField, setEditingField] = useState<'realName' | null>(null);
   const [editValue, setEditValue] = useState('');
   const [updating, setUpdating] = useState(false);
+
+  // 추천 코드 복사 상태
+  const [copied, setCopied] = useState(false);
 
   const loadUserProfile = useCallback(async () => {
     if (!user?.uid) return;
@@ -121,6 +125,20 @@ const AuthenticatedMyPage: React.FC<{
     setShowEditModal(false);
     setEditingField(null);
     setEditValue('');
+  };
+
+  // 추천 코드 복사 함수
+  const handleCopyReferralCode = async () => {
+    if (!displayUser?.referralCode) return;
+
+    try {
+      await Clipboard.setStringAsync(displayUser.referralCode);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    } catch (error) {
+      devLog.error('추천 코드 복사 실패:', error);
+      Alert.alert('오류', '복사에 실패했습니다.');
+    }
   };
 
   const displayUser = firebaseUser || user;

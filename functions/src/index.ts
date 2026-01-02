@@ -6,12 +6,20 @@ import { google } from 'googleapis';
 import * as Sentry from '@sentry/node';
 import { v4 as uuidv4 } from 'uuid';
 import { FieldValue } from 'firebase-admin/firestore';
+import chromium from '@sparticuz/chromium';
+import puppeteer from 'puppeteer-core';
 
 // 차량 데이터 업로드 함수 import
 export { uploadVehiclesToFirestore } from './uploadVehicles';
 
 // SMS 알림 유틸리티
 import { sendSMS, validateSMSConfig } from './utils/naver-sens-sms';
+
+// 추천 코드 유틸리티
+import { generateUniqueReferralCode } from './utils/referralCode';
+
+// PDF 템플릿
+import { generateReportHTML, ReportPDFData } from './utils/pdf-template';
 
 // Firebase Admin 초기화 (중복 초기화 방지)
 if (admin.apps.length === 0) {
@@ -44,11 +52,10 @@ const db = admin.firestore();
  * 카카오 로그인용 HTTP 함수 (인증 없이 호출 가능)
  */
 export const kakaoLoginHttp = functions
-  .region('asia-northeast3', 'us-central1')
+  .region('asia-northeast3')
   .runWith({
-    memory: '512MB',
+    memory: '256MB',
     timeoutSeconds: 60,
-    minInstances: 1, // Cold start 제거
   })
   .https.onRequest(async (req, res) => {
     try {
@@ -294,9 +301,9 @@ export const kakaoLoginHttp = functions
  * 카카오 로그인용 Callable 함수 (기존 호환성)
  */
 export const kakaoLogin = functions
-  .region('asia-northeast3', 'us-central1')
+  .region('asia-northeast3')
   .runWith({
-    memory: '512MB',
+    memory: '256MB',
     timeoutSeconds: 60,
   })
   .https.onCall(async (data, context) => {
@@ -333,11 +340,683 @@ export const kakaoLogin = functions
   });
 
 /**
+ * Google 로그인용 HTTP 함수 (앱/웹 공통)
+ */
+export const googleLoginHttp = functions
+  .region('asia-northeast3')
+  .runWith({
+    memory: '256MB',
+    timeoutSeconds: 60,
+  })
+  .https.onRequest(async (req, res) => {
+    try {
+      // Sentry: 함수 시작 추적
+      Sentry.addBreadcrumb({
+        category: 'auth',
+        message: 'Google login request started',
+        level: 'info',
+      });
+
+      // CORS 헤더 설정
+      res.set('Access-Control-Allow-Origin', '*');
+      res.set('Access-Control-Allow-Methods', 'POST');
+      res.set('Access-Control-Allow-Headers', 'Content-Type');
+
+      // OPTIONS 요청 처리 (CORS preflight)
+      if (req.method === 'OPTIONS') {
+        res.status(204).send('');
+        return;
+      }
+
+      // POST 요청만 허용
+      if (req.method !== 'POST') {
+        res.status(405).json({ error: 'Method not allowed' });
+        return;
+      }
+
+      console.log('🟢 Google Login HTTP 요청 받음');
+      console.log('🔍 Request body:', req.body);
+
+      const { googleIdToken } = req.body;
+
+      if (!googleIdToken) {
+        res.status(400).json({
+          success: false,
+          error: 'Google ID Token이 필요합니다.'
+        });
+        return;
+      }
+
+      // 🔒 보안 개선: 서버에서 직접 Google ID Token 검증
+      let userInfo;
+      try {
+        const OAuth2 = google.auth.OAuth2;
+        const client = new OAuth2();
+
+        // Google Web Client ID (Firebase Console > 프로젝트 설정 > 일반 > 웹 앱에서 확인)
+        const GOOGLE_WEB_CLIENT_ID = '91035459357-0ulua3kp7eje2bmjd76mceml113el8gd.apps.googleusercontent.com';
+
+        const ticket = await client.verifyIdToken({
+          idToken: googleIdToken,
+          audience: GOOGLE_WEB_CLIENT_ID,
+        });
+
+        const payload = ticket.getPayload();
+        if (!payload) {
+          throw new Error('Invalid Google ID Token');
+        }
+
+        console.log('✅ Google ID Token 검증 완료:', payload.email);
+
+        // 사용자 정보 추출
+        userInfo = {
+          id: payload.sub, // Google User ID
+          email: payload.email || undefined,
+          name: payload.name || undefined,
+          picture: payload.picture || undefined,
+        };
+
+        console.log('📋 추출된 사용자 정보:', userInfo);
+      } catch (error: any) {
+        console.error('❌ Google ID Token 검증 실패:', error.message);
+        res.status(400).json({
+          success: false,
+          error: 'Google ID Token이 유효하지 않거나 사용자 정보를 가져올 수 없습니다.'
+        });
+        return;
+      }
+
+      // 🚀 성능 최적화: googleId와 email 쿼리를 병렬로 실행
+      const [googleQuery, emailQuery] = await Promise.all([
+        db.collection('users').where('googleId', '==', userInfo.id).limit(1).get(),
+        userInfo.email ? db.collection('users').where('email', '==', userInfo.email).limit(1).get() : Promise.resolve({ empty: true, docs: [] })
+      ]);
+
+      let firebaseUID;
+      let isNewUser;
+
+      if (!googleQuery.empty) {
+        // 기존 Google 사용자 발견
+        firebaseUID = googleQuery.docs[0].id;
+        isNewUser = false;
+        console.log('✅ 기존 Google 사용자 발견:', firebaseUID);
+
+        // 기존 사용자 정보 업데이트 (undefined 필드는 자동 제외됨)
+        const updatePayload: Record<string, any> = {
+          displayName: userInfo.name || userInfo.email?.split('@')[0] || 'Google 사용자',
+          lastLoginAt: admin.firestore.FieldValue.serverTimestamp(),
+          updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+        };
+
+        if (userInfo.email) {
+          updatePayload.email = userInfo.email;
+        }
+
+        if (userInfo.picture) {
+          updatePayload.photoURL = userInfo.picture;
+        }
+
+        await db.collection('users').doc(firebaseUID).update(updatePayload);
+        console.log('✅ 기존 Google 사용자 정보 업데이트:', firebaseUID);
+      } else if (!emailQuery.empty) {
+        // 🚀 최적화: email로 기존 사용자 발견 (getUserByEmail 대신 Firestore 쿼리)
+        firebaseUID = emailQuery.docs[0].id;
+        isNewUser = false;
+        console.log('✅ 기존 이메일 사용자 발견 (Firestore 쿼리):', firebaseUID);
+
+        // 기존 사용자에 Google 정보 추가
+        const updatePayload: Record<string, any> = {
+          googleId: userInfo.id,
+          displayName: userInfo.name || emailQuery.docs[0].data().displayName,
+          lastLoginAt: admin.firestore.FieldValue.serverTimestamp(),
+          updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+          'providers.google': {
+            id: userInfo.id,
+            name: userInfo.name,
+            picture: userInfo.picture || null, // providers 내부는 null 허용
+            linkedAt: admin.firestore.FieldValue.serverTimestamp()
+          }
+        };
+
+        if (userInfo.picture) {
+          updatePayload.photoURL = userInfo.picture;
+        }
+
+        await db.collection('users').doc(firebaseUID).update(updatePayload);
+        console.log('✅ 기존 사용자에 Google 정보 추가 완료 (Firestore 쿼리 사용)');
+      } else {
+        // 완전히 새로운 사용자 - Firebase Auth 생성
+        try {
+          // photoURL과 email이 undefined이면 필드 제외
+          const createUserPayload: {
+            email?: string;
+            displayName: string;
+            photoURL?: string;
+          } = {
+            displayName: userInfo.name || userInfo.email?.split('@')[0] || 'Google 사용자',
+          };
+
+          if (userInfo.email) {
+            createUserPayload.email = userInfo.email;
+          }
+
+          if (userInfo.picture) {
+            createUserPayload.photoURL = userInfo.picture;
+          }
+
+          const userRecord = await admin.auth().createUser(createUserPayload);
+          firebaseUID = userRecord.uid;
+          isNewUser = true;
+
+          console.log('✅ 신규 Google 사용자 생성 (Firebase Auth만, Firestore 문서는 SignupComplete에서 생성):', firebaseUID);
+          console.log('🔄 클라이언트에서 SignupComplete 화면으로 이동 필요');
+        } catch (createError: any) {
+          if (createError.code === 'auth/email-already-exists' && userInfo.email) {
+            // Firebase Auth에는 있는데 Firestore에는 없는 경우 (드물지만 가능)
+            console.log('⚠️ Firebase Auth에만 존재하는 사용자, getUserByEmail로 찾기:', userInfo.email);
+            const existingUserRecord = await admin.auth().getUserByEmail(userInfo.email);
+            firebaseUID = existingUserRecord.uid;
+            isNewUser = true; // Firestore 문서가 없으므로 신규로 처리
+            console.log('📧 Firebase Auth 사용자 UID:', firebaseUID);
+          } else {
+            throw createError;
+          }
+        }
+      }
+
+      // Firebase Custom Token 생성
+      console.log('🔥 Google Custom Token 생성 중... Firebase UID:', firebaseUID);
+
+      const customClaims = {
+        provider: 'google',
+        googleId: userInfo.id,
+        email: userInfo.email || null,
+        displayName: userInfo.name || userInfo.email?.split('@')[0] || 'Google 사용자',
+        isVerified: true,
+        role: 'user',
+        canCreateReservation: true,
+        tokenVersion: Date.now()
+      };
+
+      const customToken = await admin.auth().createCustomToken(firebaseUID, customClaims);
+      console.log('✅ Google Custom Token 생성 완료 (강화된 claims 포함)');
+
+      // Sentry: 성공 로깅
+      Sentry.captureMessage('Google login successful', {
+        level: 'info',
+        tags: {
+          function: 'googleLoginHttp',
+          provider: 'google',
+          userType: isNewUser ? 'new' : 'existing'
+        },
+        contexts: {
+          user: {
+            id: firebaseUID,
+            email: userInfo.email || 'no-email',
+          }
+        }
+      });
+
+      // 응답
+      res.status(200).json({
+        success: true,
+        customToken,
+        userInfo: {
+          id: firebaseUID,
+          email: userInfo.email,
+          displayName: userInfo.name || userInfo.email?.split('@')[0] || 'Google 사용자',
+          photoURL: userInfo.picture,
+        },
+        isExistingUser: !isNewUser,
+      });
+
+    } catch (error: any) {
+      console.error('❌ Google Login 실패:', error);
+
+      // Sentry에 에러 로그 전송
+      if (process.env.SENTRY_DSN) {
+        Sentry.captureException(error, {
+          tags: {
+            function: 'googleLoginHttp',
+            provider: 'google'
+          },
+          extra: {
+            errorMessage: error.message,
+            errorCode: error.code,
+            requestBody: req.body
+          }
+        });
+      }
+
+      res.status(500).json({
+        success: false,
+        error: 'Google 로그인 처리 중 오류가 발생했습니다.'
+      });
+    }
+  });
+
+/**
+ * 웹 전용 카카오 로그인 (Authorization Code 기반)
+ * 웹에서 인가 코드를 받아서 서버에서 토큰 교환 수행
+ */
+export const kakaoLoginWebHttp = functions
+  .region('asia-northeast3')
+  .runWith({
+    memory: '512MB',
+    timeoutSeconds: 60,
+    minInstances: 1,
+  })
+  .https.onRequest(async (req, res) => {
+    try {
+      // CORS 헤더 설정
+      res.set('Access-Control-Allow-Origin', '*');
+      res.set('Access-Control-Allow-Methods', 'POST');
+      res.set('Access-Control-Allow-Headers', 'Content-Type');
+
+      if (req.method === 'OPTIONS') {
+        res.status(204).send('');
+        return;
+      }
+
+      if (req.method !== 'POST') {
+        res.status(405).json({ error: 'Method not allowed' });
+        return;
+      }
+
+      console.log('🌐 [WEB] Kakao Login 요청 받음');
+
+      const { code, redirectUri } = req.body;
+
+      if (!code || !redirectUri) {
+        res.status(400).json({
+          success: false,
+          error: 'code와 redirectUri가 필요합니다.'
+        });
+        return;
+      }
+
+      // 1. 인가 코드로 액세스 토큰 받기 (서버에서 수행)
+      const KAKAO_REST_API_KEY = process.env.KAKAO_REST_API_KEY;
+      const KAKAO_CLIENT_SECRET = process.env.KAKAO_CLIENT_SECRET;
+
+      if (!KAKAO_REST_API_KEY) {
+        console.error('❌ Kakao REST API Key가 설정되지 않았습니다.');
+        res.status(500).json({
+          success: false,
+          error: '서버 설정 오류'
+        });
+        return;
+      }
+
+      if (!KAKAO_CLIENT_SECRET) {
+        console.error('❌ Kakao Client Secret이 설정되지 않았습니다.');
+        res.status(500).json({
+          success: false,
+          error: '서버 설정 오류'
+        });
+        return;
+      }
+
+      let kakaoAccessToken;
+      try {
+        const tokenResponse = await axios.post(
+          'https://kauth.kakao.com/oauth/token',
+          new URLSearchParams({
+            grant_type: 'authorization_code',
+            client_id: KAKAO_REST_API_KEY,
+            client_secret: KAKAO_CLIENT_SECRET,
+            redirect_uri: redirectUri,
+            code: code,
+          }),
+          {
+            headers: {
+              'Content-Type': 'application/x-www-form-urlencoded',
+            },
+          }
+        );
+
+        kakaoAccessToken = tokenResponse.data.access_token;
+        console.log('✅ [WEB] 카카오 액세스 토큰 받기 성공');
+      } catch (error: unknown) {
+        console.error('❌ [WEB] 카카오 토큰 교환 실패:', error);
+        res.status(400).json({
+          success: false,
+          error: '카카오 토큰 교환 실패'
+        });
+        return;
+      }
+
+      // 2. 액세스 토큰으로 사용자 정보 조회 (기존 로직 재사용)
+      let userInfo;
+      try {
+        const response = await axios.get('https://kapi.kakao.com/v2/user/me', {
+          headers: {
+            Authorization: `Bearer ${kakaoAccessToken}`,
+            'Content-Type': 'application/x-www-form-urlencoded;charset=utf-8'
+          },
+        });
+
+        const kakaoData = response.data;
+        userInfo = {
+          id: kakaoData.id.toString(),
+          email: kakaoData.kakao_account?.email || undefined,
+          nickname: kakaoData.kakao_account?.profile?.nickname || undefined,
+          profileImageUrl: kakaoData.kakao_account?.profile?.profile_image_url || undefined
+        };
+
+        console.log('✅ [WEB] 카카오 사용자 정보 조회 완료:', userInfo);
+      } catch (error: unknown) {
+        console.error('❌ [WEB] 카카오 사용자 정보 조회 실패:', error);
+        res.status(400).json({
+          success: false,
+          error: '카카오 사용자 정보 조회 실패'
+        });
+        return;
+      }
+
+      // 3. Firestore에서 사용자 찾기 (기존 로직과 동일)
+      const [kakaoQuery, emailQuery] = await Promise.all([
+        db.collection('users').where('kakaoId', '==', userInfo.id).limit(1).get(),
+        userInfo.email ? db.collection('users').where('email', '==', userInfo.email).limit(1).get() : Promise.resolve({ empty: true, docs: [] })
+      ]);
+
+      let firebaseUID;
+      let isNewUser;
+
+      if (!kakaoQuery.empty) {
+        firebaseUID = kakaoQuery.docs[0].id;
+        isNewUser = false;
+        console.log('✅ [WEB] 기존 카카오 사용자:', firebaseUID);
+      } else if (!emailQuery.empty) {
+        firebaseUID = emailQuery.docs[0].id;
+        isNewUser = false;
+        console.log('✅ [WEB] 이메일로 기존 사용자 발견:', firebaseUID);
+
+        await db.collection('users').doc(firebaseUID).update({
+          kakaoId: userInfo.id,
+          updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+        });
+      } else {
+        firebaseUID = db.collection('users').doc().id;
+        isNewUser = true;
+        console.log('✅ [WEB] 신규 사용자 UID 생성:', firebaseUID);
+
+        // 신규 사용자: 추천 코드 생성 및 기본 문서 생성
+        try {
+          const referralCode = await generateUniqueReferralCode();
+          console.log(`✅ [WEB] 추천 코드 생성: ${referralCode}`);
+
+          // users 문서 생성 (기본 정보만)
+          await db.collection('users').doc(firebaseUID).set({
+            uid: firebaseUID,
+            provider: 'kakao',
+            kakaoId: userInfo.id,
+            email: userInfo.email || null,
+            referralCode,
+            isRegistrationComplete: false,
+            isActive: false,
+            createdAt: admin.firestore.FieldValue.serverTimestamp(),
+          });
+
+          // referralCodes 컬렉션에도 문서 생성
+          await db.collection('referralCodes').doc(referralCode).set({
+            code: referralCode,
+            ownerUserId: firebaseUID,
+            ownerType: 'user',
+            status: 'inactive',
+            createdAt: admin.firestore.FieldValue.serverTimestamp(),
+          });
+
+          console.log('✅ [WEB] 신규 사용자 문서 생성 완료');
+        } catch (error) {
+          console.error('❌ [WEB] 신규 사용자 생성 실패:', error);
+          res.status(500).json({
+            success: false,
+            error: '사용자 생성 중 오류가 발생했습니다.'
+          });
+          return;
+        }
+      }
+
+      // 4. Custom Token 생성 (기존 로직과 동일)
+      const customToken = await admin.auth().createCustomToken(firebaseUID, {
+        provider: 'kakao',
+        kakaoId: userInfo.id,
+        role: 'user',
+        canCreateReservation: false,
+        tokenVersion: 1,
+      });
+
+      console.log('✅ [WEB] Custom Token 생성 완료');
+
+      res.json({
+        success: true,
+        customToken,
+        userInfo,
+        isExistingUser: !isNewUser,
+      });
+
+    } catch (error: unknown) {
+      console.error('❌ [WEB] Kakao 로그인 처리 오류:', error);
+      res.status(500).json({
+        success: false,
+        error: '로그인 처리 중 오류가 발생했습니다.'
+      });
+    }
+  });
+
+/**
+ * 웹 전용 구글 로그인 (Authorization Code 기반)
+ * 웹에서 인가 코드를 받아서 서버에서 토큰 교환 수행
+ */
+export const googleLoginWebHttp = functions
+  .region('asia-northeast3')
+  .runWith({
+    memory: '512MB',
+    timeoutSeconds: 60,
+    minInstances: 1,
+  })
+  .https.onRequest(async (req, res) => {
+    try {
+      // CORS 헤더 설정
+      res.set('Access-Control-Allow-Origin', '*');
+      res.set('Access-Control-Allow-Methods', 'POST');
+      res.set('Access-Control-Allow-Headers', 'Content-Type');
+
+      if (req.method === 'OPTIONS') {
+        res.status(204).send('');
+        return;
+      }
+
+      if (req.method !== 'POST') {
+        res.status(405).json({ error: 'Method not allowed' });
+        return;
+      }
+
+      console.log('🌐 [WEB] Google Login 요청 받음');
+
+      const { code, redirectUri } = req.body;
+
+      if (!code || !redirectUri) {
+        res.status(400).json({
+          success: false,
+          error: 'code와 redirectUri가 필요합니다.'
+        });
+        return;
+      }
+
+      // 1. 인가 코드로 ID Token 받기 (서버에서 수행)
+      const GOOGLE_CLIENT_ID = '91035459357-0ulua3kp7eje2bmjd76mceml113el8gd.apps.googleusercontent.com';
+      const GOOGLE_CLIENT_SECRET = process.env.GOOGLE_CLIENT_SECRET;
+
+      if (!GOOGLE_CLIENT_SECRET) {
+        console.error('❌ Google Client Secret이 설정되지 않았습니다.');
+        res.status(500).json({
+          success: false,
+          error: '서버 설정 오류'
+        });
+        return;
+      }
+
+      let googleIdToken;
+      try {
+        const tokenResponse = await axios.post(
+          'https://oauth2.googleapis.com/token',
+          new URLSearchParams({
+            code: code,
+            client_id: GOOGLE_CLIENT_ID,
+            client_secret: GOOGLE_CLIENT_SECRET,
+            redirect_uri: redirectUri,
+            grant_type: 'authorization_code',
+          }),
+          {
+            headers: {
+              'Content-Type': 'application/x-www-form-urlencoded',
+            },
+          }
+        );
+
+        googleIdToken = tokenResponse.data.id_token;
+        console.log('✅ [WEB] 구글 ID Token 받기 성공');
+      } catch (error: unknown) {
+        console.error('❌ [WEB] 구글 토큰 교환 실패:', error);
+        res.status(400).json({
+          success: false,
+          error: '구글 토큰 교환 실패'
+        });
+        return;
+      }
+
+      // 2. ID Token 검증 (기존 로직과 동일)
+      let userInfo;
+      try {
+        const OAuth2 = google.auth.OAuth2;
+        const client = new OAuth2();
+
+        const ticket = await client.verifyIdToken({
+          idToken: googleIdToken,
+          audience: GOOGLE_CLIENT_ID,
+        });
+
+        const payload = ticket.getPayload();
+        if (!payload) {
+          throw new Error('Invalid Google ID Token');
+        }
+
+        userInfo = {
+          id: payload.sub,
+          email: payload.email || undefined,
+          name: payload.name || undefined,
+          picture: payload.picture || undefined,
+        };
+
+        console.log('✅ [WEB] 구글 사용자 정보 검증 완료:', userInfo);
+      } catch (error: unknown) {
+        console.error('❌ [WEB] 구글 ID Token 검증 실패:', error);
+        res.status(400).json({
+          success: false,
+          error: '구글 ID Token 검증 실패'
+        });
+        return;
+      }
+
+      // 3. Firestore에서 사용자 찾기 (기존 로직과 동일)
+      const [googleQuery, emailQuery] = await Promise.all([
+        db.collection('users').where('googleId', '==', userInfo.id).limit(1).get(),
+        userInfo.email ? db.collection('users').where('email', '==', userInfo.email).limit(1).get() : Promise.resolve({ empty: true, docs: [] })
+      ]);
+
+      let firebaseUID;
+      let isNewUser;
+
+      if (!googleQuery.empty) {
+        firebaseUID = googleQuery.docs[0].id;
+        isNewUser = false;
+        console.log('✅ [WEB] 기존 구글 사용자:', firebaseUID);
+      } else if (!emailQuery.empty) {
+        firebaseUID = emailQuery.docs[0].id;
+        isNewUser = false;
+        console.log('✅ [WEB] 이메일로 기존 사용자 발견:', firebaseUID);
+
+        await db.collection('users').doc(firebaseUID).update({
+          googleId: userInfo.id,
+          updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+        });
+      } else {
+        firebaseUID = db.collection('users').doc().id;
+        isNewUser = true;
+        console.log('✅ [WEB] 신규 사용자 UID 생성:', firebaseUID);
+
+        // 신규 사용자: 추천 코드 생성 및 기본 문서 생성
+        try {
+          const referralCode = await generateUniqueReferralCode();
+          console.log(`✅ [WEB] 추천 코드 생성: ${referralCode}`);
+
+          // users 문서 생성 (기본 정보만)
+          await db.collection('users').doc(firebaseUID).set({
+            uid: firebaseUID,
+            provider: 'google',
+            googleId: userInfo.id,
+            email: userInfo.email || null,
+            referralCode,
+            isRegistrationComplete: false,
+            isActive: false,
+            createdAt: admin.firestore.FieldValue.serverTimestamp(),
+          });
+
+          // referralCodes 컬렉션에도 문서 생성
+          await db.collection('referralCodes').doc(referralCode).set({
+            code: referralCode,
+            ownerUserId: firebaseUID,
+            ownerType: 'user',
+            status: 'inactive',
+            createdAt: admin.firestore.FieldValue.serverTimestamp(),
+          });
+
+          console.log('✅ [WEB] 신규 사용자 문서 생성 완료');
+        } catch (error) {
+          console.error('❌ [WEB] 신규 사용자 생성 실패:', error);
+          res.status(500).json({
+            success: false,
+            error: '사용자 생성 중 오류가 발생했습니다.'
+          });
+          return;
+        }
+      }
+
+      // 4. Custom Token 생성 (기존 로직과 동일)
+      const customToken = await admin.auth().createCustomToken(firebaseUID, {
+        provider: 'google',
+        googleId: userInfo.id,
+        role: 'user',
+        canCreateReservation: false,
+        tokenVersion: 1,
+      });
+
+      console.log('✅ [WEB] Custom Token 생성 완료');
+
+      res.json({
+        success: true,
+        customToken,
+        userInfo,
+        isExistingUser: !isNewUser,
+      });
+
+    } catch (error: unknown) {
+      console.error('❌ [WEB] Google 로그인 처리 오류:', error);
+      res.status(500).json({
+        success: false,
+        error: '로그인 처리 중 오류가 발생했습니다.'
+      });
+    }
+  });
+
+/**
  * 카카오 로그인을 위한 Firebase 커스텀 토큰 생성 (기존 함수 - 호환성 유지)
  * @deprecated 새로운 kakaoLogin 함수를 사용하세요
  */
 export const createKakaoCustomToken = functions
-  .region('asia-northeast3', 'us-central1')
+  .region('asia-northeast3')
   .https.onCall(async (data, context) => {
     try {
       const { kakaoId, email, displayName, photoURL } = data;
@@ -435,7 +1114,7 @@ export const createKakaoCustomToken = functions
  * 사용자 프로필 업데이트 (웹과 앱 공통)
  */
 export const updateUserProfile = functions
-  .region('asia-northeast3', 'us-central1')
+  .region('asia-northeast3')
   .https.onCall(async (data, context) => {
     try {
       // 인증 확인
@@ -481,9 +1160,9 @@ export const updateUserProfile = functions
  * Google 로그인용 Custom Token 생성
  */
 export const googleLogin = functions
-  .region('asia-northeast3', 'us-central1')
+  .region('asia-northeast3')
   .runWith({
-    memory: '512MB',
+    memory: '256MB',
     timeoutSeconds: 60,
   })
   .https.onCall(async (data, context) => {
@@ -632,7 +1311,7 @@ export const googleLogin = functions
  * Apple 로그인용 Custom Token 생성
  */
 export const createCustomTokenFromApple = functions
-  .region('asia-northeast3', 'us-central1')
+  .region('asia-northeast3')
   .runWith({
     memory: '512MB',
     timeoutSeconds: 60,
@@ -768,7 +1447,7 @@ export const createCustomTokenFromApple = functions
  * 회원탈퇴 (웹과 앱 공통)
  */
 export const deleteUserAccount = functions
-  .region('asia-northeast3', 'us-central1')
+  .region('asia-northeast3')
   .https.onCall(async (data, context) => {
     try {
       // 인증 확인
@@ -810,7 +1489,7 @@ export const deleteUserAccount = functions
  * 사용자 정보 조회 (웹과 앱 공통)
  */
 export const getUserProfile = functions
-  .region('asia-northeast3', 'us-central1')
+  .region('asia-northeast3')
   .https.onCall(async (data, context) => {
     try {
       // 인증 확인
@@ -863,9 +1542,9 @@ export const getUserProfile = functions
  * 진단 예약 생성 (서버사이드 검증 포함)
  */
 export const createDiagnosisReservation = functions
-  .region('asia-northeast3', 'us-central1')
+  .region('asia-northeast3')
   .runWith({
-    memory: '512MB',
+    memory: '256MB',
     timeoutSeconds: 60,
   })
   .https.onRequest(async (req, res) => {
@@ -1061,7 +1740,7 @@ export const createDiagnosisReservation = functions
  * 사용자 진단 예약 목록 조회
  */
 export const getUserDiagnosisReservations = functions
-  .region('asia-northeast3', 'us-central1')
+  .region('asia-northeast3')
   .https.onRequest(async (req, res) => {
     return corsHandler(req, res, async () => {
       try {
@@ -1118,7 +1797,7 @@ export const getUserDiagnosisReservations = functions
  * 사용자 차량 추가 (서버사이드 검증)
  */
 export const addUserVehicle = functions
-  .region('asia-northeast3', 'us-central1')
+  .region('asia-northeast3')
   .https.onCall(async (data, context) => {
     try {
       if (!context.auth) {
@@ -1199,7 +1878,7 @@ export const addUserVehicle = functions
  * 사용자 차량 목록 조회
  */
 export const getUserVehicles = functions
-  .region('asia-northeast3', 'us-central1')
+  .region('asia-northeast3')
   .https.onCall(async (data, context) => {
     try {
       if (!context.auth) {
@@ -1247,7 +1926,7 @@ export const getUserVehicles = functions
  * 푸시 알림 전송 (관리자용)
  */
 export const sendPushNotification = functions
-  .region('asia-northeast3', 'us-central1')
+  .region('asia-northeast3')
   .https.onCall(async (data, context) => {
     try {
       console.log('푸시 알림 전송 요청');
@@ -1421,7 +2100,7 @@ export const sendPushNotification = functions
  * 푸시 알림을 받을 수 있는 사용자 목록 조회 (관리자용)
  */
 export const getUsersWithPushTokens = functions
-  .region('asia-northeast3', 'us-central1')
+  .region('asia-northeast3')
   .https.onCall(async (data, context) => {
     try {
       console.log('사용자 목록 조회');
@@ -1819,7 +2498,7 @@ export const sendReportPublishedNotification = functions
  * 푸시 토큰 저장
  */
 export const savePushToken = functions
-  .region('asia-northeast3', 'us-central1')
+  .region('asia-northeast3')
   .https.onCall(async (data, context) => {
     try {
       if (!context.auth) {
@@ -1874,7 +2553,7 @@ export const savePushToken = functions
  * Admin Web용 푸시 알림 전송 (HTTPS 엔드포인트)
  */
 export const sendPushNotificationAdmin = functions
-  .region('asia-northeast3', 'us-central1')
+  .region('asia-northeast3')
   .https.onRequest(async (req, res) => {
     try {
       // CORS 설정
@@ -2068,7 +2747,7 @@ export const sendPushNotificationAdmin = functions
  * Admin Web용 푸시 토큰 보유 사용자 목록 조회 (HTTPS 엔드포인트)
  */
 export const getUsersWithPushTokensAdmin = functions
-  .region('asia-northeast3', 'us-central1')
+  .region('asia-northeast3')
   .https.onRequest(async (req, res) => {
     try {
       // CORS 설정
@@ -2188,7 +2867,7 @@ interface VehicleTrim {
  * 구조: /vehicles/{brandId}/models/{modelId}/trims/{trimId}/driveTypes/{driveTypeId}
  */
 export const getVehicleTrims = functions
-  .region('asia-northeast3', 'us-central1')
+  .region('asia-northeast3')
   .https.onRequest(async (req, res) => {
     try {
       // CORS 헤더 설정
@@ -2314,7 +2993,7 @@ export const getVehicleTrims = functions
  * 구조: /vehicles/{brandId}
  */
 export const getBrands = functions
-  .region('asia-northeast3', 'us-central1')
+  .region('asia-northeast3')
   .https.onRequest(async (req, res) => {
     // CORS 헤더 설정
     res.set('Access-Control-Allow-Origin', '*');
@@ -2391,7 +3070,7 @@ export const getBrands = functions
  * 구조: /vehicles/{brandId}/models/{modelId}
  */
 export const getModels = functions
-  .region('asia-northeast3', 'us-central1')
+  .region('asia-northeast3')
   .https.onRequest(async (req, res) => {
     // CORS 헤더 설정
     res.set('Access-Control-Allow-Origin', '*');
@@ -2527,9 +3206,10 @@ function validateConfig(): string {
 }
 
 export const confirmPaymentFunction = functions
-  .region('asia-northeast3', 'us-central1')
+  .region('asia-northeast3')
   .runWith({
     secrets: ['NODE_ENV', 'TOSS_SECRET_KEY_PROD', 'TOSS_SECRET_KEY_TEST', 'SENTRY_DSN'],
+    minInstances: 1, // Cold start 제거 - 결제 핵심 플로우
   })
   .https.onCall(async (data: ConfirmPaymentRequest, context): Promise<ConfirmPaymentResponse> => {
     // Sentry: 결제 확정 시작 추적
@@ -2606,6 +3286,41 @@ export const confirmPaymentFunction = functions
           console.warn(`⚠️ 예약 상태가 pending_payment가 아닙니다: ${reservationData?.status}`);
         }
 
+        // 🎫 쿠폰 사용 처리 (앱 플로우)
+        let usedCouponId: string | undefined;
+        let couponDiscountAmount = 0;
+
+        if (data.userCouponId && context.auth?.uid) {
+          try {
+            console.log(`💳 쿠폰 사용 시도 (앱): ${data.userCouponId}`);
+
+            const couponRef = db.collection('userCoupons').doc(data.userCouponId);
+            const couponDoc = await couponRef.get();
+
+            if (couponDoc.exists) {
+              const couponData = couponDoc.data();
+
+              if (couponData?.status === 'active' &&
+                  couponData.expiresAt.toDate() >= new Date() &&
+                  couponData.userId === context.auth.uid) {
+
+                await couponRef.update({
+                  status: 'used',
+                  usedAt: FieldValue.serverTimestamp(),
+                  updatedAt: FieldValue.serverTimestamp(),
+                });
+
+                usedCouponId = data.userCouponId;
+                couponDiscountAmount = couponData.discountType === 'fixed' ? couponData.discountAmount : 0;
+
+                console.log(`✅ 쿠폰 사용 완료 (앱): ${couponData.couponName}`);
+              }
+            }
+          } catch (error) {
+            console.error('❌ 쿠폰 처리 중 오류 (앱):', error);
+          }
+        }
+
         // ⭐ 예약 상태 업데이트: pending_payment → pending
         await reservationRef.update({
           status: 'pending', // ⭐ 결제 완료, 관리자/정비사 확정 대기
@@ -2622,6 +3337,11 @@ export const confirmPaymentFunction = functions
             cardNumber: paymentDocData.paymentMethod.card.number,
             cardType: paymentDocData.paymentMethod.card.cardType,
             installmentPlanMonths: paymentDocData.paymentMethod.card.installmentPlanMonths,
+          }),
+          // 🎫 쿠폰 사용 정보
+          ...(usedCouponId && {
+            usedCouponId: usedCouponId,
+            couponDiscountAmount: couponDiscountAmount,
           }),
           updatedAt: FieldValue.serverTimestamp(),
         });
@@ -2694,6 +3414,78 @@ export const confirmPaymentFunction = functions
           );
         }
 
+        // 🎁 추천 코드 검증 및 할인 처리
+        let referralDiscount = 0;
+        let referralCodeUsed: string | undefined;
+
+        // 🎫 쿠폰 사용 처리
+        let usedCouponId: string | undefined;
+        let couponDiscountAmount = 0;
+
+        if (data.userCouponId) {
+          try {
+            console.log(`💳 쿠폰 사용 시도: ${data.userCouponId}`);
+
+            const couponRef = db.collection('userCoupons').doc(data.userCouponId);
+            const couponDoc = await couponRef.get();
+
+            if (!couponDoc.exists) {
+              console.warn(`⚠️ 쿠폰을 찾을 수 없습니다: ${data.userCouponId}`);
+            } else {
+              const couponData = couponDoc.data();
+
+              // 쿠폰 유효성 검증
+              if (couponData?.status !== 'active') {
+                console.warn(`⚠️ 쿠폰이 이미 사용되었거나 만료되었습니다: ${couponData?.status}`);
+              } else if (couponData.expiresAt.toDate() < new Date()) {
+                console.warn(`⚠️ 쿠폰이 만료되었습니다: ${couponData.expiresAt.toDate()}`);
+              } else if (couponData.userId !== userId && !userId.startsWith('guest_')) {
+                console.warn(`⚠️ 다른 사용자의 쿠폰입니다: ${couponData.userId} !== ${userId}`);
+              } else {
+                // ✅ 쿠폰 사용 처리
+                await couponRef.update({
+                  status: 'used',
+                  usedAt: FieldValue.serverTimestamp(),
+                  updatedAt: FieldValue.serverTimestamp(),
+                });
+
+                usedCouponId = data.userCouponId;
+
+                // 할인 금액 계산 (정보 저장용, 실제 결제 금액은 이미 프론트엔드에서 할인된 상태)
+                if (couponData.discountType === 'fixed') {
+                  couponDiscountAmount = couponData.discountAmount;
+                } else if (couponData.discountType === 'percentage') {
+                  // 백분율 할인의 경우 원래 가격 정보가 필요하지만,
+                  // 실제로는 이미 할인된 금액이 전달되므로 기록만 유지
+                  couponDiscountAmount = 0; // 정확한 계산은 프론트엔드에서 수행됨
+                }
+
+                console.log(`✅ 쿠폰 사용 완료: ${couponData.couponName} (${data.userCouponId})`);
+
+                // Sentry: 쿠폰 사용 추적
+                Sentry.addBreadcrumb({
+                  category: 'coupon',
+                  message: 'Coupon used in payment',
+                  level: 'info',
+                  data: {
+                    couponId: data.userCouponId,
+                    couponName: couponData.couponName,
+                    discountType: couponData.discountType,
+                    discountAmount: couponData.discountAmount,
+                  },
+                });
+              }
+            }
+          } catch (error) {
+            console.error('❌ 쿠폰 처리 중 오류 발생:', error);
+            // 쿠폰 처리 실패 시에도 결제는 진행 (쿠폰 없이)
+            Sentry.captureException(error, {
+              tags: { context: 'coupon-processing' },
+              extra: { userCouponId: data.userCouponId },
+            });
+          }
+        }
+
         await reservationRef.set({
           // 기존 구조와 호환 (vehicleBrand, vehicleModel, vehicleYear)
           vehicleBrand: data.reservationInfo.vehicle.make,
@@ -2734,6 +3526,19 @@ export const confirmPaymentFunction = functions
           // 사용자 및 소스
           userId: userId, // 🔥 Guest UID 또는 인증된 UID
           source: 'web',
+
+          // 🎁 추천 코드 할인 정보
+          ...(referralCodeUsed && {
+            referralCodeUsed: referralCodeUsed,
+            discountAmount: referralDiscount,
+            originalPrice: tossResponse.totalAmount + referralDiscount,
+          }),
+
+          // 🎫 쿠폰 사용 정보
+          ...(usedCouponId && {
+            usedCouponId: usedCouponId,
+            couponDiscountAmount: couponDiscountAmount,
+          }),
 
           // 타임스탬프
           createdAt: FieldValue.serverTimestamp(),
@@ -2812,7 +3617,7 @@ export const confirmPaymentFunction = functions
   });
 
 export const cancelPaymentFunction = functions
-  .region('asia-northeast3', 'us-central1')
+  .region('asia-northeast3')
   .runWith({
     secrets: ['NODE_ENV', 'TOSS_SECRET_KEY_PROD', 'TOSS_SECRET_KEY_TEST', 'SENTRY_DSN'],
   })
@@ -3027,9 +3832,9 @@ export const cancelPaymentFunction = functions
  * }
  */
 export const tossWebhook = functions
-  .region('us-central1', 'asia-northeast3')
+  .region('asia-northeast3')
   .runWith({
-    memory: '512MB',
+    memory: '256MB',
     timeoutSeconds: 60,
   })
   .https.onRequest(async (req, res) => {
@@ -3154,9 +3959,9 @@ export const tossWebhook = functions
  * Timezone: UTC
  */
 export const cleanupPendingPayments = functions
-  .region('us-central1', 'asia-northeast3')
+  .region('asia-northeast3')
   .runWith({
-    memory: '512MB',
+    memory: '256MB',
     timeoutSeconds: 540, // 9분 (최대 시간)
   })
   .pubsub.topic('cleanup-pending-payments')
@@ -3426,5 +4231,721 @@ export const notifyReservationCreated = functions
       });
 
       // 에러를 throw하지 않음으로써 예약 생성 트랜잭션에 영향을 주지 않음
+    }
+  });
+
+/**
+ * SMS 인증번호 발송 (앱/웹 공용)
+ *
+ * 요청 데이터:
+ * - phoneNumber: 인증번호를 받을 전화번호 (010-1234-5678 형식)
+ *
+ * 응답:
+ * - success: 발송 성공 여부
+ * - expiresAt: 인증번호 만료 시간 (5분)
+ * - error: 에러 메시지 (실패 시)
+ */
+export const sendVerificationCode = functions
+  .region('asia-northeast3')
+  .runWith({
+    memory: '256MB',
+    timeoutSeconds: 30,
+  })
+  .https.onCall(async (data, context) => {
+    try {
+      console.log('📱 SMS 인증번호 발송 요청:', {
+        phoneNumber: data.phoneNumber,
+      });
+
+      // 입력 검증
+      const phoneNumber = data.phoneNumber?.replace(/[^\d]/g, '');
+      if (!phoneNumber || !/^01[016789]\d{8}$/.test(phoneNumber)) {
+        throw new functions.https.HttpsError(
+          'invalid-argument',
+          '올바른 전화번호를 입력해주세요.'
+        );
+      }
+
+      // 🔒 발송 횟수 제한 체크 (3회 초과 시 30분 차단)
+      const docRef = db.collection('verificationCodes').doc(phoneNumber);
+      const existingDoc = await docRef.get();
+      const existingData = existingDoc.data();
+
+      if (existingData) {
+        const now = Date.now();
+
+        // 차단 상태 확인
+        if (existingData.blockedUntil) {
+          const blockedUntil = existingData.blockedUntil.toMillis();
+          if (now < blockedUntil) {
+            const remainingMinutes = Math.ceil((blockedUntil - now) / 60000);
+            throw new functions.https.HttpsError(
+              'resource-exhausted',
+              `너무 많은 요청입니다. ${remainingMinutes}분 후에 다시 시도해주세요.`
+            );
+          }
+          // 차단 시간이 지났으면 카운트 리셋
+        }
+
+        // 발송 횟수 체크 (30분 내 3회 제한)
+        const sendCount = existingData.sendCount || 0;
+        const lastSendAt = existingData.lastSendAt?.toMillis() || 0;
+        const thirtyMinutesAgo = now - 30 * 60 * 1000;
+
+        // 30분이 지났으면 카운트 리셋
+        const currentSendCount = lastSendAt < thirtyMinutesAgo ? 0 : sendCount;
+
+        if (currentSendCount >= 3) {
+          // 3회 초과 - 30분 차단 설정
+          await docRef.update({
+            blockedUntil: admin.firestore.Timestamp.fromDate(new Date(now + 30 * 60 * 1000)),
+          });
+          throw new functions.https.HttpsError(
+            'resource-exhausted',
+            '인증번호 발송 횟수를 초과했습니다. 30분 후에 다시 시도해주세요.'
+          );
+        }
+      }
+
+      // SMS 설정 검증
+      const config = validateSMSConfig();
+
+      // 6자리 랜덤 인증번호 생성
+      const verificationCode = Math.floor(100000 + Math.random() * 900000).toString();
+      const expiresAt = admin.firestore.Timestamp.fromDate(
+        new Date(Date.now() + 5 * 60 * 1000) // 5분 후 만료
+      );
+
+      // 현재 발송 횟수 계산 (30분 내)
+      const now = Date.now();
+      const lastSendAt = existingData?.lastSendAt?.toMillis() || 0;
+      const thirtyMinutesAgo = now - 30 * 60 * 1000;
+      const currentSendCount = lastSendAt < thirtyMinutesAgo ? 0 : (existingData?.sendCount || 0);
+
+      // 🚀 성능 최적화: Firestore 저장과 SMS 발송을 병렬로 실행
+      await Promise.all([
+        // Firestore에 인증번호 저장 (발송 횟수 포함)
+        docRef.set({
+          code: verificationCode,
+          phoneNumber,
+          expiresAt,
+          verified: false,
+          sendCount: currentSendCount + 1,
+          lastSendAt: admin.firestore.FieldValue.serverTimestamp(),
+          blockedUntil: null, // 차단 해제
+          createdAt: admin.firestore.FieldValue.serverTimestamp(),
+        }),
+        // SMS 발송
+        sendSMS(
+          {
+            to: phoneNumber,
+            content: `[차징] 인증번호는 ${verificationCode} 입니다. 5분 내에 입력해주세요.`,
+          },
+          config.serviceId,
+          config.accessKey,
+          config.secretKey,
+          config.senderPhone
+        ),
+      ]);
+
+      console.log('✅ SMS 인증번호 발송 완료:', phoneNumber, `(${currentSendCount + 1}/3)`);
+
+      return {
+        success: true,
+        expiresAt: expiresAt.toMillis(),
+        sendCount: currentSendCount + 1, // 클라이언트에 현재 발송 횟수 전달
+        remainingCount: 3 - (currentSendCount + 1), // 남은 발송 횟수
+      };
+    } catch (error: any) {
+      console.error('❌ SMS 인증번호 발송 실패:', error);
+
+      if (error instanceof functions.https.HttpsError) {
+        throw error;
+      }
+
+      throw new functions.https.HttpsError(
+        'internal',
+        '인증번호 발송에 실패했습니다. 잠시 후 다시 시도해주세요.'
+      );
+    }
+  });
+
+/**
+ * SMS 인증번호 검증 (앱/웹 공용)
+ *
+ * 요청 데이터:
+ * - phoneNumber: 전화번호
+ * - code: 인증번호
+ *
+ * 응답:
+ * - success: 검증 성공 여부
+ * - error: 에러 메시지 (실패 시)
+ */
+export const verifyPhoneCode = functions
+  .region('asia-northeast3')
+  .runWith({
+    memory: '256MB',
+    timeoutSeconds: 30,
+  })
+  .https.onCall(async (data, context) => {
+    try {
+      console.log('🔐 SMS 인증번호 검증 요청:', {
+        phoneNumber: data.phoneNumber,
+      });
+
+      // 입력 검증
+      const phoneNumber = data.phoneNumber?.replace(/[^\d]/g, '');
+      const code = data.code?.trim();
+
+      if (!phoneNumber || !/^01[016789]\d{8}$/.test(phoneNumber)) {
+        throw new functions.https.HttpsError(
+          'invalid-argument',
+          '올바른 전화번호를 입력해주세요.'
+        );
+      }
+
+      if (!code || !/^\d{6}$/.test(code)) {
+        throw new functions.https.HttpsError(
+          'invalid-argument',
+          '인증번호는 6자리 숫자입니다.'
+        );
+      }
+
+      // Firestore에서 인증번호 조회
+      const docRef = db.collection('verificationCodes').doc(phoneNumber);
+      const doc = await docRef.get();
+
+      if (!doc.exists) {
+        throw new functions.https.HttpsError(
+          'not-found',
+          '인증번호를 먼저 발송해주세요.'
+        );
+      }
+
+      const verificationData = doc.data();
+      if (!verificationData) {
+        throw new functions.https.HttpsError(
+          'not-found',
+          '인증번호를 먼저 발송해주세요.'
+        );
+      }
+
+      // 만료 시간 확인
+      const now = admin.firestore.Timestamp.now();
+      if (verificationData.expiresAt.toMillis() < now.toMillis()) {
+        throw new functions.https.HttpsError(
+          'deadline-exceeded',
+          '인증번호가 만료되었습니다. 다시 발송해주세요.'
+        );
+      }
+
+      // 인증번호 일치 확인 (먼저 확인!)
+      if (verificationData.code !== code) {
+        throw new functions.https.HttpsError(
+          'permission-denied',
+          '인증번호가 일치하지 않습니다.'
+        );
+      }
+
+      // 이미 검증된 코드인지 확인 (맞는 경우에만 체크)
+      if (verificationData.verified) {
+        throw new functions.https.HttpsError(
+          'already-exists',
+          '이미 사용된 인증번호입니다.'
+        );
+      }
+
+      // 검증 완료 표시
+      await docRef.update({
+        verified: true,
+        verifiedAt: admin.firestore.FieldValue.serverTimestamp(),
+      });
+
+      console.log('✅ SMS 인증번호 검증 완료:', phoneNumber);
+
+      return {
+        success: true,
+      };
+    } catch (error: any) {
+      console.error('❌ SMS 인증번호 검증 실패:', error);
+
+      if (error instanceof functions.https.HttpsError) {
+        throw error;
+      }
+
+      throw new functions.https.HttpsError(
+        'internal',
+        '인증번호 검증에 실패했습니다. 잠시 후 다시 시도해주세요.'
+      );
+    }
+  });
+
+/**
+ * 추천 코드 검증 함수
+ * 예약 시 사용자가 입력한 추천 코드의 유효성을 검증
+ */
+export const validateReferralCode = functions
+  .region('asia-northeast3')
+  .runWith({
+    memory: '256MB',
+    timeoutSeconds: 10,
+  })
+  .https.onCall(async (data: { code: string; userId?: string }, context) => {
+    try {
+      const { code, userId } = data;
+
+      if (!code || typeof code !== 'string') {
+        throw new functions.https.HttpsError('invalid-argument', '추천 코드를 입력해주세요.');
+      }
+
+      // 1. settings/referralPricing 조회 (추천 기능 활성화 여부)
+      const referralPricingSnap = await db.collection('settings').doc('referralPricing').get();
+
+      if (!referralPricingSnap.exists) {
+        throw new functions.https.HttpsError('failed-precondition', '추천 할인 설정을 찾을 수 없습니다.');
+      }
+
+      const referralPricing = referralPricingSnap.data();
+      if (!referralPricing) {
+        throw new functions.https.HttpsError('failed-precondition', '추천 할인 설정이 올바르지 않습니다.');
+      }
+
+      // 2. 추천 기능 활성화 여부 체크
+      if (referralPricing.enabled !== true) {
+        throw new functions.https.HttpsError('failed-precondition', '추천 할인이 비활성화되었습니다.');
+      }
+
+      // 3. 추천 코드 문서 조회
+      const normalizedCode = code.trim().toUpperCase();
+      const referralCodeSnap = await db.collection('referralCodes').doc(normalizedCode).get();
+
+      if (!referralCodeSnap.exists) {
+        throw new functions.https.HttpsError('not-found', '존재하지 않는 추천 코드입니다.');
+      }
+
+      const referralCodeData = referralCodeSnap.data();
+      if (!referralCodeData) {
+        throw new functions.https.HttpsError('not-found', '추천 코드 데이터가 올바르지 않습니다.');
+      }
+
+      // 4. 추천 코드 상태 체크
+      if (referralCodeData.status !== 'active') {
+        throw new functions.https.HttpsError('failed-precondition', '사용할 수 없는 추천 코드입니다.');
+      }
+
+      // 5. 기간 체크
+      const now = admin.firestore.Timestamp.now();
+      if (referralPricing.startDate && now.toMillis() < referralPricing.startDate.toMillis()) {
+        throw new functions.https.HttpsError('failed-precondition', '추천 할인 기간이 아직 시작되지 않았습니다.');
+      }
+
+      if (referralPricing.endDate && now.toMillis() > referralPricing.endDate.toMillis()) {
+        throw new functions.https.HttpsError('failed-precondition', '추천 할인 기간이 종료되었습니다.');
+      }
+
+      // 6. 첫 예약 제한 체크 (userId가 있는 경우)
+      if (referralPricing.firstReservationOnly === true && userId && typeof userId === 'string') {
+        const reservationsQuery = await db.collection('diagnosisReservations')
+          .where('userId', '==', userId)
+          .where('status', 'in', ['confirmed', 'paid', 'completed'])
+          .limit(1)
+          .get();
+
+        if (!reservationsQuery.empty) {
+          throw new functions.https.HttpsError('failed-precondition', '추천 할인은 첫 예약에만 적용됩니다.');
+        }
+      }
+
+      // 7. 검증 성공 - 할인 금액만 반환 (민감 정보 제외)
+      const discountValue = referralPricing.discount?.value;
+      const discountType = referralPricing.discount?.type;
+
+      if (typeof discountValue !== 'number' || typeof discountType !== 'string') {
+        throw new functions.https.HttpsError('failed-precondition', '할인 정보가 올바르지 않습니다.');
+      }
+
+      return {
+        valid: true,
+        discountAmount: discountValue,
+        discountType: discountType,
+        message: '추천 코드가 적용되었습니다.',
+      };
+
+    } catch (error) {
+      console.error('❌ 추천 코드 검증 실패:', error);
+
+      if (error instanceof functions.https.HttpsError) {
+        throw error;
+      }
+
+      throw new functions.https.HttpsError(
+        'internal',
+        '추천 코드 검증 중 오류가 발생했습니다.'
+      );
+    }
+  });
+
+/**
+ * 추천 코드 적용 및 쿠폰 발급 함수
+ * 사용자가 추천 코드를 입력하면 검증 후 쿠폰을 발급
+ */
+export const applyReferralCode = functions
+  .region('asia-northeast3')
+  .runWith({
+    memory: '256MB',
+    timeoutSeconds: 30,
+  })
+  .https.onCall(async (data: { referralCode: string }, context) => {
+    try {
+      // 인증 확인
+      if (!context.auth) {
+        throw new functions.https.HttpsError(
+          'unauthenticated',
+          '로그인이 필요합니다.'
+        );
+      }
+
+      const userId = context.auth.uid;
+      const { referralCode } = data;
+
+      if (!referralCode || typeof referralCode !== 'string') {
+        throw new functions.https.HttpsError(
+          'invalid-argument',
+          '추천 코드를 입력해주세요.'
+        );
+      }
+
+      const normalizedCode = referralCode.trim().toUpperCase();
+
+      // 1. 추천 코드 검증
+      const referralCodeSnap = await db.collection('referralCodes').doc(normalizedCode).get();
+
+      if (!referralCodeSnap.exists) {
+        throw new functions.https.HttpsError(
+          'not-found',
+          '존재하지 않는 추천 코드입니다.'
+        );
+      }
+
+      const referralCodeData = referralCodeSnap.data();
+      if (!referralCodeData || referralCodeData.status !== 'active') {
+        throw new functions.https.HttpsError(
+          'failed-precondition',
+          '사용할 수 없는 추천 코드입니다.'
+        );
+      }
+
+      // 2. 자기 자신의 추천 코드는 사용 불가
+      if (referralCodeData.userId === userId) {
+        throw new functions.https.HttpsError(
+          'failed-precondition',
+          '자신의 추천 코드는 사용할 수 없습니다.'
+        );
+      }
+
+      // 3. 이미 추천 쿠폰을 받았는지 확인
+      const existingCouponQuery = await db.collection('userCoupons')
+        .where('userId', '==', userId)
+        .where('issueReason', '==', 'referral')
+        .limit(1)
+        .get();
+
+      if (!existingCouponQuery.empty) {
+        throw new functions.https.HttpsError(
+          'already-exists',
+          '이미 추천 코드로 쿠폰을 받으셨습니다.'
+        );
+      }
+
+      // 4. 추천 쿠폰 정의 조회
+      const referralCouponSnap = await db.collection('coupons').doc('referral-welcome').get();
+
+      if (!referralCouponSnap.exists) {
+        throw new functions.https.HttpsError(
+          'failed-precondition',
+          '추천 쿠폰 설정을 찾을 수 없습니다.'
+        );
+      }
+
+      const couponData = referralCouponSnap.data();
+      if (!couponData || !couponData.isActive) {
+        throw new functions.https.HttpsError(
+          'failed-precondition',
+          '현재 추천 쿠폰이 비활성화되었습니다.'
+        );
+      }
+
+      // 5. 사용자에게 쿠폰 발급
+      const now = admin.firestore.Timestamp.now();
+      // 추천 쿠폰은 유효기간 없음 (10년 후로 설정)
+      const expiresAt = admin.firestore.Timestamp.fromMillis(
+        now.toMillis() + 10 * 365 * 24 * 60 * 60 * 1000
+      );
+
+      const userCouponRef = db.collection('userCoupons').doc();
+      const userCouponData = {
+        id: userCouponRef.id,
+        userId: userId,
+        couponId: 'referral-welcome',
+        couponName: couponData.name,
+        couponDescription: couponData.description,
+        discountType: couponData.discountType,
+        discountAmount: couponData.discountAmount || null,
+        discountPercentage: couponData.discountPercentage || null,
+        maxDiscountAmount: couponData.maxDiscountAmount || null,
+        minOrderAmount: couponData.minOrderAmount || null,
+        issueReason: 'referral',
+        referralCode: normalizedCode,
+        status: 'active',
+        issuedAt: now,
+        expiresAt: expiresAt,
+        createdAt: now,
+        updatedAt: now,
+      };
+
+      await userCouponRef.set(userCouponData);
+
+      console.log(`✅ 쿠폰 발급 완료: ${userId} <- ${normalizedCode}`);
+
+      // 6. 추천 코드 사용 통계 업데이트 (옵션)
+      await db.collection('referralCodes').doc(normalizedCode).update({
+        usedCount: admin.firestore.FieldValue.increment(1),
+        lastUsedAt: now,
+      });
+
+      // 7. 성공 응답
+      return {
+        success: true,
+        userCoupon: {
+          id: userCouponRef.id,
+          couponName: couponData.name,
+          couponDescription: couponData.description,
+          discountAmount: couponData.discountAmount || 0,
+          expiresAt: expiresAt.toDate().toISOString(),
+        },
+      };
+
+    } catch (error) {
+      console.error('❌ 추천 코드 적용 실패:', error);
+
+      if (error instanceof functions.https.HttpsError) {
+        throw error;
+      }
+
+      throw new functions.https.HttpsError(
+        'internal',
+        '추천 코드 적용 중 오류가 발생했습니다.'
+      );
+    }
+  });
+
+/**
+ * 리포트 PDF 생성 함수
+ */
+interface GenerateReportPDFRequest {
+  reportId: string;
+}
+
+interface GenerateReportPDFResponse {
+  success: boolean;
+  pdfBase64?: string;
+  fileName?: string;
+  error?: string;
+}
+
+export const generateReportPDFFunction = functions
+  .region('asia-northeast3')
+  .runWith({
+    memory: '1GB',
+    timeoutSeconds: 60,
+  })
+  .https.onCall(async (data: GenerateReportPDFRequest, context): Promise<GenerateReportPDFResponse> => {
+    if (!data.reportId) {
+      throw new functions.https.HttpsError(
+        'invalid-argument',
+        'reportId가 필요합니다.'
+      );
+    }
+
+    try {
+      // 리포트 조회
+      const reportRef = db.collection('reports').doc(data.reportId);
+      const reportDoc = await reportRef.get();
+
+      if (!reportDoc.exists) {
+        throw new functions.https.HttpsError(
+          'not-found',
+          '리포트를 찾을 수 없습니다.'
+        );
+      }
+
+      const reportData = reportDoc.data();
+      if (!reportData) {
+        throw new functions.https.HttpsError(
+          'not-found',
+          '리포트 데이터가 없습니다.'
+        );
+      }
+
+      // 권한 확인 (본인 리포트 또는 관리자)
+      const userId = context.auth?.uid;
+      if (userId && reportData.userId !== userId) {
+        const userDoc = await db.collection('users').doc(userId).get();
+        const userData = userDoc.data();
+        if (!userData?.isAdmin) {
+          throw new functions.https.HttpsError(
+            'permission-denied',
+            '이 리포트에 접근할 권한이 없습니다.'
+          );
+        }
+      }
+
+      // 진단일 포맷팅
+      let diagnosisDateStr = '';
+      if (reportData.diagnosisDate) {
+        const diagnosisDate = reportData.diagnosisDate.toDate?.() || new Date(reportData.diagnosisDate);
+        diagnosisDateStr = diagnosisDate.toLocaleDateString('ko-KR', {
+          year: 'numeric',
+          month: 'long',
+          day: 'numeric',
+        });
+      }
+
+      // 사고/수리 이력 변환
+      interface AccidentRecord {
+        date?: { toDate?: () => Date };
+        summary?: string;
+        repairParts?: Array<{ partName: string; repairTypes?: string[] }>;
+        detailedRepairParts?: Array<{ detailedPartName: string; repairTypes?: string[] }>;
+        repairCost?: number;
+        myCarPartsCost?: number;
+        myCarLaborCost?: number;
+      }
+
+      const accidentRecords = reportData.accidentRepairHistory?.records?.map((record: AccidentRecord) => {
+        let dateStr = '';
+        if (record.date) {
+          const recordDate = record.date.toDate?.() || new Date(record.date as unknown as string);
+          dateStr = recordDate.toLocaleDateString('ko-KR', {
+            year: 'numeric',
+            month: 'long',
+            day: 'numeric',
+          });
+        }
+
+        const allParts = [
+          ...(record.repairParts || []),
+          ...(record.detailedRepairParts?.map((p) => ({
+            partName: p.detailedPartName,
+            repairTypes: p.repairTypes,
+          })) || []),
+        ];
+
+        return {
+          date: dateStr,
+          summary: record.summary,
+          repairParts: allParts,
+          repairCost: (record.repairCost || 0) + (record.myCarPartsCost || 0) + (record.myCarLaborCost || 0),
+        };
+      }) || [];
+
+      // 검사 항목 요약 계산
+      let inspectionSummary;
+      const inspectionCategories = [
+        'steeringItems', 'brakingItems', 'bodyItems',
+        'interiorItems', 'electricItems', 'safetyItems'
+      ];
+
+      let totalItems = 0;
+      let goodItems = 0;
+      let defectItems = 0;
+
+      for (const category of inspectionCategories) {
+        const items = reportData[category];
+        if (items && typeof items === 'object') {
+          for (const key of Object.keys(items)) {
+            const item = items[key];
+            if (item && typeof item === 'object' && 'status' in item) {
+              totalItems++;
+              if (item.status === 'good') goodItems++;
+              else if (item.status === 'defect') defectItems++;
+            }
+          }
+        }
+      }
+
+      if (totalItems > 0) {
+        inspectionSummary = { totalItems, goodItems, defectItems };
+      }
+
+      // PDF 데이터 구성
+      const pdfData: ReportPDFData = {
+        reportId: data.reportId,
+        vehicleBrand: reportData.vehicleBrand || '',
+        vehicleName: reportData.vehicleName || '',
+        vehicleYear: reportData.vehicleYear?.toString(),
+        diagnosisDate: diagnosisDateStr,
+        sohPercentage: reportData.sohPercentage || 0,
+        cellCount: reportData.cellCount || 0,
+        defectiveCellCount: reportData.defectiveCellCount || 0,
+        normalChargeCount: reportData.normalChargeCount,
+        fastChargeCount: reportData.fastChargeCount,
+        realDrivableDistance: reportData.realDrivableDistance,
+        accidentRecords,
+        inspectionSummary,
+      };
+
+      // HTML 생성
+      const html = generateReportHTML(pdfData);
+
+      // Puppeteer로 PDF 생성
+      const browser = await puppeteer.launch({
+        args: chromium.args,
+        defaultViewport: { width: 1200, height: 800 },
+        executablePath: await chromium.executablePath(),
+        headless: true,
+      });
+
+      const page = await browser.newPage();
+      await page.setContent(html, { waitUntil: 'networkidle0' });
+
+      const pdfBuffer = await page.pdf({
+        format: 'A4',
+        printBackground: true,
+        margin: {
+          top: '20px',
+          right: '20px',
+          bottom: '20px',
+          left: '20px',
+        },
+      });
+
+      await browser.close();
+
+      // Base64로 변환
+      const pdfBase64 = Buffer.from(pdfBuffer).toString('base64');
+      const reportIdShort = data.reportId.substring(0, 8);
+      const fileName = `Charzing_Report_${reportData.vehicleBrand}_${reportData.vehicleName}_${reportIdShort}.pdf`;
+
+      console.log(`✅ PDF 생성 완료: ${fileName}`);
+
+      return {
+        success: true,
+        pdfBase64,
+        fileName,
+      };
+
+    } catch (error) {
+      console.error('❌ PDF 생성 실패:', error);
+
+      if (error instanceof functions.https.HttpsError) {
+        throw error;
+      }
+
+      throw new functions.https.HttpsError(
+        'internal',
+        'PDF 생성 중 오류가 발생했습니다.',
+        error instanceof Error ? { message: error.message } : undefined
+      );
     }
   });

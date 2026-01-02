@@ -15,6 +15,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { scale, verticalScale, moderateScale } from 'react-native-size-matters';
 import MultipleImagePicker from '../../MultipleImagePicker';
+import StatusButtons from '../common/StatusButtons';
 import { TireAndWheelItem as FirebaseTireAndWheelItem } from '../../../services/firebaseService';
 
 interface TireAndWheelItem {
@@ -82,7 +83,7 @@ const TiresAndWheelsBottomSheet: React.FC<TiresAndWheelsBottomSheetProps> = ({
     }));
   };
 
-  const handleWheelStatusChange = (key: keyof TiresAndWheelsData, status: 'good' | 'problem') => {
+  const handleWheelStatusChange = (key: keyof TiresAndWheelsData, status: 'good' | 'problem' | undefined) => {
     setLocalData(prev => ({
       ...prev,
       [key]: {
@@ -243,53 +244,11 @@ const TiresAndWheelsBottomSheet: React.FC<TiresAndWheelsBottomSheetProps> = ({
                 {/* Wheel Status Selection */}
                 <View style={styles.wheelStatusSection}>
                   <Text style={styles.wheelStatusLabel}>휠 상태</Text>
-                  <View style={styles.statusContainer}>
-                    <TouchableOpacity
-                      style={[
-                        styles.statusButton,
-                        item?.wheelStatus === 'good' && styles.statusButtonActive,
-                      ]}
-                      onPress={() => handleWheelStatusChange(key, 'good')}
-                      activeOpacity={0.7}
-                    >
-                      <Ionicons
-                        name={item?.wheelStatus === 'good' ? 'checkmark-circle' : 'checkmark-circle-outline'}
-                        size={20}
-                        color={item?.wheelStatus === 'good' ? '#10B981' : '#9CA3AF'}
-                      />
-                      <Text
-                        style={[
-                          styles.statusButtonText,
-                          item?.wheelStatus === 'good' && styles.statusButtonTextActive,
-                        ]}
-                      >
-                        양호
-                      </Text>
-                    </TouchableOpacity>
-
-                    <TouchableOpacity
-                      style={[
-                        styles.statusButton,
-                        item?.wheelStatus === 'problem' && styles.statusButtonActiveProblem,
-                      ]}
-                      onPress={() => handleWheelStatusChange(key, 'problem')}
-                      activeOpacity={0.7}
-                    >
-                      <Ionicons
-                        name={item?.wheelStatus === 'problem' ? 'close-circle' : 'close-circle-outline'}
-                        size={20}
-                        color={item?.wheelStatus === 'problem' ? '#EF4444' : '#9CA3AF'}
-                      />
-                      <Text
-                        style={[
-                          styles.statusButtonText,
-                          item?.wheelStatus === 'problem' && styles.statusButtonTextActiveProblem,
-                        ]}
-                      >
-                        문제 있음
-                      </Text>
-                    </TouchableOpacity>
-                  </View>
+                  <StatusButtons
+                    status={item?.wheelStatus}
+                    onStatusChange={(status) => handleWheelStatusChange(key, status)}
+                    problemLabel="문제 있음"
+                  />
                 </View>
 
                 {/* Image and Issue Description (shown when status is 'problem') */}
@@ -420,44 +379,6 @@ const styles = StyleSheet.create({
     fontWeight: '500',
     color: '#6B7280',
     marginBottom: verticalScale(8),
-  },
-  statusContainer: {
-    flexDirection: 'row',
-    gap: scale(12),
-  },
-  statusButton: {
-    flex: 1,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingVertical: verticalScale(10),
-    paddingHorizontal: scale(12),
-    borderRadius: 8,
-    borderWidth: 1.5,
-    borderColor: '#E5E7EB',
-    backgroundColor: '#F9FAFB',
-    gap: scale(6),
-  },
-  statusButtonActive: {
-    borderColor: '#10B981',
-    backgroundColor: '#ECFDF5',
-  },
-  statusButtonActiveProblem: {
-    borderColor: '#EF4444',
-    backgroundColor: '#FEF2F2',
-  },
-  statusButtonText: {
-    fontSize: moderateScale(14),
-    fontWeight: '500',
-    color: '#6B7280',
-  },
-  statusButtonTextActive: {
-    color: '#10B981',
-    fontWeight: '600',
-  },
-  statusButtonTextActiveProblem: {
-    color: '#EF4444',
-    fontWeight: '600',
   },
   imageSection: {
     marginTop: verticalScale(12),

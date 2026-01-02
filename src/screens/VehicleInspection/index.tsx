@@ -43,11 +43,12 @@ import { InspectionSection, ExpandedSectionsState, SectionCompletion } from './t
 // Section Components
 import { VehicleInfoSection } from './sections/VehicleInfoSection';
 import { BatteryInfoSection } from './sections/BatteryInfoSection';
-import { MajorDevicesSection } from './sections/MajorDevicesSection';
-import { VehicleExteriorSection } from './sections/VehicleExteriorSection';
-import { VehicleUndercarriageSection } from './sections/VehicleUndercarriageSection';
-import { VehicleInteriorSection } from './sections/VehicleInteriorSection';
 import { OtherSection } from './sections/OtherSection';
+// v2 섹션 컴포넌트
+import { ExteriorSection } from './sections/ExteriorSection';
+import { InteriorSection } from './sections/InteriorSection';
+import { TireAndWheelSection } from './sections/TireAndWheelSection';
+import { UndercarriageSection } from './sections/UndercarriageSection';
 
 // Standalone Components
 import DiagnosticianConfirmationModal from '../../components/DiagnosticianConfirmationModal';
@@ -146,24 +147,24 @@ const VehicleInspectionScreen: React.FC = () => {
   }>>([]);
   const [isLoadingDrafts, setIsLoadingDrafts] = useState(false);
 
-  // Accordion Sections (처음에는 모두 닫힘)
+  // Accordion Sections (처음에는 모두 닫힘) - v2 구조
   const [expandedSections, setExpandedSections] = useState<ExpandedSectionsState>({
     vehicleInfo: false,
     batteryInfo: false,
-    majorDevices: false,
-    vehicleExterior: false,
-    vehicleUndercarriage: false,
-    vehicleInterior: false,
+    exterior: false,
+    interior: false,
+    tireAndWheel: false,
+    undercarriage: false,
     other: false,
   });
 
   const accordionAnimations = useRef({
     vehicleInfo: new Animated.Value(0),
     batteryInfo: new Animated.Value(0),
-    majorDevices: new Animated.Value(0),
-    vehicleExterior: new Animated.Value(0),
-    vehicleUndercarriage: new Animated.Value(0),
-    vehicleInterior: new Animated.Value(0),
+    exterior: new Animated.Value(0),
+    interior: new Animated.Value(0),
+    tireAndWheel: new Animated.Value(0),
+    undercarriage: new Animated.Value(0),
     other: new Animated.Value(0),
   }).current;
 
@@ -600,14 +601,14 @@ const VehicleInspectionScreen: React.FC = () => {
   const toggleSection = (section: InspectionSection) => {
     const isExpanded = !expandedSections[section];
 
-    // 🔥 한 번에 하나만 펼치기: 클릭한 섹션만 토글, 나머지는 모두 닫기
+    // 🔥 한 번에 하나만 펼치기: 클릭한 섹션만 토글, 나머지는 모두 닫기 (v2 구조)
     const newExpandedState: ExpandedSectionsState = {
       vehicleInfo: false,
       batteryInfo: false,
-      majorDevices: false,
-      vehicleExterior: false,
-      vehicleUndercarriage: false,
-      vehicleInterior: false,
+      exterior: false,
+      interior: false,
+      tireAndWheel: false,
+      undercarriage: false,
       other: false,
       [section]: isExpanded, // 클릭한 섹션만 토글
     };
@@ -635,6 +636,7 @@ const VehicleInspectionScreen: React.FC = () => {
   // Section Completion Calculations
   const calculateVehicleInfoCompletion = useCallback((): SectionCompletion => {
     const vehicleInfo = watch('vehicleInfo');
+    const vinCheck = watch('vinCheck');
 
     // 4개 주요 항목 체크 (VehicleInfoSection의 isCompleted 로직과 동일하게)
     const items = [
@@ -644,8 +646,11 @@ const VehicleInspectionScreen: React.FC = () => {
       !!(vehicleInfo.carKeyCount && parseInt(vehicleInfo.carKeyCount) > 0),
       // 3. 계기판 정보 (이미지 + 상태)
       !!(vehicleInfo.dashboardImageUris && vehicleInfo.dashboardImageUris.length > 0 && vehicleInfo.dashboardStatus),
-      // 4. 차대번호 (이미지만, VinCheckBottomSheet 안에서 3개 체크박스는 별도 검증)
-      !!(vehicleInfo.vehicleVinImageUris && vehicleInfo.vehicleVinImageUris.length > 0),
+      // 4. 차대번호 및 상태 확인 (이미지 + 3개 상태 모두)
+      !!(vinCheck.vinImageUris && vinCheck.vinImageUris.length > 0 &&
+         vinCheck.isVinVerified !== undefined &&
+         vinCheck.hasNoIllegalModification !== undefined &&
+         vinCheck.hasNoFloodDamage !== undefined),
     ];
 
     return {
@@ -653,7 +658,7 @@ const VehicleInspectionScreen: React.FC = () => {
       total: 4,
       isAllRequiredComplete: items.every(Boolean),
     };
-  }, [watch('vehicleInfo')]);
+  }, [watch('vehicleInfo'), watch('vinCheck')]);
 
   const calculateBatteryInfoCompletion = useCallback((): SectionCompletion => {
     const batteryInfo = watch('batteryInfo');
@@ -671,65 +676,120 @@ const VehicleInspectionScreen: React.FC = () => {
     };
   }, [watch('batteryInfo')]);
 
-  const calculateMajorDevicesCompletion = useCallback((): SectionCompletion => {
-    // 주요 장치 섹션이 제거되었으므로 항상 완료로 처리
-    return {
-      completed: 1,
-      total: 1,
-      isAllRequiredComplete: true,
-    };
-  }, []);
+  // ========== v2 구조 완료율 계산 ==========
 
-  const calculateVehicleExteriorCompletion = useCallback((): SectionCompletion => {
-    const vehicleExterior = watch('vehicleExterior');
+  const calculateExteriorCompletion = useCallback((): SectionCompletion => {
+    const exterior = watch('exterior');
 
-    const hasExteriorPhotos = Object.values(vehicleExterior.vehicleExterior || {}).filter((item) => typeof item === 'string' && item).length > 0;
-    const hasBodyPanel = Array.isArray(vehicleExterior.bodyPanel) && vehicleExterior.bodyPanel.length > 0;
-    const hasTiresWheels = Object.values(vehicleExterior.tiresAndWheels || {}).filter((item) => item && typeof item === 'object' && 'wheelStatus' in item && item.wheelStatus).length > 0;
+    // 외판 검사: 19개 중 10개 이상 (상태)
+    const bodyPanel = exterior?.bodyPanel || {};
+    const bodyPanelStatusCount = Object.values(bodyPanel).filter((item) => item && item.status).length;
+    const hasBodyPanelStatus = bodyPanelStatusCount >= 10;
 
-    const items = [hasExteriorPhotos, hasBodyPanel, hasTiresWheels];
+    // 외판 기본 사진: 6개 항목 중 3개 이상 (hood, doorFL-RR, trunkLid)
+    const requiredBasePhotoKeys = ['hood', 'doorFL', 'doorFR', 'doorRL', 'doorRR', 'trunkLid'];
+    const bodyPanelBasePhotoCount = requiredBasePhotoKeys.filter(
+      (key) => bodyPanel[key as keyof typeof bodyPanel]?.basePhoto
+    ).length;
+    const hasBodyPanelBasePhotos = bodyPanelBasePhotoCount >= 3;
 
-    return {
-      completed: items.filter(Boolean).length,
-      total: 3,
-      isAllRequiredComplete: items.every(Boolean),
-    };
-  }, [watch('vehicleExterior')]);
+    // 프레임 검사: 20개 중 10개 이상
+    const frame = exterior?.frame || {};
+    const hasFrame = Object.values(frame).filter((item) => item && item.status).length >= 10;
 
-  const calculateVehicleUndercarriageCompletion = useCallback((): SectionCompletion => {
-    const vehicleUndercarriage = watch('vehicleUndercarriage');
+    // 유리 검사: 7개 중 4개 이상
+    const glass = exterior?.glass || {};
+    const hasGlass = Object.values(glass).filter((item) => item && item.status).length >= 4;
 
-    const hasSuspension = Object.values(vehicleUndercarriage.suspensionArms || {}).filter(Boolean).length > 0;
-    const hasBatteryPack = Object.values(vehicleUndercarriage.underBatteryPack || {}).filter(Boolean).length > 0;
-    const hasSteering = Object.values(vehicleUndercarriage.steering || {}).filter((item) => item && item.status).length > 0;
-    const hasBraking = Object.values(vehicleUndercarriage.braking || {}).filter((item) => item && item.status).length > 0;
+    // 램프 검사: 5개 중 3개 이상
+    const lamp = exterior?.lamp || {};
+    const hasLamp = Object.values(lamp).filter((item) => item && item.status).length >= 3;
 
-    const items = [hasSuspension, hasBatteryPack, hasSteering, hasBraking];
+    // 외판은 상태+사진 둘 다 충족해야 완료
+    const hasBodyPanel = hasBodyPanelStatus && hasBodyPanelBasePhotos;
+    const items = [hasBodyPanel, hasFrame, hasGlass, hasLamp];
 
     return {
       completed: items.filter(Boolean).length,
       total: 4,
       isAllRequiredComplete: items.every(Boolean),
     };
-  }, [watch('vehicleUndercarriage')]);
+  }, [watch('exterior')]);
 
-  const calculateVehicleInteriorCompletion = useCallback((): SectionCompletion => {
-    const vehicleInterior = watch('vehicleInterior');
+  const calculateInteriorCompletion = useCallback((): SectionCompletion => {
+    const interior = watch('interior');
 
-    const hasInterior = Object.values(vehicleInterior.interior || {}).filter((item) => item && item.status).length > 0;
-    const hasAirconMotor = Object.values(vehicleInterior.airconMotor || {}).filter((item) => item && item.status).length > 0;
-    const hasOptions = Object.values(vehicleInterior.options || {}).filter((item) => item && item.status).length > 0;
-    const hasLighting = Object.values(vehicleInterior.lighting || {}).filter((item) => item && item.status).length > 0;
-    const hasGlass = Object.values(vehicleInterior.glass || {}).filter((item) => item && item.status).length > 0;
+    // 내장재 검사: 사진 6개 필수 (운전석, 뒷좌석, 문 4개)
+    const materials = interior?.materials || {};
+    const PHOTO_KEYS = ['driverSeat', 'rearSeat', 'doorFL', 'doorFR', 'doorRL', 'doorRR'];
+    const basePhotoCount = PHOTO_KEYS.filter(
+      (key) => materials[key as keyof typeof materials]?.basePhoto
+    ).length;
+    const hasMaterials = basePhotoCount >= 6;
 
-    const items = [hasInterior, hasAirconMotor, hasOptions, hasLighting, hasGlass];
+    // 기능 검사: 7개 전부 필수
+    const functions = interior?.functions || {};
+    const functionsCount = Object.values(functions).filter((item) => item && item.status).length;
+    const hasFunctions = functionsCount >= 7;
+
+    const items = [hasMaterials, hasFunctions];
 
     return {
       completed: items.filter(Boolean).length,
-      total: 5,
+      total: 2,
       isAllRequiredComplete: items.every(Boolean),
     };
-  }, [watch('vehicleInterior')]);
+  }, [watch('interior')]);
+
+  const calculateTireAndWheelCompletion = useCallback((): SectionCompletion => {
+    const tireAndWheel = watch('tireAndWheel');
+
+    // 타이어 검사: 상태 2개 + 사진 2개 필수
+    const tire = tireAndWheel?.tire || {};
+    const tireStatusCount = Object.values(tire).filter((item) => item && item.status).length;
+    const tirePhotoCount = Object.values(tire).filter((item) => item && item.basePhoto).length;
+    const hasTire = tireStatusCount >= 2 && tirePhotoCount >= 2;
+
+    // 휠 검사: 상태 2개 + 사진 2개 필수
+    const wheel = tireAndWheel?.wheel || {};
+    const wheelStatusCount = Object.values(wheel).filter((item) => item && item.status).length;
+    const wheelPhotoCount = Object.values(wheel).filter((item) => item && item.basePhoto).length;
+    const hasWheel = wheelStatusCount >= 2 && wheelPhotoCount >= 2;
+
+    const items = [hasTire, hasWheel];
+
+    return {
+      completed: items.filter(Boolean).length,
+      total: 2,
+      isAllRequiredComplete: items.every(Boolean),
+    };
+  }, [watch('tireAndWheel')]);
+
+  const calculateUndercarriageCompletion = useCallback((): SectionCompletion => {
+    const undercarriage = watch('undercarriage');
+
+    // 배터리 팩 검사: 상태 2개 + 사진 2개 필수
+    const batteryPack = undercarriage?.batteryPack || {};
+    const batteryStatusCount = Object.values(batteryPack).filter((item) => item && item.status).length;
+    const batteryPhotoCount = Object.values(batteryPack).filter((item) => item && item.basePhoto).length;
+    const hasBatteryPack = batteryStatusCount >= 2 && batteryPhotoCount >= 2;
+
+    // 서스펜션 검사: 4개 중 2개 이상
+    const suspension = undercarriage?.suspension || {};
+    const hasSuspension = Object.values(suspension).filter((item) => item && item.status).length >= 2;
+
+    // 브레이크 검사: 5개 중 3개 이상
+    const brake = undercarriage?.brake || {};
+    const hasBrake = Object.values(brake).filter((item) => item && item.status).length >= 3;
+
+    const items = [hasBatteryPack, hasSuspension, hasBrake];
+
+    return {
+      completed: items.filter(Boolean).length,
+      total: 3,
+      isAllRequiredComplete: items.every(Boolean),
+    };
+  }, [watch('undercarriage')]);
 
   const calculateOtherCompletion = useCallback((): SectionCompletion => {
     const other = watch('other');
@@ -746,18 +806,19 @@ const VehicleInspectionScreen: React.FC = () => {
     return (
       calculateVehicleInfoCompletion().isAllRequiredComplete &&
       calculateBatteryInfoCompletion().isAllRequiredComplete &&
-      calculateMajorDevicesCompletion().isAllRequiredComplete &&
-      calculateVehicleExteriorCompletion().isAllRequiredComplete &&
-      calculateVehicleUndercarriageCompletion().isAllRequiredComplete &&
-      calculateVehicleInteriorCompletion().isAllRequiredComplete
+      calculateExteriorCompletion().isAllRequiredComplete &&
+      calculateInteriorCompletion().isAllRequiredComplete &&
+      calculateTireAndWheelCompletion().isAllRequiredComplete &&
+      calculateUndercarriageCompletion().isAllRequiredComplete
     );
   }, [
-    // 🔥 함수 대신 실제 watch 값들을 dependency로 사용
+    // 🔥 함수 대신 실제 watch 값들을 dependency로 사용 (v2 구조)
     watch('vehicleInfo'),
     watch('batteryInfo'),
-    watch('vehicleExterior'),
-    watch('vehicleUndercarriage'),
-    watch('vehicleInterior'),
+    watch('exterior'),
+    watch('interior'),
+    watch('tireAndWheel'),
+    watch('undercarriage'),
   ]);
 
   const handleSubmit = async () => {
@@ -766,22 +827,22 @@ const VehicleInspectionScreen: React.FC = () => {
       return;
     }
 
-    // 🔥 최신 completion 값들을 직접 계산
+    // 🔥 최신 completion 값들을 직접 계산 (v2 구조)
     const vehicleInfoCompletion = calculateVehicleInfoCompletion();
     const batteryInfoCompletion = calculateBatteryInfoCompletion();
-    const majorDevicesCompletion = calculateMajorDevicesCompletion();
-    const vehicleExteriorCompletion = calculateVehicleExteriorCompletion();
-    const vehicleUndercarriageCompletion = calculateVehicleUndercarriageCompletion();
-    const vehicleInteriorCompletion = calculateVehicleInteriorCompletion();
+    const exteriorCompletion = calculateExteriorCompletion();
+    const interiorCompletion = calculateInteriorCompletion();
+    const tireAndWheelCompletion = calculateTireAndWheelCompletion();
+    const undercarriageCompletion = calculateUndercarriageCompletion();
 
     // 디버깅 정보
-    console.log('📊 섹션별 완료 상태:', {
+    console.log('📊 섹션별 완료 상태 (v2):', {
       vehicleInfo: vehicleInfoCompletion,
       batteryInfo: batteryInfoCompletion,
-      majorDevices: majorDevicesCompletion,
-      vehicleExterior: vehicleExteriorCompletion,
-      vehicleUndercarriage: vehicleUndercarriageCompletion,
-      vehicleInterior: vehicleInteriorCompletion,
+      exterior: exteriorCompletion,
+      interior: interiorCompletion,
+      tireAndWheel: tireAndWheelCompletion,
+      undercarriage: undercarriageCompletion,
     });
 
     // 미완성 섹션 리스트 생성
@@ -793,17 +854,32 @@ const VehicleInspectionScreen: React.FC = () => {
     if (!batteryInfoCompletion.isAllRequiredComplete) {
       incompleteSections.push({ name: '배터리 정보', key: 'batteryInfo', completion: batteryInfoCompletion });
     }
-    if (!majorDevicesCompletion.isAllRequiredComplete) {
-      incompleteSections.push({ name: '주요 장치', key: 'majorDevices', completion: majorDevicesCompletion });
+    if (!exteriorCompletion.isAllRequiredComplete) {
+      incompleteSections.push({ name: '외부 검사', key: 'exterior', completion: exteriorCompletion });
     }
-    if (!vehicleExteriorCompletion.isAllRequiredComplete) {
-      incompleteSections.push({ name: '차량 외부 점검', key: 'vehicleExterior', completion: vehicleExteriorCompletion });
+    if (!interiorCompletion.isAllRequiredComplete) {
+      incompleteSections.push({ name: '내부 검사', key: 'interior', completion: interiorCompletion });
     }
-    if (!vehicleUndercarriageCompletion.isAllRequiredComplete) {
-      incompleteSections.push({ name: '차량 하부 점검', key: 'vehicleUndercarriage', completion: vehicleUndercarriageCompletion });
+    if (!tireAndWheelCompletion.isAllRequiredComplete) {
+      incompleteSections.push({ name: '타이어 & 휠', key: 'tireAndWheel', completion: tireAndWheelCompletion });
     }
-    if (!vehicleInteriorCompletion.isAllRequiredComplete) {
-      incompleteSections.push({ name: '차량 내부 점검', key: 'vehicleInterior', completion: vehicleInteriorCompletion });
+    if (!undercarriageCompletion.isAllRequiredComplete) {
+      incompleteSections.push({ name: '하체 검사', key: 'undercarriage', completion: undercarriageCompletion });
+    }
+
+    // 진단사 수행 확인 필수 체크
+    const diagnosticianData = methods.getValues('diagnosticianConfirmation');
+    const isDiagnosticianComplete = diagnosticianData?.confirmed &&
+      diagnosticianData?.diagnosticianName &&
+      diagnosticianData?.signatureDataUrl;
+
+    if (!isDiagnosticianComplete) {
+      Alert.alert(
+        '진단사 확인 필요',
+        '진단사 서명 및 확인을 완료해주세요.',
+        [{ text: '확인' }]
+      );
+      return;
     }
 
     if (incompleteSections.length > 0) {
@@ -1212,72 +1288,72 @@ const VehicleInspectionScreen: React.FC = () => {
             {expandedSections.batteryInfo && <BatteryInfoSection />}
           </Animated.View>
 
-          {/* Section 3: Major Devices */}
-          {renderSectionHeader('주요 장치', 'majorDevices', calculateMajorDevicesCompletion(), true)}
+          {/* Section 3: Exterior (외부 검사) - v2 */}
+          {renderSectionHeader('외부 검사', 'exterior', calculateExteriorCompletion(), true)}
           <Animated.View
             style={[
               styles.sectionContent,
               {
-                maxHeight: accordionAnimations.majorDevices.interpolate({
+                maxHeight: accordionAnimations.exterior.interpolate({
                   inputRange: [0, 1],
                   outputRange: [0, 2000],
                 }),
-                opacity: accordionAnimations.majorDevices,
+                opacity: accordionAnimations.exterior,
               },
             ]}
           >
-            {expandedSections.majorDevices && <MajorDevicesSection />}
+            {expandedSections.exterior && <ExteriorSection />}
           </Animated.View>
 
-          {/* Section 4: Vehicle Exterior */}
-          {renderSectionHeader('차량 외부 점검', 'vehicleExterior', calculateVehicleExteriorCompletion(), true)}
+          {/* Section 4: Interior (내부 검사) - v2 */}
+          {renderSectionHeader('내부 검사', 'interior', calculateInteriorCompletion(), true)}
           <Animated.View
             style={[
               styles.sectionContent,
               {
-                maxHeight: accordionAnimations.vehicleExterior.interpolate({
+                maxHeight: accordionAnimations.interior.interpolate({
                   inputRange: [0, 1],
                   outputRange: [0, 2000],
                 }),
-                opacity: accordionAnimations.vehicleExterior,
+                opacity: accordionAnimations.interior,
               },
             ]}
           >
-            {expandedSections.vehicleExterior && <VehicleExteriorSection />}
+            {expandedSections.interior && <InteriorSection />}
           </Animated.View>
 
-          {/* Section 5: Vehicle Undercarriage */}
-          {renderSectionHeader('차량 하부 점검', 'vehicleUndercarriage', calculateVehicleUndercarriageCompletion(), true)}
+          {/* Section 5: Tire & Wheel (타이어 & 휠) - v2 */}
+          {renderSectionHeader('타이어 & 휠', 'tireAndWheel', calculateTireAndWheelCompletion(), true)}
           <Animated.View
             style={[
               styles.sectionContent,
               {
-                maxHeight: accordionAnimations.vehicleUndercarriage.interpolate({
+                maxHeight: accordionAnimations.tireAndWheel.interpolate({
                   inputRange: [0, 1],
                   outputRange: [0, 2000],
                 }),
-                opacity: accordionAnimations.vehicleUndercarriage,
+                opacity: accordionAnimations.tireAndWheel,
               },
             ]}
           >
-            {expandedSections.vehicleUndercarriage && <VehicleUndercarriageSection />}
+            {expandedSections.tireAndWheel && <TireAndWheelSection />}
           </Animated.View>
 
-          {/* Section 6: Vehicle Interior ⭐ NEW */}
-          {renderSectionHeader('차량 실내 점검', 'vehicleInterior', calculateVehicleInteriorCompletion(), true)}
+          {/* Section 6: Undercarriage (하체 검사) - v2 */}
+          {renderSectionHeader('하체 검사', 'undercarriage', calculateUndercarriageCompletion(), true)}
           <Animated.View
             style={[
               styles.sectionContent,
               {
-                maxHeight: accordionAnimations.vehicleInterior.interpolate({
+                maxHeight: accordionAnimations.undercarriage.interpolate({
                   inputRange: [0, 1],
                   outputRange: [0, 2000],
                 }),
-                opacity: accordionAnimations.vehicleInterior,
+                opacity: accordionAnimations.undercarriage,
               },
             ]}
           >
-            {expandedSections.vehicleInterior && <VehicleInteriorSection />}
+            {expandedSections.undercarriage && <UndercarriageSection />}
           </Animated.View>
 
           {/* Section 7: Other */}
@@ -1329,20 +1405,33 @@ const VehicleInspectionScreen: React.FC = () => {
         </ScrollView>
 
         {/* Submit Button */}
-        <View style={[styles.submitContainer, { paddingBottom: insets.bottom }]}>
-          <TouchableOpacity
-            style={styles.submitButton}
-            onPress={handleSubmit}
-            disabled={isSubmitting}
-            activeOpacity={0.7}
-          >
-            {isSubmitting ? (
-              <ActivityIndicator color="#fff" />
-            ) : (
-              <Text style={styles.submitButtonText}>리포트 제출</Text>
-            )}
-          </TouchableOpacity>
-        </View>
+        {(() => {
+          const diagData = watch('diagnosticianConfirmation');
+          const isDiagnosticianComplete = diagData?.confirmed &&
+            diagData?.diagnosticianName &&
+            diagData?.signatureDataUrl;
+          const isButtonDisabled = isSubmitting || !isDiagnosticianComplete;
+
+          return (
+            <View style={[styles.submitContainer, { paddingBottom: insets.bottom }]}>
+              <TouchableOpacity
+                style={[
+                  styles.submitButton,
+                  isButtonDisabled && styles.submitButtonDisabled,
+                ]}
+                onPress={handleSubmit}
+                disabled={isButtonDisabled}
+                activeOpacity={0.7}
+              >
+                {isSubmitting ? (
+                  <ActivityIndicator color="#fff" />
+                ) : (
+                  <Text style={styles.submitButtonText}>리포트 제출</Text>
+                )}
+              </TouchableOpacity>
+            </View>
+          );
+        })()}
 
         {/* 진단사 수행 확인 모달 */}
         <DiagnosticianConfirmationModal
