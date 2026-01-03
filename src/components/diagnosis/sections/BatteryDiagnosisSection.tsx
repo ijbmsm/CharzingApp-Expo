@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
+import { Ionicons } from '@expo/vector-icons';
 import { VehicleDiagnosisReport } from '../../../services/firebaseService';
 import { convertToLineSeedFont } from '../../../styles/fonts';
 import BatteryCellViewModal from '../../BatteryCellViewModal';
@@ -18,6 +19,34 @@ const getHealthColor = (soh: number): string => {
 export const BatteryDiagnosisSection: React.FC<BatteryDiagnosisSectionProps> = ({ report }) => {
   const [cellMapVisible, setCellMapVisible] = useState(false);
 
+  // 배터리 데이터가 아직 입력되지 않은 경우 (앱에서 체크만 하고 admin에서 입력 예정)
+  const hasBatteryData = report.sohPercentage != null && report.cellCount != null;
+
+  if (!hasBatteryData) {
+    return (
+      <View style={styles.section}>
+        <View style={styles.pendingContainer}>
+          <Ionicons name="hourglass-outline" size={32} color="#9CA3AF" />
+          <Text style={[styles.pendingText, convertToLineSeedFont(styles.pendingText)]}>
+            배터리 상세 정보가 아직 입력되지 않았습니다
+          </Text>
+          <Text style={[styles.pendingSubText, convertToLineSeedFont(styles.pendingSubText)]}>
+            관리자가 OBD 데이터를 입력하면 표시됩니다
+          </Text>
+        </View>
+        <View style={styles.divider} />
+      </View>
+    );
+  }
+
+  const soh = report.sohPercentage ?? 0;
+  const cellCount = report.cellCount ?? 0;
+  const defectiveCellCount = report.defectiveCellCount ?? 0;
+  const normalChargeCount = report.normalChargeCount ?? 0;
+  const fastChargeCount = report.fastChargeCount ?? 0;
+  const maxVoltage = report.maxVoltage ?? null;
+  const minVoltage = report.minVoltage ?? null;
+
   return (
     <View style={styles.section}>
       {/* SOH - 강조 표시 */}
@@ -34,11 +63,11 @@ export const BatteryDiagnosisSection: React.FC<BatteryDiagnosisSectionProps> = (
           <Text
             style={[
               styles.sohValue,
-              { color: getHealthColor(report.sohPercentage) },
+              { color: getHealthColor(soh) },
               convertToLineSeedFont(styles.sohValue),
             ]}
           >
-            {report.sohPercentage}
+            {soh}
           </Text>
           <Text style={[styles.sohUnit, convertToLineSeedFont(styles.sohUnit)]}>%</Text>
         </View>
@@ -49,7 +78,7 @@ export const BatteryDiagnosisSection: React.FC<BatteryDiagnosisSectionProps> = (
         <View style={styles.infoRow}>
           <Text style={[styles.label, convertToLineSeedFont(styles.label)]}>총 셀 개수</Text>
           <Text style={[styles.value, convertToLineSeedFont(styles.value)]}>
-            {report.cellCount}개
+            {cellCount}개
           </Text>
         </View>
 
@@ -58,28 +87,28 @@ export const BatteryDiagnosisSection: React.FC<BatteryDiagnosisSectionProps> = (
           <Text
             style={[
               styles.value,
-              report.defectiveCellCount > 0 && styles.valueDanger,
+              defectiveCellCount > 0 && styles.valueDanger,
               convertToLineSeedFont(styles.value),
             ]}
           >
-            {report.defectiveCellCount}개
+            {defectiveCellCount}개
           </Text>
         </View>
 
-        {report.maxVoltage !== undefined && (
+        {maxVoltage != null && (
           <View style={styles.infoRow}>
             <Text style={[styles.label, convertToLineSeedFont(styles.label)]}>최대 전압</Text>
             <Text style={[styles.value, convertToLineSeedFont(styles.value)]}>
-              {report.maxVoltage.toFixed(2)}V
+              {maxVoltage.toFixed(2)}V
             </Text>
           </View>
         )}
 
-        {report.minVoltage !== undefined && (
+        {minVoltage != null && (
           <View style={styles.infoRow}>
             <Text style={[styles.label, convertToLineSeedFont(styles.label)]}>최소 전압</Text>
             <Text style={[styles.value, convertToLineSeedFont(styles.value)]}>
-              {report.minVoltage.toFixed(2)}V
+              {minVoltage.toFixed(2)}V
             </Text>
           </View>
         )}
@@ -87,14 +116,14 @@ export const BatteryDiagnosisSection: React.FC<BatteryDiagnosisSectionProps> = (
         <View style={styles.infoRow}>
           <Text style={[styles.label, convertToLineSeedFont(styles.label)]}>일반 충전</Text>
           <Text style={[styles.value, convertToLineSeedFont(styles.value)]}>
-            {report.normalChargeCount}회
+            {normalChargeCount}회
           </Text>
         </View>
 
         <View style={styles.infoRow}>
           <Text style={[styles.label, convertToLineSeedFont(styles.label)]}>급속 충전</Text>
           <Text style={[styles.value, convertToLineSeedFont(styles.value)]}>
-            {report.fastChargeCount}회
+            {fastChargeCount}회
           </Text>
         </View>
 
@@ -131,9 +160,9 @@ export const BatteryDiagnosisSection: React.FC<BatteryDiagnosisSectionProps> = (
         visible={cellMapVisible}
         onClose={() => setCellMapVisible(false)}
         cells={report.cellsData || []}
-        defectiveCellCount={report.defectiveCellCount}
-        maxCellVoltage={report.maxVoltage || 0}
-        minCellVoltage={report.minVoltage || 0}
+        defectiveCellCount={defectiveCellCount}
+        maxCellVoltage={maxVoltage ?? 0}
+        minCellVoltage={minVoltage ?? 0}
       />
     </View>
   );
@@ -142,6 +171,27 @@ export const BatteryDiagnosisSection: React.FC<BatteryDiagnosisSectionProps> = (
 const styles = StyleSheet.create({
   section: {
     marginBottom: 32,
+  },
+  pendingContainer: {
+    alignItems: 'center',
+    paddingVertical: 32,
+    paddingHorizontal: 16,
+    backgroundColor: '#F9FAFB',
+    borderRadius: 12,
+    marginBottom: 16,
+  },
+  pendingText: {
+    fontSize: 15,
+    fontWeight: '600',
+    color: '#6B7280',
+    marginTop: 12,
+    textAlign: 'center',
+  },
+  pendingSubText: {
+    fontSize: 13,
+    color: '#9CA3AF',
+    marginTop: 4,
+    textAlign: 'center',
   },
   viewDetailButton: {
     marginTop: 16,

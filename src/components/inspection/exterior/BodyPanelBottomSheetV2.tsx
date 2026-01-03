@@ -301,9 +301,6 @@ const BodyPanelBottomSheetV2: React.FC<BodyPanelBottomSheetV2Props> = ({
                       onChangeText={(text) => handleDescriptionChange(key, text)}
                       multiline
                       textAlignVertical="top"
-                      returnKeyType="done"
-                      blurOnSubmit={true}
-                      onSubmitEditing={Keyboard.dismiss}
                     />
                   </>
                 )}

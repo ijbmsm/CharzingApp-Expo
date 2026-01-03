@@ -19,8 +19,7 @@ export interface PaintInspectionItem extends BaseInspectionItem {
 }
 
 export interface TireInspectionItem extends BaseInspectionItem {
-  basePhoto?: string;
-  treadDepth?: number;  // mm
+  treadDepth?: number;  // mm (기본 사진 없음, 문제 시에만 issueImageUris 사용)
 }
 
 export interface WheelInspectionItem extends BaseInspectionItem {
@@ -28,7 +27,8 @@ export interface WheelInspectionItem extends BaseInspectionItem {
 }
 
 export interface BatteryPackInspectionItem extends BaseInspectionItem {
-  basePhoto?: string;
+  basePhoto?: string;  // 하위 호환성 유지 (단일)
+  basePhotos?: string[];  // v2: 10개까지
 }
 
 export interface OtherInspectionItemV2 {
@@ -131,14 +131,18 @@ export interface TireAndWheelInspection {
 // ============================================
 
 export type BatteryPackDirectionKey = 'front' | 'left' | 'rear' | 'right';
-export type SuspensionKey = 'spring' | 'stabilizer' | 'lowerArm' | 'shockAbsorber';
+export type SuspensionKey = 'spring' | 'stabilizer' | 'lowerArm' | 'shockAbsorber'; // 레거시 호환용
 export type BrakeKey = 'brakeOil' | 'padF' | 'padR' | 'discF' | 'discR';
+
+// 서스펜션 위치별 검사 항목 (v2)
+export interface SuspensionPositionItem extends BaseInspectionItem {
+  basePhotos?: string[];  // 각 위치별 기본 사진 (최대 10개)
+}
 
 export interface UndercarriageInspection {
   batteryPack?: { [K in BatteryPackDirectionKey]?: BatteryPackInspectionItem };
-  suspensionBasePhotos?: { [K in PositionKey]?: string };
-  suspension?: { [K in SuspensionKey]?: BaseInspectionItem };
-  brakeBasePhotos?: { discF?: string; discR?: string };
+  suspension?: { [K in PositionKey]?: SuspensionPositionItem };  // 위치별(FL,FR,RL,RR) 기본사진+상태
+  brakeBasePhotos?: { discF?: string[]; discR?: string[] };  // 디스크별 10개까지
   brake?: { [K in BrakeKey]?: BaseInspectionItem };
 }
 

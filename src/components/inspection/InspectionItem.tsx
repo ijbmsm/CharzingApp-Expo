@@ -78,9 +78,6 @@ export const InspectionItem: React.FC<InspectionItemProps> = ({
             onChangeText={onIssueDescriptionChange}
             multiline
             textAlignVertical="top"
-            returnKeyType="done"
-            blurOnSubmit={true}
-            onSubmitEditing={Keyboard.dismiss}
           />
         </>
       )}

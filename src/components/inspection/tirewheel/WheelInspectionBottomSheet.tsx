@@ -12,11 +12,10 @@ import {
   Modal,
   TouchableOpacity,
   Platform,
-  ScrollView,
   TextInput,
   Keyboard,
-  KeyboardAvoidingView,
 } from 'react-native';
+import { KeyboardAwareScrollView } from 'react-native-keyboard-aware-scroll-view';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import MultipleImagePicker from '../../MultipleImagePicker';
@@ -56,7 +55,8 @@ const WheelInspectionBottomSheet: React.FC<WheelInspectionBottomSheetProps> = ({
       });
       setWheelData(dataMap);
     }
-  }, [visible, initialData]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [visible]);
 
   const handleBasePhotoAdded = (key: PositionKey, uris: string[]) => {
     setWheelData((prev) => ({
@@ -105,26 +105,6 @@ const WheelInspectionBottomSheet: React.FC<WheelInspectionBottomSheetProps> = ({
     }));
   };
 
-  const handleImagesAdded = (key: PositionKey, newUris: string[]) => {
-    setWheelData((prev) => ({
-      ...prev,
-      [key]: {
-        ...prev[key],
-        issueImageUris: [...(prev[key]?.issueImageUris || []), ...newUris],
-      },
-    }));
-  };
-
-  const handleImageRemoved = (key: PositionKey, index: number) => {
-    setWheelData((prev) => ({
-      ...prev,
-      [key]: {
-        ...prev[key],
-        issueImageUris: (prev[key]?.issueImageUris || []).filter((_, i) => i !== index),
-      },
-    }));
-  };
-
   const handleSave = () => {
     const result: Record<PositionKey, WheelInspectionItem> = {} as Record<PositionKey, WheelInspectionItem>;
     POSITION_KEYS.forEach((key) => {
@@ -133,8 +113,7 @@ const WheelInspectionBottomSheet: React.FC<WheelInspectionBottomSheetProps> = ({
         result[key] = {
           status: item.status,
           basePhoto: item.basePhotoArr?.[0] || item.basePhoto,
-          issueDescription: item.issueDescription,
-          issueImageUris: item.issueImageUris,
+          issueDescription: item.status === 'problem' ? item.issueDescription : undefined,
         };
       }
     });
@@ -166,33 +145,31 @@ const WheelInspectionBottomSheet: React.FC<WheelInspectionBottomSheetProps> = ({
           },
         ]}
       >
-        <KeyboardAvoidingView
-          behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-          style={styles.keyboardView}
+        {/* Header */}
+        <View style={styles.header}>
+          <TouchableOpacity onPress={onClose} style={styles.closeButton}>
+            <Ionicons name="close" size={24} color="#1F2937" />
+          </TouchableOpacity>
+          <Text style={styles.headerTitle}>휠 검사</Text>
+          <View style={styles.placeholder} />
+        </View>
+
+        {/* Progress Bar */}
+        <View style={styles.progressBar}>
+          <Text style={styles.progressText}>
+            상태 {completedCount} / {POSITION_KEYS.length} | 사진 {basePhotoCount} / {POSITION_KEYS.length}
+          </Text>
+        </View>
+
+        {/* Content */}
+        <KeyboardAwareScrollView
+          style={styles.content}
+          contentContainerStyle={{ paddingBottom: 100 + insets.bottom }}
+          showsVerticalScrollIndicator={false}
+          keyboardShouldPersistTaps="handled"
+          extraScrollHeight={120}
+          enableOnAndroid={true}
         >
-          {/* Header */}
-          <View style={styles.header}>
-            <TouchableOpacity onPress={onClose} style={styles.closeButton}>
-              <Ionicons name="close" size={24} color="#1F2937" />
-            </TouchableOpacity>
-            <Text style={styles.headerTitle}>휠 검사</Text>
-            <View style={styles.placeholder} />
-          </View>
-
-          {/* Progress Bar */}
-          <View style={styles.progressBar}>
-            <Text style={styles.progressText}>
-              상태 {completedCount} / {POSITION_KEYS.length} | 사진 {basePhotoCount} / {POSITION_KEYS.length}
-            </Text>
-          </View>
-
-          {/* Content */}
-          <ScrollView
-            style={styles.content}
-            contentContainerStyle={{ paddingBottom: 100 + insets.bottom }}
-            showsVerticalScrollIndicator={false}
-            keyboardShouldPersistTaps="handled"
-          >
             {POSITION_KEYS.map((key) => {
               const item = wheelData[key] || {};
               const label = POSITION_LABELS[key];
@@ -226,54 +203,37 @@ const WheelInspectionBottomSheet: React.FC<WheelInspectionBottomSheetProps> = ({
 
                   {/* 문제일 때 추가 입력 */}
                   {item.status === 'problem' && (
-                    <>
-                      <View style={styles.inputGroup}>
-                        <Text style={styles.inputLabel}>문제 사진</Text>
-                        <MultipleImagePicker
-                          imageUris={item.issueImageUris || []}
-                          onImagesAdded={(uris) => handleImagesAdded(key, uris)}
-                          onImageRemoved={(index) => handleImageRemoved(key, index)}
-                          onImageEdited={() => {}}
-                          label="문제 부위 사진"
-                        />
-                      </View>
-
-                      <View style={styles.inputGroup}>
-                        <Text style={styles.inputLabel}>문제 설명</Text>
-                        <TextInput
-                          style={[styles.textInput, styles.notesInput]}
-                          placeholder="문제 내용을 입력하세요"
-                          placeholderTextColor="#9CA3AF"
-                          value={item.issueDescription || ''}
-                          onChangeText={(text) => handleDescriptionChange(key, text)}
-                          multiline
-                          textAlignVertical="top"
-                          returnKeyType="done"
-                          blurOnSubmit={true}
-                          onSubmitEditing={Keyboard.dismiss}
-                        />
-                      </View>
-                    </>
+                    <View style={styles.inputGroup}>
+                      <Text style={styles.inputLabel}>문제 설명</Text>
+                      <TextInput
+                        style={[styles.textInput, styles.notesInput]}
+                        placeholder="문제 내용을 입력하세요"
+                        placeholderTextColor="#9CA3AF"
+                        value={item.issueDescription || ''}
+                        onChangeText={(text) => handleDescriptionChange(key, text)}
+                        multiline
+                        textAlignVertical="top"
+                      />
+                    </View>
                   )}
                 </View>
               );
             })}
-          </ScrollView>
+        </KeyboardAwareScrollView>
 
-          {/* Footer */}
-          <View style={[styles.footer, { paddingBottom: 8 + insets.bottom }]}>
-            <TouchableOpacity
-              style={[
-                styles.confirmButton,
-                !isComplete && styles.confirmButtonDisabled,
-              ]}
-              onPress={handleSave}
-              disabled={!isComplete}
-            >
-              <Text style={styles.confirmButtonText}>저장</Text>
-            </TouchableOpacity>
-          </View>
-        </KeyboardAvoidingView>
+        {/* Footer */}
+        <View style={[styles.footer, { paddingBottom: 8 + insets.bottom }]}>
+          <TouchableOpacity
+            style={[
+              styles.confirmButton,
+              !isComplete && styles.confirmButtonDisabled,
+            ]}
+            onPress={handleSave}
+            disabled={!isComplete}
+          >
+            <Text style={styles.confirmButtonText}>저장</Text>
+          </TouchableOpacity>
+        </View>
       </View>
     </Modal>
   );

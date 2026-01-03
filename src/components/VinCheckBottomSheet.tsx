@@ -17,7 +17,7 @@ import { Ionicons } from '@expo/vector-icons';
 import MultipleImagePicker from './MultipleImagePicker';
 
 export interface VinCheckData {
-  registrationImageUris: string[];  // 자동차 등록증 사진 (선택)
+  registrationImageUris: string[];  // 자동차 등록증 사진 (필수)
   vinImageUris: string[];           // 차대번호 사진 (필수)
   isVinVerified: boolean;           // 자동차 등록증 확인 체크
   hasNoIllegalModification: boolean;
@@ -107,7 +107,7 @@ const VinCheckBottomSheet: React.FC<VinCheckBottomSheetProps> = ({
   }, [floodStatus]);
 
   const handleSave = () => {
-    if (vinImageUris.length > 0 && vinStatus && modificationStatus && floodStatus) {
+    if (registrationImageUris.length > 0 && vinImageUris.length > 0 && vinStatus && modificationStatus && floodStatus) {
       onSave({
         registrationImageUris,
         vinImageUris,
@@ -122,8 +122,8 @@ const VinCheckBottomSheet: React.FC<VinCheckBottomSheetProps> = ({
     }
   };
 
-  // 필수: 차대번호 사진 + 3개 상태 모두 선택
-  const isComplete = vinImageUris.length > 0 && vinStatus && modificationStatus && floodStatus;
+  // 필수: 등록증 사진 + 차대번호 사진 + 3개 상태 모두 선택
+  const isComplete = registrationImageUris.length > 0 && vinImageUris.length > 0 && vinStatus && modificationStatus && floodStatus;
 
   const renderStatusButtons = (
     label: string,
@@ -256,9 +256,9 @@ const VinCheckBottomSheet: React.FC<VinCheckBottomSheetProps> = ({
             showsVerticalScrollIndicator={false}
             keyboardShouldPersistTaps="handled"
           >
-            {/* 자동차 등록증 사진 (선택) */}
+            {/* 자동차 등록증 사진 (필수) */}
             <View style={styles.inputGroup}>
-              <Text style={styles.inputLabel}>자동차 등록증 사진 (선택)</Text>
+              <Text style={styles.inputLabel}>자동차 등록증 사진 *</Text>
               <MultipleImagePicker
                 imageUris={registrationImageUris}
                 onImagesAdded={(uris) => setRegistrationImageUris((prev) => [...prev, ...uris])}

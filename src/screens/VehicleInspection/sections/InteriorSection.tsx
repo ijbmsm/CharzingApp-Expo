@@ -14,7 +14,11 @@ import InputButton from '../../../components/InputButton';
 import MaterialsBottomSheet from '../../../components/inspection/interior/MaterialsBottomSheet';
 import FunctionsBottomSheet from '../../../components/inspection/interior/FunctionsBottomSheet';
 
-export const InteriorSection: React.FC = () => {
+interface InteriorSectionProps {
+  showValidationErrors?: boolean;
+}
+
+export const InteriorSection: React.FC<InteriorSectionProps> = ({ showValidationErrors = false }) => {
   const { watch, setValue } = useFormContext<InspectionFormData>();
 
   // BottomSheet 상태
@@ -61,6 +65,7 @@ export const InteriorSection: React.FC = () => {
             : '6개 사진 촬영'
         }
         onPress={() => setIsMaterialsVisible(true)}
+        showError={showValidationErrors}
       />
 
       {/* 기능 (7개) - 전부 필수 */}
@@ -69,6 +74,7 @@ export const InteriorSection: React.FC = () => {
         isCompleted={functionsCompleted >= 7}
         value={functionsCompleted > 0 ? `${functionsCompleted}/7 완료` : '7개 항목 검사'}
         onPress={() => setIsFunctionsVisible(true)}
+        showError={showValidationErrors}
       />
 
       {/* BottomSheet 컴포넌트들 */}
@@ -99,7 +105,7 @@ const styles = StyleSheet.create({
     backgroundColor: '#F3F4F6',
     padding: moderateScale(12),
     borderRadius: moderateScale(8),
-    marginBottom: verticalScale(16),
+    marginBottom: 12,
   },
   descriptionText: {
     fontSize: moderateScale(12),

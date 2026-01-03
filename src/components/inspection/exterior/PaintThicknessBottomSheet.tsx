@@ -5,12 +5,12 @@ import {
   StyleSheet,
   Modal,
   TouchableOpacity,
-  KeyboardAvoidingView,
   Platform,
-  ScrollView,
   TextInput,
   Keyboard,
+  ScrollView,
 } from 'react-native';
+import { KeyboardAwareScrollView } from 'react-native-keyboard-aware-scroll-view';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { scale, verticalScale, moderateScale } from 'react-native-size-matters';
@@ -316,26 +316,24 @@ const PaintThicknessBottomSheet: React.FC<PaintThicknessBottomSheetProps> = ({
           },
         ]}
       >
-        <KeyboardAvoidingView
-          behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-          style={styles.keyboardView}
-        >
-          <View style={styles.header}>
-            <TouchableOpacity onPress={onClose} activeOpacity={0.7}>
-              <Ionicons name="close" size={28} color="#1F2937" />
-            </TouchableOpacity>
-            <Text style={styles.headerTitle}>외판 수리/교체 확인 및 도막 측정</Text>
-            <TouchableOpacity onPress={handleConfirm} activeOpacity={0.7}>
-              <Text style={styles.saveButton}>저장</Text>
-            </TouchableOpacity>
-          </View>
+        <View style={styles.header}>
+          <TouchableOpacity onPress={onClose} activeOpacity={0.7}>
+            <Ionicons name="close" size={28} color="#1F2937" />
+          </TouchableOpacity>
+          <Text style={styles.headerTitle}>외판 수리/교체 확인 및 도막 측정</Text>
+          <TouchableOpacity onPress={handleConfirm} activeOpacity={0.7}>
+            <Text style={styles.saveButton}>저장</Text>
+          </TouchableOpacity>
+        </View>
 
-          <ScrollView
-            style={styles.content}
-            contentContainerStyle={{ paddingBottom: 100 + insets.bottom }}
-            showsVerticalScrollIndicator={false}
-            keyboardShouldPersistTaps="handled"
-          >
+        <KeyboardAwareScrollView
+          style={styles.content}
+          contentContainerStyle={{ paddingBottom: 100 + insets.bottom }}
+          showsVerticalScrollIndicator={false}
+          keyboardShouldPersistTaps="handled"
+          extraScrollHeight={120}
+          enableOnAndroid={true}
+        >
             {PAINT_LOCATIONS.map((location) => {
               const data = paintData[location.key] || { thickness: '', status: undefined, imageUris: [], notes: '' };
 
@@ -405,17 +403,13 @@ const PaintThicknessBottomSheet: React.FC<PaintThicknessBottomSheetProps> = ({
                         onChangeText={(text) => handleNotesChange(location.key, text)}
                         multiline
                         textAlignVertical="top"
-                        returnKeyType="done"
-                        blurOnSubmit={true}
-                        onSubmitEditing={Keyboard.dismiss}
                       />
                     </>
                   )}
                 </View>
               );
             })}
-          </ScrollView>
-        </KeyboardAvoidingView>
+        </KeyboardAwareScrollView>
       </View>
 
       {/* 측정 위치 설명 모달 */}

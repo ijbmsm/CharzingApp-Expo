@@ -232,7 +232,7 @@ const FullScreenImageViewer: React.FC<FullScreenImageViewerProps> = ({
               disabled={isProcessing}
             >
               <Ionicons name="arrow-undo-outline" size={24} color="#FFFFFF" />
-              <Text style={styles.toolButtonText}>좌회전</Text>
+              <Text style={styles.toolButtonText}>왼쪽 회전</Text>
             </TouchableOpacity>
 
             {/* Rotate right */}
@@ -242,7 +242,7 @@ const FullScreenImageViewer: React.FC<FullScreenImageViewerProps> = ({
               disabled={isProcessing}
             >
               <Ionicons name="arrow-redo-outline" size={24} color="#FFFFFF" />
-              <Text style={styles.toolButtonText}>우회전</Text>
+              <Text style={styles.toolButtonText}>오른쪽 회전</Text>
             </TouchableOpacity>
 
             {/* Flip horizontal */}

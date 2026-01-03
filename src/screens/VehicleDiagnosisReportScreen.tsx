@@ -106,15 +106,16 @@ const VehicleDiagnosisReportScreen: React.FC<Props> = ({
 
       setReport(reportData);
 
-      // SOH 게이지 애니메이션 시작
+      // SOH 게이지 애니메이션 시작 (null인 경우 0)
+      const sohValue = reportData.sohPercentage ?? 0;
       Animated.timing(animatedValue, {
-        toValue: reportData.sohPercentage,
+        toValue: sohValue,
         duration: 1500,
         useNativeDriver: false,
       }).start();
 
-      // Firebase에서 셀 데이터가 없을 때 기본 데이터 생성
-      if (!reportData.cellsData || reportData.cellsData.length === 0) {
+      // Firebase에서 셀 데이터가 없을 때 기본 데이터 생성 (cellCount가 있는 경우에만)
+      if ((!reportData.cellsData || reportData.cellsData.length === 0) && reportData.cellCount) {
         // 기본 셀 데이터 생성 (총 cellCount 개수만큼, 모두 정상 상태)
         const tempCells: BatteryCell[] = [];
         for (let i = 1; i <= reportData.cellCount; i++) {

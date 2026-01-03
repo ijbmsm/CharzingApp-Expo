@@ -203,9 +203,6 @@ const LampInspectionBottomSheet: React.FC<LampInspectionBottomSheetProps> = ({
                       onChangeText={(text) => handleDescriptionChange(key, text)}
                       multiline
                       textAlignVertical="top"
-                      returnKeyType="done"
-                      blurOnSubmit={true}
-                      onSubmitEditing={Keyboard.dismiss}
                     />
                   </>
                 )}

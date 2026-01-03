@@ -1,4 +1,4 @@
-import { BatteryCell, OtherInspectionItem } from '../../../services/firebaseService';
+import { OtherInspectionItem } from '../../../services/firebaseService';
 import {
   ExteriorInspection,
   InteriorInspection,
@@ -31,7 +31,7 @@ export interface InspectionFormData {
 
   // 2. 차대번호 및 상태 확인
   vinCheck: {
-    registrationImageUris: string[];  // 자동차 등록증 사진 (선택)
+    registrationImageUris: string[];  // 자동차 등록증 사진 (필수)
     vinImageUris: string[];           // 차대번호 사진 (필수)
     isVinVerified: boolean;           // 자동차 등록증 확인 체크
     hasNoIllegalModification: boolean;
@@ -41,12 +41,9 @@ export interface InspectionFormData {
     floodIssue: string;
   };
 
-  // 3. 배터리 정보
+  // 3. 배터리 정보 확인 (상세 데이터는 admin에서 입력)
   batteryInfo: {
-    batterySOH: string;
-    batteryCellCount: number;
-    batteryCells: BatteryCell[];
-    defaultCellVoltage: number;
+    checked: boolean;  // OBD로 배터리 정보 확인 완료 여부
   };
 
   // ========== 검사 v2 구조 ==========

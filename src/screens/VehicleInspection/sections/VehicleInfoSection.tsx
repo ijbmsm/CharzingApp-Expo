@@ -1,44 +1,26 @@
 import React, { useState } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, TextInput } from 'react-native';
 import { useFormContext, Controller } from 'react-hook-form';
-import { Ionicons } from '@expo/vector-icons';
 import { scale, verticalScale } from 'react-native-size-matters';
 import { InspectionFormData } from '../types';
-import VehicleModelBottomSheet from '../../../components/VehicleModelBottomSheet';
 import DashboardInfoBottomSheet from '../../../components/DashboardInfoBottomSheet';
 import VinCheckBottomSheet, { VinCheckData } from '../../../components/VinCheckBottomSheet';
 import InputButton from '../../../components/InputButton';
 
-export const VehicleInfoSection: React.FC = () => {
+interface VehicleInfoSectionProps {
+  showValidationErrors?: boolean;
+}
+
+export const VehicleInfoSection: React.FC<VehicleInfoSectionProps> = ({ showValidationErrors = false }) => {
   const { control, setValue, watch } = useFormContext<InspectionFormData>();
-  const [isVehicleModelModalVisible, setIsVehicleModelModalVisible] = useState(false);
   const [isDashboardInfoModalVisible, setIsDashboardInfoModalVisible] = useState(false);
   const [isVinCheckModalVisible, setIsVinCheckModalVisible] = useState(false);
 
-  const vehicleBrand = watch('vehicleInfo.vehicleBrand');
-  const vehicleName = watch('vehicleInfo.vehicleName');
-  const vehicleGrade = watch('vehicleInfo.vehicleGrade');
-  const vehicleYear = watch('vehicleInfo.vehicleYear');
   const mileage = watch('vehicleInfo.mileage');
   const dashboardImageUris = watch('vehicleInfo.dashboardImageUris');
   const dashboardStatus = watch('vehicleInfo.dashboardStatus');
   const carKeyCount = watch('vehicleInfo.carKeyCount');
   const vinCheck = watch('vinCheck');
-
-  const handleVehicleSelect = (data: {
-    brand: string;
-    name: string;
-    grade?: string;
-    year: string;
-    mileage: string;
-  }) => {
-    setValue('vehicleInfo.vehicleBrand', data.brand, { shouldValidate: true });
-    setValue('vehicleInfo.vehicleName', data.name, { shouldValidate: true });
-    setValue('vehicleInfo.vehicleGrade', data.grade || '', { shouldValidate: true });
-    setValue('vehicleInfo.vehicleYear', data.year, { shouldValidate: true });
-    setValue('vehicleInfo.mileage', data.mileage, { shouldValidate: true });
-    setIsVehicleModelModalVisible(false);
-  };
 
   const handleDashboardSave = (data: {
     imageUris: string[];
@@ -49,18 +31,6 @@ export const VehicleInfoSection: React.FC = () => {
     setValue('vehicleInfo.dashboardStatus', data.status, { shouldValidate: true });
     setValue('vehicleInfo.dashboardIssueDescription', data.issueDescription || '', { shouldValidate: true });
     setIsDashboardInfoModalVisible(false);
-  };
-
-  const getVehicleDisplayText = () => {
-    if (!vehicleBrand || !vehicleName) return '';
-    let text = `${vehicleBrand} ${vehicleName}`;
-    if (vehicleGrade) text += ` ${vehicleGrade}`;
-    if (vehicleYear) text += ` (${vehicleYear})`;
-    return text;
-  };
-
-  const isVehicleInfoCompleted = () => {
-    return !!(vehicleBrand && vehicleName && vehicleYear && mileage);
   };
 
   const isDashboardInfoCompleted = () => {
@@ -80,14 +50,15 @@ export const VehicleInfoSection: React.FC = () => {
   };
 
   const isVinCheckCompleted = () => {
-    // 차대번호 사진 필수 + 3개 상태 모두 선택
+    // 등록증 사진 + 차대번호 사진 필수 + 3개 상태 모두 선택
+    const hasRegistrationPhoto = vinCheck?.registrationImageUris && vinCheck.registrationImageUris.length > 0;
     const hasVinPhoto = vinCheck?.vinImageUris && vinCheck.vinImageUris.length > 0;
     const completedCount = [
       vinCheck?.isVinVerified !== undefined,
       vinCheck?.hasNoIllegalModification !== undefined,
       vinCheck?.hasNoFloodDamage !== undefined,
     ].filter(Boolean).length;
-    return hasVinPhoto && completedCount === 3;
+    return hasRegistrationPhoto && hasVinPhoto && completedCount === 3;
   };
 
   const getVinCheckDisplayText = () => {
@@ -107,68 +78,71 @@ export const VehicleInfoSection: React.FC = () => {
   return (
     <View style={styles.container}>
 
-      {/* 차량 모델 선택 */}
-      <InputButton
-        label="차량 모델"
-        isCompleted={isVehicleInfoCompleted()}
-        value={getVehicleDisplayText()}
-        onPress={() => setIsVehicleModelModalVisible(true)}
-      />
-
       {/* 차량 키 개수 */}
       <Controller
         control={control}
         name="vehicleInfo.carKeyCount"
         rules={{ required: true }}
-        render={({ field: { value, onChange } }) => (
-          <View style={[
-            styles.carKeyCountContainer,
-            value && parseInt(value) > 0 && styles.carKeyCountContainerCompleted
-          ]}>
-            <Text style={[
-              styles.carKeyCountLabel,
-              value && parseInt(value) > 0 && styles.carKeyCountLabelCompleted
-            ]}>
-              차키 수
-            </Text>
-            <View style={styles.carKeyCountInputRow}>
-              <Text style={styles.carKeyCountText}>총</Text>
-              <TouchableOpacity
-                style={styles.carKeyCountButton}
-                onPress={() => {
-                  const currentValue = parseInt(value || '0');
-                  if (currentValue > 0) {
-                    onChange((currentValue - 1).toString());
-                  }
-                }}
-              >
-                <Text style={styles.carKeyCountButtonText}>-</Text>
-              </TouchableOpacity>
-              <TextInput
-                style={styles.carKeyCountInput}
-                value={value}
-                onChangeText={(text) => {
-                  const numericValue = text.replace(/[^0-9]/g, '');
-                  onChange(numericValue);
-                }}
-                keyboardType="number-pad"
-                returnKeyType="done"
-                placeholder="0"
-                placeholderTextColor="#9CA3AF"
-              />
-              <TouchableOpacity
-                style={styles.carKeyCountButton}
-                onPress={() => {
-                  const currentValue = parseInt(value || '0');
-                  onChange((currentValue + 1).toString());
-                }}
-              >
-                <Text style={styles.carKeyCountButtonText}>+</Text>
-              </TouchableOpacity>
-              <Text style={styles.carKeyCountText}>개</Text>
+        render={({ field: { value, onChange } }) => {
+          const isCompleted = value && parseInt(value) > 0;
+          const hasError = showValidationErrors && !isCompleted;
+          return (
+            <View>
+              <View style={[
+                styles.carKeyCountContainer,
+                isCompleted && styles.carKeyCountContainerCompleted,
+                hasError && styles.carKeyCountContainerError,
+              ]}>
+                <Text style={[
+                  styles.carKeyCountLabel,
+                  isCompleted && styles.carKeyCountLabelCompleted,
+                  hasError && styles.carKeyCountLabelError,
+                ]}>
+                  차키 수
+                </Text>
+                <View style={styles.carKeyCountInputRow}>
+                  <Text style={styles.carKeyCountText}>총</Text>
+                  <TouchableOpacity
+                    style={styles.carKeyCountButton}
+                    onPress={() => {
+                      const currentValue = parseInt(value || '0');
+                      if (currentValue > 0) {
+                        onChange((currentValue - 1).toString());
+                      }
+                    }}
+                  >
+                    <Text style={styles.carKeyCountButtonText}>-</Text>
+                  </TouchableOpacity>
+                  <TextInput
+                    style={styles.carKeyCountInput}
+                    value={value}
+                    onChangeText={(text) => {
+                      const numericValue = text.replace(/[^0-9]/g, '');
+                      onChange(numericValue);
+                    }}
+                    keyboardType="number-pad"
+                    returnKeyType="done"
+                    placeholder="0"
+                    placeholderTextColor="#9CA3AF"
+                  />
+                  <TouchableOpacity
+                    style={styles.carKeyCountButton}
+                    onPress={() => {
+                      const currentValue = parseInt(value || '0');
+                      onChange((currentValue + 1).toString());
+                    }}
+                  >
+                    <Text style={styles.carKeyCountButtonText}>+</Text>
+                  </TouchableOpacity>
+                  <Text style={styles.carKeyCountText}>개</Text>
+                </View>
+              </View>
+              {hasError && (
+                <Text style={styles.errorText}>입력이 필요합니다</Text>
+              )}
             </View>
-          </View>
-        )}
+          );
+        }}
       />
 
       {/* 계기판 정보 */}
@@ -177,6 +151,7 @@ export const VehicleInfoSection: React.FC = () => {
         isCompleted={isDashboardInfoCompleted()}
         value={dashboardImageUris && dashboardImageUris.length > 0 ? `${dashboardImageUris.length}장` : undefined}
         onPress={() => setIsDashboardInfoModalVisible(true)}
+        showError={showValidationErrors}
       />
 
       {/* 차대번호 및 상태 확인 */}
@@ -185,19 +160,7 @@ export const VehicleInfoSection: React.FC = () => {
         isCompleted={isVinCheckCompleted()}
         value={getVinCheckDisplayText()}
         onPress={() => setIsVinCheckModalVisible(true)}
-      />
-
-      <VehicleModelBottomSheet
-        visible={isVehicleModelModalVisible}
-        onClose={() => setIsVehicleModelModalVisible(false)}
-        onConfirm={(brand, model, grade, year, mileage) => {
-          handleVehicleSelect({ brand, name: model, grade, year, mileage });
-        }}
-        initialBrand={vehicleBrand}
-        initialModel={vehicleName}
-        initialGrade={vehicleGrade}
-        initialYear={vehicleYear}
-        initialMileage={mileage}
+        showError={showValidationErrors}
       />
 
       <DashboardInfoBottomSheet
@@ -233,7 +196,6 @@ export const VehicleInfoSection: React.FC = () => {
 
 const styles = StyleSheet.create({
   container: {
-    gap: scale(16),
     paddingHorizontal: scale(16),
     paddingTop: verticalScale(16),
     paddingBottom: verticalScale(16),
@@ -247,9 +209,15 @@ const styles = StyleSheet.create({
     paddingHorizontal: 12,
     paddingVertical: 18,
     height: 80,
+    marginBottom: 12,
   },
   carKeyCountContainerCompleted: {
     backgroundColor: '#E0F2FE',
+  },
+  carKeyCountContainerError: {
+    backgroundColor: '#FEF2F2',
+    borderWidth: 1.5,
+    borderColor: '#EF4444',
   },
   carKeyCountLabel: {
     fontSize: 17,
@@ -258,6 +226,16 @@ const styles = StyleSheet.create({
   },
   carKeyCountLabelCompleted: {
     color: '#06B6D4',
+  },
+  carKeyCountLabelError: {
+    color: '#EF4444',
+  },
+  errorText: {
+    fontSize: 12,
+    color: '#EF4444',
+    marginTop: -8,
+    marginBottom: 12,
+    marginLeft: 4,
   },
   carKeyCountInputRow: {
     flexDirection: 'row',

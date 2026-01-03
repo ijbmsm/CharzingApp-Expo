@@ -1,7 +1,7 @@
 /**
  * TireInspectionBottomSheet - 타이어 검사 (v2)
- * 4개 위치 (FL, FR, RL, RR) 각각 사진 + 트레드 깊이 + 상태
- * VinCheckBottomSheet 디자인 통일
+ * 4개 위치 (FL, FR, RL, RR) 각각 트레드 깊이 + 상태
+ * 문제 시에만 사진 + 설명 입력
  */
 
 import React, { useState, useEffect } from 'react';
@@ -12,11 +12,9 @@ import {
   Modal,
   TouchableOpacity,
   Platform,
-  ScrollView,
   TextInput,
-  Keyboard,
-  KeyboardAvoidingView,
 } from 'react-native';
+import { KeyboardAwareScrollView } from 'react-native-keyboard-aware-scroll-view';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import MultipleImagePicker from '../../MultipleImagePicker';
@@ -42,59 +40,28 @@ const TireInspectionBottomSheet: React.FC<TireInspectionBottomSheetProps> = ({
   initialData = {},
 }) => {
   const insets = useSafeAreaInsets();
-  const [tireData, setTireData] = useState<Record<string, TireInspectionItem & { basePhotoArr?: string[] }>>({});
+  const [tireData, setTireData] = useState<Record<string, TireInspectionItem>>({});
 
   useEffect(() => {
     if (visible) {
-      const dataMap: Record<string, TireInspectionItem & { basePhotoArr?: string[] }> = {};
+      const dataMap: Record<string, TireInspectionItem> = {};
       POSITION_KEYS.forEach((key) => {
-        const item = initialData[key] || {};
-        dataMap[key] = {
-          ...item,
-          basePhotoArr: item.basePhoto ? [item.basePhoto] : [],
-        };
+        dataMap[key] = initialData[key] || {};
       });
       setTireData(dataMap);
     }
-  }, [visible, initialData]);
-
-  const handleBasePhotoAdded = (key: PositionKey, uris: string[]) => {
-    setTireData((prev) => ({
-      ...prev,
-      [key]: {
-        ...prev[key],
-        basePhotoArr: [...(prev[key]?.basePhotoArr || []), ...uris].slice(0, 1),
-        basePhoto: uris[0] || prev[key]?.basePhoto,
-      },
-    }));
-  };
-
-  const handleBasePhotoRemoved = (key: PositionKey, index: number) => {
-    setTireData((prev) => ({
-      ...prev,
-      [key]: {
-        ...prev[key],
-        basePhotoArr: (prev[key]?.basePhotoArr || []).filter((_, i) => i !== index),
-        basePhoto: undefined,
-      },
-    }));
-  };
-
-  const handleBasePhotoEdited = (key: PositionKey, index: number, newUri: string) => {
-    setTireData((prev) => ({
-      ...prev,
-      [key]: {
-        ...prev[key],
-        basePhotoArr: (prev[key]?.basePhotoArr || []).map((uri, i) => (i === index ? newUri : uri)),
-        basePhoto: newUri,
-      },
-    }));
-  };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [visible]);
 
   const handleStatusChange = (key: PositionKey, status: 'good' | 'problem' | undefined) => {
     setTireData((prev) => ({
       ...prev,
-      [key]: { ...prev[key], status },
+      [key]: {
+        ...prev[key],
+        status,
+        // 양호로 변경 시 문제 관련 필드 초기화
+        ...(status === 'good' ? { issueDescription: undefined, issueImageUris: undefined } : {}),
+      },
     }));
   };
 
@@ -133,17 +100,26 @@ const TireInspectionBottomSheet: React.FC<TireInspectionBottomSheetProps> = ({
     }));
   };
 
+  const handleImageEdited = (key: PositionKey, index: number, newUri: string) => {
+    setTireData((prev) => ({
+      ...prev,
+      [key]: {
+        ...prev[key],
+        issueImageUris: (prev[key]?.issueImageUris || []).map((uri, i) => (i === index ? newUri : uri)),
+      },
+    }));
+  };
+
   const handleSave = () => {
     const result: Record<PositionKey, TireInspectionItem> = {} as Record<PositionKey, TireInspectionItem>;
     POSITION_KEYS.forEach((key) => {
       const item = tireData[key];
-      if (item?.status || item?.basePhoto || item?.basePhotoArr?.[0]) {
+      if (item?.status || item?.treadDepth) {
         result[key] = {
           status: item.status,
-          basePhoto: item.basePhotoArr?.[0] || item.basePhoto,
           treadDepth: item.treadDepth,
-          issueDescription: item.issueDescription,
-          issueImageUris: item.issueImageUris,
+          issueDescription: item.status === 'problem' ? item.issueDescription : undefined,
+          issueImageUris: item.status === 'problem' ? item.issueImageUris : undefined,
         };
       }
     });
@@ -152,10 +128,7 @@ const TireInspectionBottomSheet: React.FC<TireInspectionBottomSheetProps> = ({
   };
 
   const completedCount = Object.values(tireData).filter((item) => item?.status).length;
-  const basePhotoCount = POSITION_KEYS.filter(
-    (key) => tireData[key]?.basePhotoArr && tireData[key].basePhotoArr!.length > 0
-  ).length;
-  const isComplete = completedCount >= 2 && basePhotoCount >= 2; // 상태 2개 + 사진 2개 이상
+  const isComplete = completedCount >= 4; // 모든 위치 상태 선택 필수
 
   return (
     <Modal
@@ -175,130 +148,112 @@ const TireInspectionBottomSheet: React.FC<TireInspectionBottomSheetProps> = ({
           },
         ]}
       >
-        <KeyboardAvoidingView
-          behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-          style={styles.keyboardView}
+        {/* Header */}
+        <View style={styles.header}>
+          <TouchableOpacity onPress={onClose} style={styles.closeButton}>
+            <Ionicons name="close" size={24} color="#1F2937" />
+          </TouchableOpacity>
+          <Text style={styles.headerTitle}>타이어 검사</Text>
+          <View style={styles.placeholder} />
+        </View>
+
+        {/* Progress Bar */}
+        <View style={styles.progressBar}>
+          <Text style={styles.progressText}>
+            {completedCount} / {POSITION_KEYS.length} 완료
+          </Text>
+        </View>
+
+        {/* Content */}
+        <KeyboardAwareScrollView
+          style={styles.content}
+          contentContainerStyle={{ paddingBottom: 100 + insets.bottom }}
+          showsVerticalScrollIndicator={false}
+          keyboardShouldPersistTaps="handled"
+          extraScrollHeight={120}
+          enableOnAndroid={true}
         >
-          {/* Header */}
-          <View style={styles.header}>
-            <TouchableOpacity onPress={onClose} style={styles.closeButton}>
-              <Ionicons name="close" size={24} color="#1F2937" />
-            </TouchableOpacity>
-            <Text style={styles.headerTitle}>타이어 검사</Text>
-            <View style={styles.placeholder} />
-          </View>
+          {POSITION_KEYS.map((key) => {
+            const item = tireData[key] || {};
+            const label = POSITION_LABELS[key];
 
-          {/* Progress Bar */}
-          <View style={styles.progressBar}>
-            <Text style={styles.progressText}>
-              상태 {completedCount} / {POSITION_KEYS.length} | 사진 {basePhotoCount} / {POSITION_KEYS.length}
-            </Text>
-          </View>
+            return (
+              <View key={key} style={styles.itemCard}>
+                <Text style={styles.itemTitle}>타이어 {label}</Text>
 
-          {/* Content */}
-          <ScrollView
-            style={styles.content}
-            contentContainerStyle={{ paddingBottom: 100 + insets.bottom }}
-            showsVerticalScrollIndicator={false}
-            keyboardShouldPersistTaps="handled"
-          >
-            {POSITION_KEYS.map((key) => {
-              const item = tireData[key] || {};
-              const label = POSITION_LABELS[key];
-
-              return (
-                <View key={key} style={styles.itemCard}>
-                  <Text style={styles.itemTitle}>타이어 {label}</Text>
-
-                  {/* 기본 사진 */}
-                  <View style={styles.inputGroup}>
-                    <Text style={styles.inputLabel}>기본 사진 <Text style={styles.requiredMark}>*</Text></Text>
-                    <MultipleImagePicker
-                      imageUris={item.basePhotoArr || []}
-                      onImagesAdded={(uris) => handleBasePhotoAdded(key, uris)}
-                      onImageRemoved={(index) => handleBasePhotoRemoved(key, index)}
-                      onImageEdited={(index, uri) => handleBasePhotoEdited(key, index, uri)}
-                      label={`타이어 ${label}`}
-                      maxImages={1}
+                {/* 트레드 깊이 */}
+                <View style={styles.inputGroup}>
+                  <Text style={styles.inputLabel}>트레드 깊이</Text>
+                  <View style={styles.treadRow}>
+                    <TextInput
+                      style={[styles.textInput, styles.treadInput]}
+                      placeholder="0.0"
+                      placeholderTextColor="#9CA3AF"
+                      value={item.treadDepth?.toString() || ''}
+                      onChangeText={(text) => handleTreadDepthChange(key, text)}
+                      keyboardType="decimal-pad"
                     />
+                    <Text style={styles.unit}>mm</Text>
                   </View>
-
-                  {/* 트레드 깊이 */}
-                  <View style={styles.inputGroup}>
-                    <Text style={styles.inputLabel}>트레드 깊이</Text>
-                    <View style={styles.treadRow}>
-                      <TextInput
-                        style={[styles.textInput, styles.treadInput]}
-                        placeholder="0.0"
-                        placeholderTextColor="#9CA3AF"
-                        value={item.treadDepth?.toString() || ''}
-                        onChangeText={(text) => handleTreadDepthChange(key, text)}
-                        keyboardType="decimal-pad"
-                      />
-                      <Text style={styles.unit}>mm</Text>
-                    </View>
-                  </View>
-
-                  {/* 상태 선택 */}
-                  <View style={styles.inputGroup}>
-                    <Text style={styles.inputLabel}>상태 *</Text>
-                    <StatusButtons
-                      status={item.status}
-                      onStatusChange={(status) => handleStatusChange(key, status)}
-                      problemLabel="문제 있음"
-                    />
-                  </View>
-
-                  {/* 문제일 때 추가 입력 */}
-                  {item.status === 'problem' && (
-                    <>
-                      <View style={styles.inputGroup}>
-                        <Text style={styles.inputLabel}>문제 사진</Text>
-                        <MultipleImagePicker
-                          imageUris={item.issueImageUris || []}
-                          onImagesAdded={(uris) => handleImagesAdded(key, uris)}
-                          onImageRemoved={(index) => handleImageRemoved(key, index)}
-                          onImageEdited={() => {}}
-                          label="문제 부위 사진"
-                        />
-                      </View>
-
-                      <View style={styles.inputGroup}>
-                        <Text style={styles.inputLabel}>문제 설명</Text>
-                        <TextInput
-                          style={[styles.textInput, styles.notesInput]}
-                          placeholder="문제 내용을 입력하세요"
-                          placeholderTextColor="#9CA3AF"
-                          value={item.issueDescription || ''}
-                          onChangeText={(text) => handleDescriptionChange(key, text)}
-                          multiline
-                          textAlignVertical="top"
-                          returnKeyType="done"
-                          blurOnSubmit={true}
-                          onSubmitEditing={Keyboard.dismiss}
-                        />
-                      </View>
-                    </>
-                  )}
                 </View>
-              );
-            })}
-          </ScrollView>
 
-          {/* Footer */}
-          <View style={[styles.footer, { paddingBottom: 8 + insets.bottom }]}>
-            <TouchableOpacity
-              style={[
-                styles.confirmButton,
-                !isComplete && styles.confirmButtonDisabled,
-              ]}
-              onPress={handleSave}
-              disabled={!isComplete}
-            >
-              <Text style={styles.confirmButtonText}>저장</Text>
-            </TouchableOpacity>
-          </View>
-        </KeyboardAvoidingView>
+                {/* 상태 선택 */}
+                <View style={styles.inputGroup}>
+                  <Text style={styles.inputLabel}>상태 <Text style={styles.requiredMark}>*</Text></Text>
+                  <StatusButtons
+                    status={item.status}
+                    onStatusChange={(status) => handleStatusChange(key, status)}
+                    problemLabel="문제 있음"
+                  />
+                </View>
+
+                {/* 문제일 때 추가 입력 */}
+                {item.status === 'problem' && (
+                  <>
+                    <View style={styles.inputGroup}>
+                      <Text style={styles.inputLabel}>문제 사진</Text>
+                      <MultipleImagePicker
+                        imageUris={item.issueImageUris || []}
+                        onImagesAdded={(uris) => handleImagesAdded(key, uris)}
+                        onImageRemoved={(index) => handleImageRemoved(key, index)}
+                        onImageEdited={(index, uri) => handleImageEdited(key, index, uri)}
+                        label={`타이어 ${label} 문제`}
+                        maxImages={5}
+                      />
+                    </View>
+
+                    <View style={styles.inputGroup}>
+                      <Text style={styles.inputLabel}>문제 설명</Text>
+                      <TextInput
+                        style={[styles.textInput, styles.notesInput]}
+                        placeholder="문제 내용을 입력하세요"
+                        placeholderTextColor="#9CA3AF"
+                        value={item.issueDescription || ''}
+                        onChangeText={(text) => handleDescriptionChange(key, text)}
+                        multiline
+                        textAlignVertical="top"
+                      />
+                    </View>
+                  </>
+                )}
+              </View>
+            );
+          })}
+        </KeyboardAwareScrollView>
+
+        {/* Footer */}
+        <View style={[styles.footer, { paddingBottom: 8 + insets.bottom }]}>
+          <TouchableOpacity
+            style={[
+              styles.confirmButton,
+              !isComplete && styles.confirmButtonDisabled,
+            ]}
+            onPress={handleSave}
+            disabled={!isComplete}
+          >
+            <Text style={styles.confirmButtonText}>저장</Text>
+          </TouchableOpacity>
+        </View>
       </View>
     </Modal>
   );
@@ -308,9 +263,6 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: '#F9FAFB',
-  },
-  keyboardView: {
-    flex: 1,
   },
   header: {
     flexDirection: 'row',
@@ -336,7 +288,7 @@ const styles = StyleSheet.create({
   },
   progressBar: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
+    justifyContent: 'center',
     alignItems: 'center',
     paddingHorizontal: 16,
     paddingVertical: 12,

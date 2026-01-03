@@ -213,7 +213,7 @@ const BatteryCellGridModal: React.FC<BatteryCellGridModalProps> = ({
                       {cell.id}
                     </Text>
                     <Text style={[styles.cellVoltage, cell.isDefective && styles.cellVoltageDefective]}>
-                      {cell.voltage ? `${typeof cell.voltage === 'number' ? cell.voltage.toFixed(2) : parseFloat(cell.voltage || '0').toFixed(2)}V` : '0.00V'}
+                      {cell.voltage ? `${typeof cell.voltage === 'string' ? cell.voltage : cell.voltage}V` : '0V'}
                     </Text>
                     {cell.isDefective && (
                       <View style={styles.cellDefectiveBadge}>
@@ -244,11 +244,11 @@ const BatteryCellGridModal: React.FC<BatteryCellGridModalProps> = ({
             </View>
             <View style={styles.summaryRow}>
               <Text style={styles.summaryLabel}>최대 전압:</Text>
-              <Text style={styles.summaryValue}>{maxCellVoltage.toFixed(2)}V</Text>
+              <Text style={styles.summaryValue}>{maxCellVoltage.toFixed(3)}V</Text>
             </View>
             <View style={styles.summaryRow}>
               <Text style={styles.summaryLabel}>최소 전압:</Text>
-              <Text style={styles.summaryValue}>{minCellVoltage.toFixed(2)}V</Text>
+              <Text style={styles.summaryValue}>{minCellVoltage.toFixed(3)}V</Text>
             </View>
           </View>
         </KeyboardAvoidingView>

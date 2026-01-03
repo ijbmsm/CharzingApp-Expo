@@ -13,7 +13,11 @@ import InputButton from '../../../components/InputButton';
 import TireInspectionBottomSheet from '../../../components/inspection/tirewheel/TireInspectionBottomSheet';
 import WheelInspectionBottomSheet from '../../../components/inspection/tirewheel/WheelInspectionBottomSheet';
 
-export const TireAndWheelSection: React.FC = () => {
+interface TireAndWheelSectionProps {
+  showValidationErrors?: boolean;
+}
+
+export const TireAndWheelSection: React.FC<TireAndWheelSectionProps> = ({ showValidationErrors = false }) => {
   const { watch, setValue } = useFormContext<InspectionFormData>();
 
   // BottomSheet 상태
@@ -25,7 +29,6 @@ export const TireAndWheelSection: React.FC = () => {
   // ========== 타이어 ==========
   const tire = tireAndWheel?.tire || {};
   const tireStatusCount = Object.values(tire).filter((item) => item?.status).length;
-  const tirePhotoCount = POSITION_KEYS.filter((key) => tire[key]?.basePhoto).length;
 
   // ========== 휠 ==========
   const wheel = tireAndWheel?.wheel || {};
@@ -46,20 +49,21 @@ export const TireAndWheelSection: React.FC = () => {
       {/* 섹션 설명 */}
       <View style={styles.descriptionBox}>
         <Text style={styles.descriptionText}>
-          타이어 & 휠: 타이어 4개, 휠 4개 (각 위치별 사진 + 상태)
+          타이어: 트레드 깊이 + 상태 | 휠: 사진 + 상태
         </Text>
       </View>
 
-      {/* 타이어 (4개) */}
+      {/* 타이어 (4개) - 상태만 필수, 문제 시에만 사진 */}
       <InputButton
         label="타이어 검사"
-        isCompleted={tireStatusCount >= 2 && tirePhotoCount >= 2}
+        isCompleted={tireStatusCount >= 4}
         value={
-          tireStatusCount > 0 || tirePhotoCount > 0
-            ? `상태 ${tireStatusCount}/4 | 사진 ${tirePhotoCount}/4`
+          tireStatusCount > 0
+            ? `상태 ${tireStatusCount}/4`
             : '4개 위치 검사'
         }
         onPress={() => setIsTireVisible(true)}
+        showError={showValidationErrors}
       />
 
       {/* 휠 (4개) */}
@@ -72,6 +76,7 @@ export const TireAndWheelSection: React.FC = () => {
             : '4개 위치 검사'
         }
         onPress={() => setIsWheelVisible(true)}
+        showError={showValidationErrors}
       />
 
       {/* BottomSheet 컴포넌트들 */}
@@ -102,7 +107,7 @@ const styles = StyleSheet.create({
     backgroundColor: '#F3F4F6',
     padding: moderateScale(12),
     borderRadius: moderateScale(8),
-    marginBottom: verticalScale(16),
+    marginBottom: 12,
   },
   descriptionText: {
     fontSize: moderateScale(12),

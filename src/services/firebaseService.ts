@@ -761,25 +761,28 @@ export interface VehicleDiagnosisReport {
   hasNoIllegalModification?: boolean; // 불법 구조변경 없음
   hasNoFloodDamage?: boolean; // 침수 이력 없음
   carKeyCount: number; // 차키 개수 (필수)
+
+  // 배터리 정보 확인 (v2: 상세 데이터는 admin에서 입력)
+  batteryInfoChecked?: boolean; // OBD로 배터리 정보 확인 완료 여부
+
+  // 배터리 진단 정보 (admin에서 입력, 앱에서는 null)
+  cellCount?: number | null; // 셀 개수
+  defectiveCellCount?: number | null; // 불량 개수
+  normalChargeCount?: number | null; // 일반 충전 횟수
+  fastChargeCount?: number | null; // 급속 충전 횟수
+  sohPercentage?: number | null; // SOH(%)
+  realDrivableDistance?: string | null; // 실 주행 가능 거리
   
-  // 배터리 진단 정보
-  cellCount: number; // 셀 개수
-  defectiveCellCount: number; // 불량 개수
-  normalChargeCount: number; // 일반 충전 횟수
-  fastChargeCount: number; // 급속 충전 횟수
-  sohPercentage: number; // SOH(%)
-  realDrivableDistance?: string; // 실 주행 가능 거리
-  
-  // 전압 정보 (새로 추가)
-  totalVoltage?: number; // 총 전압
-  maxVoltage?: number; // 최대 전압
-  minVoltage?: number; // 최소 전압
-  
-  // 셀 정보
-  cellsData?: BatteryCell[]; // 개별 셀 상태 데이터
+  // 전압 정보 (admin에서 입력)
+  totalVoltage?: number | null; // 총 전압
+  maxVoltage?: number | null; // 최대 전압
+  minVoltage?: number | null; // 최소 전압
+
+  // 셀 정보 (admin에서 입력)
+  cellsData?: BatteryCell[] | null; // 개별 셀 상태 데이터
 
   // 진단 세부 결과
-  diagnosisDetails: DiagnosisDetail[];
+  diagnosisDetails?: DiagnosisDetail[];
   
   // 업로드된 파일들
   uploadedFiles?: UploadedFile[];

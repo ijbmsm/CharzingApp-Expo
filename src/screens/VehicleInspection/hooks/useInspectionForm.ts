@@ -25,10 +25,7 @@ const getDefaultValues = (): InspectionFormData => ({
         floodIssue: '',
       },
       batteryInfo: {
-        batterySOH: '100',
-        batteryCellCount: 0,
-        batteryCells: [],
-        defaultCellVoltage: 3.7,
+        checked: false,
       },
 
       // ========== 검사 v2 구조 ==========
@@ -54,7 +51,6 @@ const getDefaultValues = (): InspectionFormData => ({
       // 7. 하체 검사
       undercarriage: {
         batteryPack: {},
-        suspensionBasePhotos: {},
         suspension: {},
         brakeBasePhotos: {},
         brake: {},

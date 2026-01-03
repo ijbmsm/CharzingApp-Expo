@@ -12,11 +12,10 @@ import {
   Modal,
   TouchableOpacity,
   Platform,
-  ScrollView,
   TextInput,
   Keyboard,
-  KeyboardAvoidingView,
 } from 'react-native';
+import { KeyboardAwareScrollView } from 'react-native-keyboard-aware-scroll-view';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import MultipleImagePicker from '../../MultipleImagePicker';
@@ -49,9 +48,11 @@ const BatteryPackInspectionBottomSheet: React.FC<BatteryPackInspectionBottomShee
       const dataMap: Record<string, BatteryPackInspectionItem & { basePhotoArr?: string[] }> = {};
       BATTERY_PACK_KEYS.forEach((key) => {
         const item = initialData[key] || {};
+        // basePhotos 배열 우선, 없으면 basePhoto 단일값 사용 (하위 호환성)
+        const photos = item.basePhotos || (item.basePhoto ? [item.basePhoto] : []);
         dataMap[key] = {
           ...item,
-          basePhotoArr: item.basePhoto ? [item.basePhoto] : [],
+          basePhotoArr: photos,
         };
       });
       setBatteryData(dataMap);
@@ -63,8 +64,7 @@ const BatteryPackInspectionBottomSheet: React.FC<BatteryPackInspectionBottomShee
       ...prev,
       [key]: {
         ...prev[key],
-        basePhotoArr: [...(prev[key]?.basePhotoArr || []), ...uris].slice(0, 1),
-        basePhoto: uris[0] || prev[key]?.basePhoto,
+        basePhotoArr: [...(prev[key]?.basePhotoArr || []), ...uris].slice(0, 10),
       },
     }));
   };
@@ -75,7 +75,6 @@ const BatteryPackInspectionBottomSheet: React.FC<BatteryPackInspectionBottomShee
       [key]: {
         ...prev[key],
         basePhotoArr: (prev[key]?.basePhotoArr || []).filter((_, i) => i !== index),
-        basePhoto: undefined,
       },
     }));
   };
@@ -86,7 +85,6 @@ const BatteryPackInspectionBottomSheet: React.FC<BatteryPackInspectionBottomShee
       [key]: {
         ...prev[key],
         basePhotoArr: (prev[key]?.basePhotoArr || []).map((uri, i) => (i === index ? newUri : uri)),
-        basePhoto: newUri,
       },
     }));
   };
@@ -129,10 +127,10 @@ const BatteryPackInspectionBottomSheet: React.FC<BatteryPackInspectionBottomShee
     const result: Record<BatteryPackDirectionKey, BatteryPackInspectionItem> = {} as Record<BatteryPackDirectionKey, BatteryPackInspectionItem>;
     BATTERY_PACK_KEYS.forEach((key) => {
       const item = batteryData[key];
-      if (item?.status || item?.basePhoto || item?.basePhotoArr?.[0]) {
+      if (item?.status || (item?.basePhotoArr && item.basePhotoArr.length > 0)) {
         result[key] = {
           status: item.status,
-          basePhoto: item.basePhotoArr?.[0] || item.basePhoto,
+          basePhotos: item.basePhotoArr || [],
           issueDescription: item.issueDescription,
           issueImageUris: item.issueImageUris,
         };
@@ -166,33 +164,31 @@ const BatteryPackInspectionBottomSheet: React.FC<BatteryPackInspectionBottomShee
           },
         ]}
       >
-        <KeyboardAvoidingView
-          behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-          style={styles.keyboardView}
+        {/* Header */}
+        <View style={styles.header}>
+          <TouchableOpacity onPress={onClose} style={styles.closeButton}>
+            <Ionicons name="close" size={24} color="#1F2937" />
+          </TouchableOpacity>
+          <Text style={styles.headerTitle}>배터리 팩 검사</Text>
+          <View style={styles.placeholder} />
+        </View>
+
+        {/* Progress Bar */}
+        <View style={styles.progressBar}>
+          <Text style={styles.progressText}>
+            상태 {completedCount} / {BATTERY_PACK_KEYS.length} | 사진 {basePhotoCount} / {BATTERY_PACK_KEYS.length}
+          </Text>
+        </View>
+
+        {/* Content */}
+        <KeyboardAwareScrollView
+          style={styles.content}
+          contentContainerStyle={{ paddingBottom: 100 + insets.bottom }}
+          showsVerticalScrollIndicator={false}
+          keyboardShouldPersistTaps="handled"
+          extraScrollHeight={120}
+          enableOnAndroid={true}
         >
-          {/* Header */}
-          <View style={styles.header}>
-            <TouchableOpacity onPress={onClose} style={styles.closeButton}>
-              <Ionicons name="close" size={24} color="#1F2937" />
-            </TouchableOpacity>
-            <Text style={styles.headerTitle}>배터리 팩 검사</Text>
-            <View style={styles.placeholder} />
-          </View>
-
-          {/* Progress Bar */}
-          <View style={styles.progressBar}>
-            <Text style={styles.progressText}>
-              상태 {completedCount} / {BATTERY_PACK_KEYS.length} | 사진 {basePhotoCount} / {BATTERY_PACK_KEYS.length}
-            </Text>
-          </View>
-
-          {/* Content */}
-          <ScrollView
-            style={styles.content}
-            contentContainerStyle={{ paddingBottom: 100 + insets.bottom }}
-            showsVerticalScrollIndicator={false}
-            keyboardShouldPersistTaps="handled"
-          >
             {BATTERY_PACK_KEYS.map((key) => {
               const item = batteryData[key] || {};
               const label = BATTERY_PACK_LABELS[key];
@@ -210,7 +206,6 @@ const BatteryPackInspectionBottomSheet: React.FC<BatteryPackInspectionBottomShee
                       onImageRemoved={(index) => handleBasePhotoRemoved(key, index)}
                       onImageEdited={(index, uri) => handleBasePhotoEdited(key, index, uri)}
                       label={`배터리 팩 ${label}`}
-                      maxImages={1}
                     />
                   </View>
 
@@ -226,54 +221,37 @@ const BatteryPackInspectionBottomSheet: React.FC<BatteryPackInspectionBottomShee
 
                   {/* 문제일 때 추가 입력 */}
                   {item.status === 'problem' && (
-                    <>
-                      <View style={styles.inputGroup}>
-                        <Text style={styles.inputLabel}>문제 사진</Text>
-                        <MultipleImagePicker
-                          imageUris={item.issueImageUris || []}
-                          onImagesAdded={(uris) => handleImagesAdded(key, uris)}
-                          onImageRemoved={(index) => handleImageRemoved(key, index)}
-                          onImageEdited={() => {}}
-                          label="문제 부위 사진"
-                        />
-                      </View>
-
-                      <View style={styles.inputGroup}>
-                        <Text style={styles.inputLabel}>문제 설명</Text>
-                        <TextInput
-                          style={[styles.textInput, styles.notesInput]}
-                          placeholder="문제 내용을 입력하세요"
-                          placeholderTextColor="#9CA3AF"
-                          value={item.issueDescription || ''}
-                          onChangeText={(text) => handleDescriptionChange(key, text)}
-                          multiline
-                          textAlignVertical="top"
-                          returnKeyType="done"
-                          blurOnSubmit={true}
-                          onSubmitEditing={Keyboard.dismiss}
-                        />
-                      </View>
-                    </>
+                    <View style={styles.inputGroup}>
+                      <Text style={styles.inputLabel}>문제 설명</Text>
+                      <TextInput
+                        style={[styles.textInput, styles.notesInput]}
+                        placeholder="문제 내용을 입력하세요"
+                        placeholderTextColor="#9CA3AF"
+                        value={item.issueDescription || ''}
+                        onChangeText={(text) => handleDescriptionChange(key, text)}
+                        multiline
+                        textAlignVertical="top"
+                      />
+                    </View>
                   )}
                 </View>
               );
             })}
-          </ScrollView>
+        </KeyboardAwareScrollView>
 
-          {/* Footer */}
-          <View style={[styles.footer, { paddingBottom: 8 + insets.bottom }]}>
-            <TouchableOpacity
-              style={[
-                styles.confirmButton,
-                !isComplete && styles.confirmButtonDisabled,
-              ]}
-              onPress={handleSave}
-              disabled={!isComplete}
-            >
-              <Text style={styles.confirmButtonText}>저장</Text>
-            </TouchableOpacity>
-          </View>
-        </KeyboardAvoidingView>
+        {/* Footer */}
+        <View style={[styles.footer, { paddingBottom: 8 + insets.bottom }]}>
+          <TouchableOpacity
+            style={[
+              styles.confirmButton,
+              !isComplete && styles.confirmButtonDisabled,
+            ]}
+            onPress={handleSave}
+            disabled={!isComplete}
+          >
+            <Text style={styles.confirmButtonText}>저장</Text>
+          </TouchableOpacity>
+        </View>
       </View>
     </Modal>
   );

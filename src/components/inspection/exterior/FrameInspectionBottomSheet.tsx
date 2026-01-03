@@ -205,9 +205,6 @@ const FrameInspectionBottomSheet: React.FC<FrameInspectionBottomSheetProps> = ({
                       onChangeText={(text) => handleDescriptionChange(key, text)}
                       multiline
                       textAlignVertical="top"
-                      returnKeyType="done"
-                      blurOnSubmit={true}
-                      onSubmitEditing={Keyboard.dismiss}
                     />
                   </>
                 )}

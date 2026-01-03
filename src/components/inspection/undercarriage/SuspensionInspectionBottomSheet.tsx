@@ -1,7 +1,7 @@
 /**
  * SuspensionInspectionBottomSheet - 서스펜션 검사 (v2)
- * 4개 항목 (spring, stabilizer, lowerArm, shockAbsorber)
- * TireInspectionBottomSheet 디자인 통일
+ * 4개 위치 (FL, FR, RL, RR) 각각 기본 사진 + 상태
+ * 문제 시에만 사진 + 설명 입력
  */
 
 import React, { useState, useEffect } from 'react';
@@ -12,27 +12,30 @@ import {
   Modal,
   TouchableOpacity,
   Platform,
-  ScrollView,
   TextInput,
-  Keyboard,
-  KeyboardAvoidingView,
 } from 'react-native';
+import { KeyboardAwareScrollView } from 'react-native-keyboard-aware-scroll-view';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import MultipleImagePicker from '../../MultipleImagePicker';
 import StatusButtons from '../common/StatusButtons';
 import {
-  SuspensionKey,
-  SUSPENSION_KEYS,
-  SUSPENSION_LABELS,
+  PositionKey,
+  POSITION_KEYS,
+  POSITION_LABELS,
   BaseInspectionItem,
 } from '../../../types/inspection';
+
+interface SuspensionPositionItem extends BaseInspectionItem {
+  basePhotos?: string[];
+}
 
 interface SuspensionInspectionBottomSheetProps {
   visible: boolean;
   onClose: () => void;
-  onSave: (data: Record<SuspensionKey, BaseInspectionItem>) => void;
-  initialData?: Record<SuspensionKey, BaseInspectionItem>;
+  onSave: (data: Record<PositionKey, SuspensionPositionItem>, basePhotos: Record<string, string[]>) => void;
+  initialData?: Record<PositionKey, SuspensionPositionItem>;
+  initialBasePhotos?: Record<string, string[]>;
 }
 
 const SuspensionInspectionBottomSheet: React.FC<SuspensionInspectionBottomSheetProps> = ({
@@ -40,72 +43,97 @@ const SuspensionInspectionBottomSheet: React.FC<SuspensionInspectionBottomSheetP
   onClose,
   onSave,
   initialData = {},
+  initialBasePhotos = {},
 }) => {
   const insets = useSafeAreaInsets();
-  const [suspensionData, setSuspensionData] = useState<Record<string, BaseInspectionItem>>({});
+  const [suspensionData, setSuspensionData] = useState<Record<string, SuspensionPositionItem>>({});
 
   useEffect(() => {
     if (visible) {
-      const dataMap: Record<string, BaseInspectionItem> = {};
-      SUSPENSION_KEYS.forEach((key) => {
-        dataMap[key] = initialData[key] || {};
+      const dataMap: Record<string, SuspensionPositionItem> = {};
+      POSITION_KEYS.forEach((key) => {
+        dataMap[key] = {
+          ...initialData[key],
+          basePhotos: initialBasePhotos[key] || initialData[key]?.basePhotos || [],
+        };
       });
       setSuspensionData(dataMap);
     }
-  }, [visible, initialData]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [visible]);
 
-  const handleStatusChange = (key: SuspensionKey, status: 'good' | 'problem' | undefined) => {
+  // 기본 사진 핸들러
+  const handleBasePhotoAdded = (key: PositionKey, uris: string[]) => {
     setSuspensionData((prev) => ({
       ...prev,
-      [key]: { ...prev[key], status },
+      [key]: {
+        ...prev[key],
+        basePhotos: [...(prev[key]?.basePhotos || []), ...uris].slice(0, 10),
+      },
     }));
   };
 
-  const handleDescriptionChange = (key: SuspensionKey, description: string) => {
+  const handleBasePhotoRemoved = (key: PositionKey, index: number) => {
+    setSuspensionData((prev) => ({
+      ...prev,
+      [key]: {
+        ...prev[key],
+        basePhotos: (prev[key]?.basePhotos || []).filter((_, i) => i !== index),
+      },
+    }));
+  };
+
+  const handleBasePhotoEdited = (key: PositionKey, index: number, newUri: string) => {
+    setSuspensionData((prev) => ({
+      ...prev,
+      [key]: {
+        ...prev[key],
+        basePhotos: (prev[key]?.basePhotos || []).map((uri, i) => (i === index ? newUri : uri)),
+      },
+    }));
+  };
+
+  const handleStatusChange = (key: PositionKey, status: 'good' | 'problem' | undefined) => {
+    setSuspensionData((prev) => ({
+      ...prev,
+      [key]: {
+        ...prev[key],
+        status,
+        // 양호로 변경 시 문제 관련 필드 초기화
+        ...(status === 'good' ? { issueDescription: undefined, issueImageUris: undefined } : {}),
+      },
+    }));
+  };
+
+  const handleDescriptionChange = (key: PositionKey, description: string) => {
     setSuspensionData((prev) => ({
       ...prev,
       [key]: { ...prev[key], issueDescription: description },
     }));
   };
 
-  const handleImagesAdded = (key: SuspensionKey, newUris: string[]) => {
-    setSuspensionData((prev) => ({
-      ...prev,
-      [key]: {
-        ...prev[key],
-        issueImageUris: [...(prev[key]?.issueImageUris || []), ...newUris],
-      },
-    }));
-  };
-
-  const handleImageRemoved = (key: SuspensionKey, index: number) => {
-    setSuspensionData((prev) => ({
-      ...prev,
-      [key]: {
-        ...prev[key],
-        issueImageUris: (prev[key]?.issueImageUris || []).filter((_, i) => i !== index),
-      },
-    }));
-  };
-
   const handleSave = () => {
-    const result: Record<SuspensionKey, BaseInspectionItem> = {} as Record<SuspensionKey, BaseInspectionItem>;
-    SUSPENSION_KEYS.forEach((key) => {
+    const result: Record<PositionKey, SuspensionPositionItem> = {} as Record<PositionKey, SuspensionPositionItem>;
+    const basePhotosResult: Record<string, string[]> = {};
+
+    POSITION_KEYS.forEach((key) => {
       const item = suspensionData[key];
-      if (item?.status) {
+      if (item?.status || (item?.basePhotos && item.basePhotos.length > 0)) {
         result[key] = {
           status: item.status,
-          issueDescription: item.issueDescription,
-          issueImageUris: item.issueImageUris,
+          issueDescription: item.status === 'problem' ? item.issueDescription : undefined,
         };
+        basePhotosResult[key] = item.basePhotos || [];
       }
     });
-    onSave(result);
+
+    onSave(result, basePhotosResult);
     onClose();
   };
 
   const completedCount = Object.values(suspensionData).filter((item) => item?.status).length;
-  const isComplete = completedCount >= 2;
+  const basePhotoCount = POSITION_KEYS.filter((key) => (suspensionData[key]?.basePhotos?.length || 0) > 0).length;
+  const isComplete = completedCount >= 4 && basePhotoCount >= 4; // 모든 위치 상태 + 사진 필수
 
   return (
     <Modal
@@ -125,100 +153,104 @@ const SuspensionInspectionBottomSheet: React.FC<SuspensionInspectionBottomSheetP
           },
         ]}
       >
-        <KeyboardAvoidingView
-          behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-          style={styles.keyboardView}
-        >
-          {/* Header */}
-          <View style={styles.header}>
-            <TouchableOpacity onPress={onClose} style={styles.closeButton}>
-              <Ionicons name="close" size={24} color="#1F2937" />
-            </TouchableOpacity>
-            <Text style={styles.headerTitle}>서스펜션 검사</Text>
-            <View style={styles.placeholder} />
-          </View>
+        {/* Header */}
+        <View style={styles.header}>
+          <TouchableOpacity onPress={onClose} style={styles.closeButton}>
+            <Ionicons name="close" size={24} color="#1F2937" />
+          </TouchableOpacity>
+          <Text style={styles.headerTitle}>서스펜션 검사</Text>
+          <View style={styles.placeholder} />
+        </View>
 
-          {/* Progress Bar */}
-          <View style={styles.progressBar}>
-            <Text style={styles.progressText}>
-              {completedCount} / {SUSPENSION_KEYS.length} 완료
+        {/* Progress Bar */}
+        <View style={styles.progressBar}>
+          <Text style={styles.progressText}>
+            {completedCount} / {POSITION_KEYS.length} 완료
+          </Text>
+        </View>
+
+        {/* Content */}
+        <KeyboardAwareScrollView
+          style={styles.content}
+          contentContainerStyle={{ paddingBottom: 100 + insets.bottom }}
+          showsVerticalScrollIndicator={false}
+          keyboardShouldPersistTaps="handled"
+          extraScrollHeight={120}
+          enableOnAndroid={true}
+        >
+          {/* 안내 문구 */}
+          <View style={styles.guideCard}>
+            <Ionicons name="information-circle" size={20} color="#06B6D4" />
+            <Text style={styles.guideText}>
+              스프링, 스테빌라이저, 로어 암, 쇼크 업소버 등의 상태를 확인해주세요
             </Text>
           </View>
 
-          {/* Content */}
-          <ScrollView
-            style={styles.content}
-            contentContainerStyle={{ paddingBottom: 100 + insets.bottom }}
-            showsVerticalScrollIndicator={false}
-            keyboardShouldPersistTaps="handled"
-          >
-            {SUSPENSION_KEYS.map((key) => {
-              const item = suspensionData[key] || {};
-              const label = SUSPENSION_LABELS[key];
+          {/* 각 위치별 검사 */}
+          {POSITION_KEYS.map((key) => {
+            const item = suspensionData[key] || {};
+            const label = POSITION_LABELS[key];
 
-              return (
-                <View key={key} style={styles.itemCard}>
-                  <Text style={styles.itemTitle}>{label}</Text>
+            return (
+              <View key={key} style={styles.itemCard}>
+                <Text style={styles.itemTitle}>서스펜션 ({label})</Text>
 
-                  {/* 상태 선택 */}
+                {/* 기본 사진 */}
+                <View style={styles.inputGroup}>
+                  <Text style={styles.inputLabel}>기본 사진 <Text style={styles.requiredMark}>*</Text></Text>
+                  <MultipleImagePicker
+                    imageUris={item.basePhotos || []}
+                    onImagesAdded={(uris) => handleBasePhotoAdded(key, uris)}
+                    onImageRemoved={(index) => handleBasePhotoRemoved(key, index)}
+                    onImageEdited={(index, uri) => handleBasePhotoEdited(key, index, uri)}
+                    label={`서스펜션 ${label}`}
+                    maxImages={10}
+                  />
+                </View>
+
+                {/* 상태 선택 */}
+                <View style={styles.inputGroup}>
+                  <Text style={styles.inputLabel}>상태 <Text style={styles.requiredMark}>*</Text></Text>
+                  <StatusButtons
+                    status={item.status}
+                    onStatusChange={(status) => handleStatusChange(key, status)}
+                    problemLabel="문제 있음"
+                  />
+                </View>
+
+                {/* 문제일 때 설명만 입력 (기본 사진이 있으므로 문제 사진 불필요) */}
+                {item.status === 'problem' && (
                   <View style={styles.inputGroup}>
-                    <Text style={styles.inputLabel}>상태 *</Text>
-                    <StatusButtons
-                      status={item.status}
-                      onStatusChange={(status) => handleStatusChange(key, status)}
+                    <Text style={styles.inputLabel}>문제 설명</Text>
+                    <TextInput
+                      style={[styles.textInput, styles.notesInput]}
+                      placeholder="문제 내용을 입력하세요"
+                      placeholderTextColor="#9CA3AF"
+                      value={item.issueDescription || ''}
+                      onChangeText={(text) => handleDescriptionChange(key, text)}
+                      multiline
+                      textAlignVertical="top"
                     />
                   </View>
+                )}
+              </View>
+            );
+          })}
+        </KeyboardAwareScrollView>
 
-                  {/* 문제일 때 추가 입력 */}
-                  {item.status === 'problem' && (
-                    <>
-                      <View style={styles.inputGroup}>
-                        <Text style={styles.inputLabel}>문제 사진</Text>
-                        <MultipleImagePicker
-                          imageUris={item.issueImageUris || []}
-                          onImagesAdded={(uris) => handleImagesAdded(key, uris)}
-                          onImageRemoved={(index) => handleImageRemoved(key, index)}
-                          onImageEdited={() => {}}
-                          label="문제 부위 사진"
-                        />
-                      </View>
-
-                      <View style={styles.inputGroup}>
-                        <Text style={styles.inputLabel}>문제 설명</Text>
-                        <TextInput
-                          style={[styles.textInput, styles.notesInput]}
-                          placeholder="문제 내용을 입력하세요"
-                          placeholderTextColor="#9CA3AF"
-                          value={item.issueDescription || ''}
-                          onChangeText={(text) => handleDescriptionChange(key, text)}
-                          multiline
-                          textAlignVertical="top"
-                          returnKeyType="done"
-                          blurOnSubmit={true}
-                          onSubmitEditing={Keyboard.dismiss}
-                        />
-                      </View>
-                    </>
-                  )}
-                </View>
-              );
-            })}
-          </ScrollView>
-
-          {/* Footer */}
-          <View style={[styles.footer, { paddingBottom: 8 + insets.bottom }]}>
-            <TouchableOpacity
-              style={[
-                styles.confirmButton,
-                !isComplete && styles.confirmButtonDisabled,
-              ]}
-              onPress={handleSave}
-              disabled={!isComplete}
-            >
-              <Text style={styles.confirmButtonText}>저장</Text>
-            </TouchableOpacity>
-          </View>
-        </KeyboardAvoidingView>
+        {/* Footer */}
+        <View style={[styles.footer, { paddingBottom: 8 + insets.bottom }]}>
+          <TouchableOpacity
+            style={[
+              styles.confirmButton,
+              !isComplete && styles.confirmButtonDisabled,
+            ]}
+            onPress={handleSave}
+            disabled={!isComplete}
+          >
+            <Text style={styles.confirmButtonText}>저장</Text>
+          </TouchableOpacity>
+        </View>
       </View>
     </Modal>
   );
@@ -228,9 +260,6 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: '#F9FAFB',
-  },
-  keyboardView: {
-    flex: 1,
   },
   header: {
     flexDirection: 'row',
@@ -256,7 +285,7 @@ const styles = StyleSheet.create({
   },
   progressBar: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
+    justifyContent: 'center',
     alignItems: 'center',
     paddingHorizontal: 16,
     paddingVertical: 12,
@@ -272,6 +301,22 @@ const styles = StyleSheet.create({
   content: {
     flex: 1,
     padding: 16,
+  },
+  guideCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#ECFEFF',
+    borderRadius: 12,
+    padding: 14,
+    marginBottom: 16,
+    gap: 10,
+  },
+  guideText: {
+    flex: 1,
+    fontSize: 14,
+    fontWeight: '500',
+    color: '#0891B2',
+    lineHeight: 20,
   },
   itemCard: {
     backgroundColor: '#FFFFFF',
@@ -295,6 +340,10 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     color: '#1F2937',
     marginBottom: 8,
+  },
+  requiredMark: {
+    color: '#EF4444',
+    fontWeight: '700',
   },
   textInput: {
     backgroundColor: '#FFFFFF',

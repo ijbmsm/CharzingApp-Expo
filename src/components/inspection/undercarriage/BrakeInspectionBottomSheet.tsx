@@ -12,11 +12,10 @@ import {
   Modal,
   TouchableOpacity,
   Platform,
-  ScrollView,
   TextInput,
   Keyboard,
-  KeyboardAvoidingView,
 } from 'react-native';
+import { KeyboardAwareScrollView } from 'react-native-keyboard-aware-scroll-view';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import MultipleImagePicker from '../../MultipleImagePicker';
@@ -125,33 +124,31 @@ const BrakeInspectionBottomSheet: React.FC<BrakeInspectionBottomSheetProps> = ({
           },
         ]}
       >
-        <KeyboardAvoidingView
-          behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-          style={styles.keyboardView}
+        {/* Header */}
+        <View style={styles.header}>
+          <TouchableOpacity onPress={onClose} style={styles.closeButton}>
+            <Ionicons name="close" size={24} color="#1F2937" />
+          </TouchableOpacity>
+          <Text style={styles.headerTitle}>브레이크 검사</Text>
+          <View style={styles.placeholder} />
+        </View>
+
+        {/* Progress Bar */}
+        <View style={styles.progressBar}>
+          <Text style={styles.progressText}>
+            {completedCount} / {BRAKE_KEYS.length} 완료
+          </Text>
+        </View>
+
+        {/* Content */}
+        <KeyboardAwareScrollView
+          style={styles.content}
+          contentContainerStyle={{ paddingBottom: 100 + insets.bottom }}
+          showsVerticalScrollIndicator={false}
+          keyboardShouldPersistTaps="handled"
+          extraScrollHeight={120}
+          enableOnAndroid={true}
         >
-          {/* Header */}
-          <View style={styles.header}>
-            <TouchableOpacity onPress={onClose} style={styles.closeButton}>
-              <Ionicons name="close" size={24} color="#1F2937" />
-            </TouchableOpacity>
-            <Text style={styles.headerTitle}>브레이크 검사</Text>
-            <View style={styles.placeholder} />
-          </View>
-
-          {/* Progress Bar */}
-          <View style={styles.progressBar}>
-            <Text style={styles.progressText}>
-              {completedCount} / {BRAKE_KEYS.length} 완료
-            </Text>
-          </View>
-
-          {/* Content */}
-          <ScrollView
-            style={styles.content}
-            contentContainerStyle={{ paddingBottom: 100 + insets.bottom }}
-            showsVerticalScrollIndicator={false}
-            keyboardShouldPersistTaps="handled"
-          >
             {BRAKE_KEYS.map((key) => {
               const item = brakeData[key] || {};
               const label = BRAKE_LABELS[key];
@@ -193,9 +190,6 @@ const BrakeInspectionBottomSheet: React.FC<BrakeInspectionBottomSheetProps> = ({
                           onChangeText={(text) => handleDescriptionChange(key, text)}
                           multiline
                           textAlignVertical="top"
-                          returnKeyType="done"
-                          blurOnSubmit={true}
-                          onSubmitEditing={Keyboard.dismiss}
                         />
                       </View>
                     </>
@@ -203,22 +197,21 @@ const BrakeInspectionBottomSheet: React.FC<BrakeInspectionBottomSheetProps> = ({
                 </View>
               );
             })}
-          </ScrollView>
+        </KeyboardAwareScrollView>
 
-          {/* Footer */}
-          <View style={[styles.footer, { paddingBottom: 8 + insets.bottom }]}>
-            <TouchableOpacity
-              style={[
-                styles.confirmButton,
-                !isComplete && styles.confirmButtonDisabled,
-              ]}
-              onPress={handleSave}
-              disabled={!isComplete}
-            >
-              <Text style={styles.confirmButtonText}>저장</Text>
-            </TouchableOpacity>
-          </View>
-        </KeyboardAvoidingView>
+        {/* Footer */}
+        <View style={[styles.footer, { paddingBottom: 8 + insets.bottom }]}>
+          <TouchableOpacity
+            style={[
+              styles.confirmButton,
+              !isComplete && styles.confirmButtonDisabled,
+            ]}
+            onPress={handleSave}
+            disabled={!isComplete}
+          >
+            <Text style={styles.confirmButtonText}>저장</Text>
+          </TouchableOpacity>
+        </View>
       </View>
     </Modal>
   );

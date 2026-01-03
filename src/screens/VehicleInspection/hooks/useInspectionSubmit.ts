@@ -121,8 +121,21 @@ export const useInspectionSubmit = () => {
   };
 
   /**
+   * 🔥 로컬 이미지 URI인지 확인 (file://, content://, ph:// 지원)
+   */
+  const isLocalImageUri = (uri: string): boolean => {
+    return (
+      uri.startsWith('file://') ||
+      uri.startsWith('content://') ||
+      uri.startsWith('ph://') ||
+      uri.startsWith('assets-library://')
+    );
+  };
+
+  /**
    * 🔥 데이터에서 모든 이미지 경로 수집
    * { path: 'vehicleInfo_dashboardImageUris_0', uri: 'file://...' }
+   * 지원하는 URI 스키마: file://, content://, ph://, assets-library://
    */
   const collectAllImages = (
     obj: any,
@@ -137,7 +150,7 @@ export const useInspectionSubmit = () => {
     if (Array.isArray(obj)) {
       obj.forEach((item, index) => {
         const currentPath = `${path}_${index}`;
-        if (typeof item === 'string' && item.startsWith('file://')) {
+        if (typeof item === 'string' && isLocalImageUri(item)) {
           images.push({ path: currentPath, uri: item, type: 'file' });
         } else if (typeof item === 'object') {
           images.push(...collectAllImages(item, currentPath));
@@ -151,7 +164,7 @@ export const useInspectionSubmit = () => {
 
       if (key === 'signatureDataUrl' && typeof value === 'string' && value.startsWith('data:image')) {
         images.push({ path: currentPath, uri: value, type: 'base64' });
-      } else if (typeof value === 'string' && value.startsWith('file://')) {
+      } else if (typeof value === 'string' && isLocalImageUri(value)) {
         images.push({ path: currentPath, uri: value, type: 'file' });
       } else if (typeof value === 'object' && value !== null) {
         images.push(...collectAllImages(value, currentPath));
@@ -163,6 +176,7 @@ export const useInspectionSubmit = () => {
 
   /**
    * 🔥 데이터 구조에서 이미지 경로를 URL로 대체
+   * 지원하는 URI 스키마: file://, content://, ph://, assets-library://
    */
   const replaceImageUris = (
     obj: any,
@@ -176,7 +190,7 @@ export const useInspectionSubmit = () => {
     if (Array.isArray(obj)) {
       return obj.map((item, index) => {
         const currentPath = `${path}_${index}`;
-        if (typeof item === 'string' && item.startsWith('file://')) {
+        if (typeof item === 'string' && isLocalImageUri(item)) {
           return urlMap.get(currentPath) || item;
         }
         return replaceImageUris(item, urlMap, currentPath);
@@ -189,7 +203,7 @@ export const useInspectionSubmit = () => {
 
       if (key === 'signatureDataUrl' && typeof value === 'string' && value.startsWith('data:image')) {
         result[key] = urlMap.get(currentPath) || value;
-      } else if (typeof value === 'string' && value.startsWith('file://')) {
+      } else if (typeof value === 'string' && isLocalImageUri(value)) {
         result[key] = urlMap.get(currentPath) || value;
       } else if (typeof value === 'object' && value !== null) {
         result[key] = replaceImageUris(value, urlMap, currentPath);
@@ -309,8 +323,7 @@ export const useInspectionSubmit = () => {
         vehicleBrand: data.vehicleInfo?.vehicleBrand || 'MISSING',
         vehicleName: data.vehicleInfo?.vehicleName || 'MISSING',
         vehicleYear: data.vehicleInfo?.vehicleYear || 'MISSING',
-        cellCount: data.batteryInfo?.batteryCellCount || 'MISSING',
-        soh: data.batteryInfo?.batterySOH || 'MISSING',
+        batteryInfoChecked: data.batteryInfo?.checked || false,
         hasVehicleInfo: !!data.vehicleInfo,
         hasBatteryInfo: !!data.batteryInfo,
         hasVinCheck: !!data.vinCheck,
@@ -323,7 +336,7 @@ export const useInspectionSubmit = () => {
       });
       console.log(`✅ [${currentStep}] 완료`);
 
-      setUploadProgress(10);
+      setUploadProgress(5);
 
       // ========================================
       // 🔥 STEP 1: reportId 생성
@@ -337,8 +350,6 @@ export const useInspectionSubmit = () => {
         sentryLogger.logError(`❌ [${currentStep}] 실패`, stepError as Error, { selectedUserId });
         throw stepError;
       }
-
-      setUploadProgress(20);
 
       // ========================================
       // 🔥 STEP 2: 이미지 업로드 (최적화: 압축 + 청크 병렬)
@@ -361,8 +372,8 @@ export const useInspectionSubmit = () => {
 
         // 🔥 최적화된 업로드 사용 (압축 + 청크 병렬)
         uploadedData = await uploadAllImagesOptimized(data, reportId, (current, total) => {
-          // 이미지 업로드 진행률 (20% ~ 50% 구간)
-          const imageProgress = 20 + Math.round((current / total) * 30);
+          // 이미지 업로드 진행률 (5% ~ 80% 구간) - 가장 오래 걸리는 작업
+          const imageProgress = 5 + Math.round((current / total) * 75);
           setUploadProgress(imageProgress);
         });
 
@@ -379,42 +390,25 @@ export const useInspectionSubmit = () => {
         throw stepError;
       }
 
-      setUploadProgress(50);
+      setUploadProgress(80);
 
       // ========================================
-      // 🔥 STEP 3: 전압 계산
+      // 🔥 STEP 3: 배터리 확인 상태 검증 (실제 데이터는 admin에서 입력)
       // ========================================
-      currentStep = 'STEP_3_CALCULATE_VOLTAGE';
-      let maxVoltage = 0;
-      let minVoltage = 0;
+      currentStep = 'STEP_3_VALIDATE_BATTERY_CHECK';
       try {
-        const batteryCells = uploadedData?.batteryInfo?.batteryCells || [];
-        sentryLogger.log(`⚡ [${currentStep}] 전압 계산 시작`, {
+        const batteryInfoChecked = uploadedData?.batteryInfo?.checked || false;
+        sentryLogger.log(`🔋 [${currentStep}] 배터리 확인 상태`, {
           reportId,
-          batteryCellsCount: batteryCells.length,
-          firstCell: batteryCells[0] ? JSON.stringify(batteryCells[0]) : 'N/A',
+          batteryInfoChecked,
         });
-
-        const voltages = batteryCells
-          .map((c: any) => c?.voltage)
-          .filter((v: any): v is number => typeof v === 'number' && !isNaN(v));
-
-        maxVoltage = voltages.length > 0 ? Math.max(...voltages) : 0;
-        minVoltage = voltages.length > 0 ? Math.min(...voltages) : 0;
-
-        sentryLogger.log(`✅ [${currentStep}] 전압 계산 완료`, {
-          reportId,
-          voltagesCount: voltages.length,
-          maxVoltage,
-          minVoltage,
-        });
-        console.log(`✅ [${currentStep}] 완료: max=${maxVoltage}, min=${minVoltage}`);
+        console.log(`✅ [${currentStep}] 완료: checked=${batteryInfoChecked}`);
       } catch (stepError) {
         sentryLogger.logError(`❌ [${currentStep}] 실패`, stepError as Error, { reportId });
         throw stepError;
       }
 
-      setUploadProgress(60);
+      setUploadProgress(85);
 
       // ========================================
       // 🔥 STEP 4: Report 데이터 생성
@@ -450,16 +444,26 @@ export const useInspectionSubmit = () => {
           isVinVerified: vinCheck.isVinVerified || false,
           hasNoIllegalModification: vinCheck.hasNoIllegalModification || false,
           hasNoFloodDamage: vinCheck.hasNoFloodDamage || false,
+          // vinCheck 이미지 (v2)
+          registrationImageUris: vinCheck.registrationImageUris || [],
+          vinCheckImageUris: vinCheck.vinImageUris || [],
+          // vinCheck 문제 설명 (v2)
+          vinIssue: vinCheck.vinIssue || null,
+          modificationIssue: vinCheck.modificationIssue || null,
+          floodIssue: vinCheck.floodIssue || null,
           carKeyCount: parseInt(vehicleInfo.carKeyCount) || 2,
           diagnosisDate: new Date(),
-          cellCount: batteryInfo.batteryCellCount || 0,
-          defectiveCellCount: (batteryInfo.batteryCells || []).filter((c: any) => c?.isDefective).length,
-          normalChargeCount: batteryInfo.normalChargeCount || 0,
-          fastChargeCount: batteryInfo.fastChargeCount || 0,
-          sohPercentage: batteryInfo.batterySOH !== '' ? parseFloat(batteryInfo.batterySOH) || 0 : 0,
-          maxVoltage,
-          minVoltage,
-          cellsData: batteryInfo.batteryCells || [],
+          // 배터리 정보 확인 여부 (상세 데이터는 admin에서 입력)
+          batteryInfoChecked: batteryInfo.checked || false,
+          // 배터리 상세 데이터는 admin에서 입력하므로 null로 설정
+          cellCount: null,
+          defectiveCellCount: null,
+          normalChargeCount: null,
+          fastChargeCount: null,
+          sohPercentage: null,
+          maxVoltage: null,
+          minVoltage: null,
+          cellsData: null,
           diagnosisDetails: [],
           comprehensiveInspection: {
             otherInspection: (uploadedData?.other?.items?.length || 0) > 0 ? uploadedData.other.items : null,
@@ -501,7 +505,7 @@ export const useInspectionSubmit = () => {
         throw stepError;
       }
 
-      setUploadProgress(80);
+      setUploadProgress(90);
 
       // ========================================
       // 🔥 STEP 5: Firebase에 저장
@@ -537,9 +541,9 @@ export const useInspectionSubmit = () => {
       // 성공 로그 (상세 정보 포함)
       sentryLogger.log('✅ 진단 리포트 제출 성공', {
         reportId,
-        reservationId: reservationId || 'N/A',  // ⭐ 예약 ID 로깅
-        mechanicId: mechanicId || 'N/A',        // ⭐ 정비사 ID 로깅
-        mechanicName: mechanicName || 'N/A',    // ⭐ 정비사 이름 로깅
+        reservationId: reservationId || 'N/A',
+        mechanicId: mechanicId || 'N/A',
+        mechanicName: mechanicName || 'N/A',
         userId: selectedUserId,
         userName: selectedUserName,
         vehicleBrand: reportData.vehicleBrand,
@@ -547,13 +551,7 @@ export const useInspectionSubmit = () => {
         vehicleYear: reportData.vehicleYear,
         vehicleGrade: reportData.vehicleGrade,
         mileage: reportData.mileage,
-        cellCount: reportData.cellCount,
-        defectiveCellCount: reportData.defectiveCellCount,
-        sohPercentage: reportData.sohPercentage,
-        maxVoltage: reportData.maxVoltage,
-        minVoltage: reportData.minVoltage,
-        normalChargeCount: reportData.normalChargeCount,
-        fastChargeCount: reportData.fastChargeCount,
+        batteryInfoChecked: reportData.batteryInfoChecked,
         dashboardStatus: reportData.dashboardStatus,
         isVinVerified: reportData.isVinVerified,
         hasNoIllegalModification: reportData.hasNoIllegalModification,
@@ -617,11 +615,8 @@ export const useInspectionSubmit = () => {
         hasNoIllegalModification: data?.vinCheck?.hasNoIllegalModification || false,
         hasNoFloodDamage: data?.vinCheck?.hasNoFloodDamage || false,
 
-        // 배터리 정보
-        batteryCellCount: data?.batteryInfo?.batteryCellCount || 0,
-        batterySOH: data?.batteryInfo?.batterySOH || 'N/A',
-        batteryCellsLength: data?.batteryInfo?.batteryCells?.length || 0,
-        defectiveCellsCount: data?.batteryInfo?.batteryCells?.filter((c) => c?.isDefective)?.length || 0,
+        // 배터리 정보 확인
+        batteryInfoChecked: data?.batteryInfo?.checked || false,
 
         // 섹션 존재 여부 (v2 구조)
         hasExterior: !!data?.exterior,

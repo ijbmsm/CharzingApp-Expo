@@ -5,12 +5,11 @@ import {
   Modal,
   StyleSheet,
   TouchableOpacity,
-  ScrollView,
   TextInput,
   Keyboard,
   Platform,
-  KeyboardAvoidingView,
 } from 'react-native';
+import { KeyboardAwareScrollView } from 'react-native-keyboard-aware-scroll-view';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { scale, verticalScale, moderateScale } from 'react-native-size-matters';
@@ -174,11 +173,6 @@ const TiresAndWheelsBottomSheet: React.FC<TiresAndWheelsBottomSheetProps> = ({
       presentationStyle={Platform.OS === 'ios' ? 'pageSheet' : undefined}
       onRequestClose={handleCancel}
     >
-      <KeyboardAvoidingView
-        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-        style={{ flex: 1 }}
-        keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 20}
-      >
         <View
           style={[
             styles.container,
@@ -212,14 +206,13 @@ const TiresAndWheelsBottomSheet: React.FC<TiresAndWheelsBottomSheetProps> = ({
         </View>
 
         {/* Tire/Wheel List */}
-        <ScrollView
+        <KeyboardAwareScrollView
           style={styles.scrollView}
           contentContainerStyle={styles.scrollContent}
           showsVerticalScrollIndicator={false}
           keyboardShouldPersistTaps="handled"
-          keyboardDismissMode="on-drag"
-          automaticallyAdjustKeyboardInsets={true}
-          contentInsetAdjustmentBehavior="automatic"
+          extraScrollHeight={120}
+          enableOnAndroid={true}
         >
           {positions.map(({ key, label }) => {
             const item = localData[key];
@@ -273,18 +266,14 @@ const TiresAndWheelsBottomSheet: React.FC<TiresAndWheelsBottomSheetProps> = ({
                       value={item?.wheelIssueDescription || ''}
                       onChangeText={(text) => handleWheelIssueDescriptionChange(key, text)}
                       multiline
-                      returnKeyType="done"
-                      blurOnSubmit={true}
-                      onSubmitEditing={Keyboard.dismiss}
                     />
                   </>
                 )}
               </View>
             );
           })}
-        </ScrollView>
+        </KeyboardAwareScrollView>
       </View>
-      </KeyboardAvoidingView>
     </Modal>
   );
 };

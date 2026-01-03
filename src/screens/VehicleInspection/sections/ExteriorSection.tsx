@@ -22,7 +22,11 @@ const REQUIRED_BASE_PHOTO_KEYS: BodyPanelKey[] = [
   'hood', 'doorFL', 'doorFR', 'doorRL', 'doorRR', 'trunkLid',
 ];
 
-export const ExteriorSection: React.FC = () => {
+interface ExteriorSectionProps {
+  showValidationErrors?: boolean;
+}
+
+export const ExteriorSection: React.FC<ExteriorSectionProps> = ({ showValidationErrors = false }) => {
   const { watch, setValue } = useFormContext<InspectionFormData>();
 
   // BottomSheet 상태
@@ -88,6 +92,7 @@ export const ExteriorSection: React.FC = () => {
             : '19개 항목 + 기본사진 6컷'
         }
         onPress={() => setIsBodyPanelVisible(true)}
+        showError={showValidationErrors}
       />
 
       {/* 프레임 (20개) */}
@@ -96,6 +101,7 @@ export const ExteriorSection: React.FC = () => {
         isCompleted={frameCompleted >= 10}
         value={frameCompleted > 0 ? `${frameCompleted}/20 완료` : '20개 항목 검사'}
         onPress={() => setIsFrameVisible(true)}
+        showError={showValidationErrors}
       />
 
       {/* 유리 (7개) */}
@@ -104,6 +110,7 @@ export const ExteriorSection: React.FC = () => {
         isCompleted={glassCompleted >= 4}
         value={glassCompleted > 0 ? `${glassCompleted}/7 완료` : '7개 항목 검사'}
         onPress={() => setIsGlassVisible(true)}
+        showError={showValidationErrors}
       />
 
       {/* 램프 (5개) */}
@@ -112,6 +119,7 @@ export const ExteriorSection: React.FC = () => {
         isCompleted={lampCompleted >= 3}
         value={lampCompleted > 0 ? `${lampCompleted}/5 완료` : '5개 항목 검사'}
         onPress={() => setIsLampVisible(true)}
+        showError={showValidationErrors}
       />
 
       {/* BottomSheet 컴포넌트들 */}
@@ -156,7 +164,7 @@ const styles = StyleSheet.create({
     backgroundColor: '#F3F4F6',
     padding: moderateScale(12),
     borderRadius: moderateScale(8),
-    marginBottom: verticalScale(16),
+    marginBottom: 12,
   },
   descriptionText: {
     fontSize: moderateScale(12),

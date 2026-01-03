@@ -40,6 +40,7 @@ import { useInspectionSubmit } from './hooks/useInspectionSubmit';
 // Types
 import { InspectionSection, ExpandedSectionsState, SectionCompletion } from './types';
 
+
 // Section Components
 import { VehicleInfoSection } from './sections/VehicleInfoSection';
 import { BatteryInfoSection } from './sections/BatteryInfoSection';
@@ -100,6 +101,9 @@ const VehicleInspectionScreen: React.FC = () => {
   // 진단사 수행 확인 모달
   const [isDiagnosticianModalVisible, setIsDiagnosticianModalVisible] = useState(false);
 
+  // 유효성 검사 에러 표시 (제출 시도 후)
+  const [showValidationErrors, setShowValidationErrors] = useState(false);
+
   // 🔍 디버깅: 상태 변화 추적
   useEffect(() => {
     console.log('🔍 inspectionMode 변경:', inspectionMode);
@@ -112,7 +116,7 @@ const VehicleInspectionScreen: React.FC = () => {
   // React Hook Form (draft는 복구 시 reset으로 주입)
   const methods = useInspectionForm(undefined);
   const { watch, reset } = methods;
-  const { isSubmitting, submitInspection } = useInspectionSubmit();
+  const { isSubmitting, uploadProgress, submitInspection } = useInspectionSubmit();
 
   // 자동저장 (사용자 선택 후에만 활성화)
   const { isSaving } = useAutoSave({
@@ -638,16 +642,15 @@ const VehicleInspectionScreen: React.FC = () => {
     const vehicleInfo = watch('vehicleInfo');
     const vinCheck = watch('vinCheck');
 
-    // 4개 주요 항목 체크 (VehicleInfoSection의 isCompleted 로직과 동일하게)
+    // 3개 주요 항목 체크 (차량 모델은 admin에서 입력)
     const items = [
-      // 1. 차량 모델 (브랜드, 차량명, 연식, 주행거리)
-      !!(vehicleInfo.vehicleBrand && vehicleInfo.vehicleName && vehicleInfo.vehicleYear && vehicleInfo.mileage),
-      // 2. 차키 수
+      // 1. 차키 수
       !!(vehicleInfo.carKeyCount && parseInt(vehicleInfo.carKeyCount) > 0),
-      // 3. 계기판 정보 (이미지 + 상태)
+      // 2. 계기판 정보 (이미지 + 상태)
       !!(vehicleInfo.dashboardImageUris && vehicleInfo.dashboardImageUris.length > 0 && vehicleInfo.dashboardStatus),
-      // 4. 차대번호 및 상태 확인 (이미지 + 3개 상태 모두)
-      !!(vinCheck.vinImageUris && vinCheck.vinImageUris.length > 0 &&
+      // 3. 차대번호 및 상태 확인 (등록증 + 차대번호 이미지 + 3개 상태 모두)
+      !!(vinCheck.registrationImageUris && vinCheck.registrationImageUris.length > 0 &&
+         vinCheck.vinImageUris && vinCheck.vinImageUris.length > 0 &&
          vinCheck.isVinVerified !== undefined &&
          vinCheck.hasNoIllegalModification !== undefined &&
          vinCheck.hasNoFloodDamage !== undefined),
@@ -655,7 +658,7 @@ const VehicleInspectionScreen: React.FC = () => {
 
     return {
       completed: items.filter(Boolean).length,
-      total: 4,
+      total: 3,
       isAllRequiredComplete: items.every(Boolean),
     };
   }, [watch('vehicleInfo'), watch('vinCheck')]);
@@ -663,16 +666,13 @@ const VehicleInspectionScreen: React.FC = () => {
   const calculateBatteryInfoCompletion = useCallback((): SectionCompletion => {
     const batteryInfo = watch('batteryInfo');
 
-    const items = [
-      !!batteryInfo.batterySOH,
-      batteryInfo.batteryCellCount > 0,
-      batteryInfo.batteryCells && batteryInfo.batteryCells.length > 0,
-    ];
+    // 배터리 정보 확인 체크만 필요 (상세 데이터는 admin에서 입력)
+    const isChecked = batteryInfo?.checked || false;
 
     return {
-      completed: items.filter(Boolean).length,
-      total: 3,
-      isAllRequiredComplete: items.every(Boolean),
+      completed: isChecked ? 1 : 0,
+      total: 1,
+      isAllRequiredComplete: isChecked,
     };
   }, [watch('batteryInfo')]);
 
@@ -744,11 +744,10 @@ const VehicleInspectionScreen: React.FC = () => {
   const calculateTireAndWheelCompletion = useCallback((): SectionCompletion => {
     const tireAndWheel = watch('tireAndWheel');
 
-    // 타이어 검사: 상태 2개 + 사진 2개 필수
+    // 타이어 검사: 4개 위치 모두 상태 선택 필수 (기본 사진 없음)
     const tire = tireAndWheel?.tire || {};
     const tireStatusCount = Object.values(tire).filter((item) => item && item.status).length;
-    const tirePhotoCount = Object.values(tire).filter((item) => item && item.basePhoto).length;
-    const hasTire = tireStatusCount >= 2 && tirePhotoCount >= 2;
+    const hasTire = tireStatusCount >= 4;
 
     // 휠 검사: 상태 2개 + 사진 2개 필수
     const wheel = tireAndWheel?.wheel || {};
@@ -774,9 +773,11 @@ const VehicleInspectionScreen: React.FC = () => {
     const batteryPhotoCount = Object.values(batteryPack).filter((item) => item && item.basePhoto).length;
     const hasBatteryPack = batteryStatusCount >= 2 && batteryPhotoCount >= 2;
 
-    // 서스펜션 검사: 4개 중 2개 이상
+    // 서스펜션 검사: 4개 위치 모두 상태 + 기본사진 필수
     const suspension = undercarriage?.suspension || {};
-    const hasSuspension = Object.values(suspension).filter((item) => item && item.status).length >= 2;
+    const suspensionStatusCount = Object.values(suspension).filter((item) => item && item.status).length;
+    const suspensionPhotoCount = Object.values(suspension).filter((item) => item && item.basePhotos?.length).length;
+    const hasSuspension = suspensionStatusCount >= 4 && suspensionPhotoCount >= 4;
 
     // 브레이크 검사: 5개 중 3개 이상
     const brake = undercarriage?.brake || {};
@@ -873,32 +874,37 @@ const VehicleInspectionScreen: React.FC = () => {
       diagnosticianData?.diagnosticianName &&
       diagnosticianData?.signatureDataUrl;
 
-    if (!isDiagnosticianComplete) {
-      Alert.alert(
-        '진단사 확인 필요',
-        '진단사 서명 및 확인을 완료해주세요.',
-        [{ text: '확인' }]
-      );
-      return;
-    }
-
-    if (incompleteSections.length > 0) {
+    // 미완성 항목이 있거나 진단사 확인이 안됐으면 Alert 표시
+    if (incompleteSections.length > 0 || !isDiagnosticianComplete) {
       // 상세 정보 포함된 리스트 생성
-      const sectionList = incompleteSections
-        .map((s) => `• ${s.name} (${s.completion.completed}/${s.completion.total})`)
-        .join('\n');
+      const incompleteList: string[] = [];
+
+      // 섹션별 미완성 항목
+      incompleteSections.forEach((s) => {
+        incompleteList.push(`• ${s.name} (${s.completion.completed}/${s.completion.total})`);
+      });
+
+      // 진단사 확인 미완성
+      if (!isDiagnosticianComplete) {
+        incompleteList.push('• 진단사 서명 확인');
+      }
+
+      // 유효성 에러 표시 활성화
+      setShowValidationErrors(true);
 
       Alert.alert(
         '미완성 항목',
-        `다음 항목을 완료해주세요:\n\n${sectionList}`,
+        `다음 항목을 완료해주세요:\n\n${incompleteList.join('\n')}`,
         [
           {
             text: '확인',
             onPress: () => {
               // 첫 번째 미완성 섹션 자동으로 펼치기
-              const firstIncomplete = incompleteSections[0]!.key;
-              if (!expandedSections[firstIncomplete]) {
-                toggleSection(firstIncomplete);
+              if (incompleteSections.length > 0) {
+                const firstIncomplete = incompleteSections[0]!.key;
+                if (!expandedSections[firstIncomplete]) {
+                  toggleSection(firstIncomplete);
+                }
               }
             },
           },
@@ -1268,7 +1274,7 @@ const VehicleInspectionScreen: React.FC = () => {
               },
             ]}
           >
-            {expandedSections.vehicleInfo && <VehicleInfoSection />}
+            {expandedSections.vehicleInfo && <VehicleInfoSection showValidationErrors={showValidationErrors} />}
           </Animated.View>
 
           {/* Section 2: Battery Info */}
@@ -1285,7 +1291,7 @@ const VehicleInspectionScreen: React.FC = () => {
               },
             ]}
           >
-            {expandedSections.batteryInfo && <BatteryInfoSection />}
+            {expandedSections.batteryInfo && <BatteryInfoSection showValidationErrors={showValidationErrors} />}
           </Animated.View>
 
           {/* Section 3: Exterior (외부 검사) - v2 */}
@@ -1302,7 +1308,7 @@ const VehicleInspectionScreen: React.FC = () => {
               },
             ]}
           >
-            {expandedSections.exterior && <ExteriorSection />}
+            {expandedSections.exterior && <ExteriorSection showValidationErrors={showValidationErrors} />}
           </Animated.View>
 
           {/* Section 4: Interior (내부 검사) - v2 */}
@@ -1319,7 +1325,7 @@ const VehicleInspectionScreen: React.FC = () => {
               },
             ]}
           >
-            {expandedSections.interior && <InteriorSection />}
+            {expandedSections.interior && <InteriorSection showValidationErrors={showValidationErrors} />}
           </Animated.View>
 
           {/* Section 5: Tire & Wheel (타이어 & 휠) - v2 */}
@@ -1336,7 +1342,7 @@ const VehicleInspectionScreen: React.FC = () => {
               },
             ]}
           >
-            {expandedSections.tireAndWheel && <TireAndWheelSection />}
+            {expandedSections.tireAndWheel && <TireAndWheelSection showValidationErrors={showValidationErrors} />}
           </Animated.View>
 
           {/* Section 6: Undercarriage (하체 검사) - v2 */}
@@ -1353,7 +1359,7 @@ const VehicleInspectionScreen: React.FC = () => {
               },
             ]}
           >
-            {expandedSections.undercarriage && <UndercarriageSection />}
+            {expandedSections.undercarriage && <UndercarriageSection showValidationErrors={showValidationErrors} />}
           </Animated.View>
 
           {/* Section 7: Other */}
@@ -1410,17 +1416,27 @@ const VehicleInspectionScreen: React.FC = () => {
           const isDiagnosticianComplete = diagData?.confirmed &&
             diagData?.diagnosticianName &&
             diagData?.signatureDataUrl;
-          const isButtonDisabled = isSubmitting || !isDiagnosticianComplete;
+
+          // 모든 섹션 완료 여부 체크
+          const allSectionsComplete =
+            calculateVehicleInfoCompletion().isAllRequiredComplete &&
+            calculateBatteryInfoCompletion().isAllRequiredComplete &&
+            calculateExteriorCompletion().isAllRequiredComplete &&
+            calculateInteriorCompletion().isAllRequiredComplete &&
+            calculateTireAndWheelCompletion().isAllRequiredComplete &&
+            calculateUndercarriageCompletion().isAllRequiredComplete;
+
+          const isFullyComplete = isDiagnosticianComplete && allSectionsComplete;
 
           return (
             <View style={[styles.submitContainer, { paddingBottom: insets.bottom }]}>
               <TouchableOpacity
                 style={[
                   styles.submitButton,
-                  isButtonDisabled && styles.submitButtonDisabled,
+                  !isFullyComplete && styles.submitButtonDisabled,
                 ]}
                 onPress={handleSubmit}
-                disabled={isButtonDisabled}
+                disabled={isSubmitting}
                 activeOpacity={0.7}
               >
                 {isSubmitting ? (
@@ -1442,6 +1458,24 @@ const VehicleInspectionScreen: React.FC = () => {
           }}
           initialData={watch('diagnosticianConfirmation')}
         />
+
+        {/* 업로드 진행률 모달 */}
+        <Modal
+          visible={isSubmitting}
+          transparent={true}
+          animationType="fade"
+        >
+          <View style={styles.uploadModalOverlay}>
+            <View style={styles.uploadModalContent}>
+              <ActivityIndicator size="large" color="#06B6D4" />
+              <Text style={styles.uploadModalTitle}>리포트 제출 중</Text>
+              <View style={styles.uploadProgressBarContainer}>
+                <View style={[styles.uploadProgressBar, { width: `${uploadProgress}%` }]} />
+              </View>
+              <Text style={styles.uploadModalProgress}>{uploadProgress}%</Text>
+            </View>
+          </View>
+        </Modal>
       </SafeAreaView>
     </FormProvider>
   );
@@ -1860,6 +1894,45 @@ const styles = StyleSheet.create({
     fontSize: moderateScale(16),
     fontWeight: '700',
     color: '#FFFFFF',
+  },
+  // 업로드 진행률 모달
+  uploadModalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.6)',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  uploadModalContent: {
+    backgroundColor: '#FFFFFF',
+    borderRadius: 16,
+    padding: scale(32),
+    alignItems: 'center',
+    width: scale(280),
+  },
+  uploadModalTitle: {
+    fontSize: moderateScale(16),
+    fontWeight: '600',
+    color: '#1F2937',
+    marginTop: verticalScale(16),
+    marginBottom: verticalScale(20),
+  },
+  uploadProgressBarContainer: {
+    width: '100%',
+    height: verticalScale(8),
+    backgroundColor: '#E5E7EB',
+    borderRadius: 4,
+    overflow: 'hidden',
+  },
+  uploadProgressBar: {
+    height: '100%',
+    backgroundColor: '#06B6D4',
+    borderRadius: 4,
+  },
+  uploadModalProgress: {
+    fontSize: moderateScale(14),
+    fontWeight: '600',
+    color: '#06B6D4',
+    marginTop: verticalScale(12),
   },
 });
 

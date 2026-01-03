@@ -12,11 +12,10 @@ import {
   Modal,
   TouchableOpacity,
   Platform,
-  ScrollView,
   TextInput,
   Keyboard,
-  KeyboardAvoidingView,
 } from 'react-native';
+import { KeyboardAwareScrollView } from 'react-native-keyboard-aware-scroll-view';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import MultipleImagePicker from '../../MultipleImagePicker';
@@ -174,10 +173,6 @@ const MaterialsBottomSheet: React.FC<MaterialsBottomSheetProps> = ({
           },
         ]}
       >
-        <KeyboardAvoidingView
-          behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-          style={styles.keyboardView}
-        >
           {/* Header */}
           <View style={styles.header}>
             <TouchableOpacity onPress={onClose} style={styles.closeButton}>
@@ -195,11 +190,13 @@ const MaterialsBottomSheet: React.FC<MaterialsBottomSheetProps> = ({
           </View>
 
           {/* Content */}
-          <ScrollView
+          <KeyboardAwareScrollView
             style={styles.content}
             contentContainerStyle={{ paddingBottom: 100 + insets.bottom }}
             showsVerticalScrollIndicator={false}
             keyboardShouldPersistTaps="handled"
+            extraScrollHeight={120}
+            enableOnAndroid={true}
           >
             {INTERIOR_MATERIALS_KEYS.map((key) => {
               const item = materialsData[key] || {};
@@ -263,9 +260,6 @@ const MaterialsBottomSheet: React.FC<MaterialsBottomSheetProps> = ({
                           onChangeText={(text) => handleDescriptionChange(key, text)}
                           multiline
                           textAlignVertical="top"
-                          returnKeyType="done"
-                          blurOnSubmit={true}
-                          onSubmitEditing={Keyboard.dismiss}
                         />
                       </View>
                     </>
@@ -273,7 +267,7 @@ const MaterialsBottomSheet: React.FC<MaterialsBottomSheetProps> = ({
                 </View>
               );
             })}
-          </ScrollView>
+          </KeyboardAwareScrollView>
 
           {/* Footer */}
           <View style={[styles.footer, { paddingBottom: 8 + insets.bottom }]}>
@@ -288,7 +282,6 @@ const MaterialsBottomSheet: React.FC<MaterialsBottomSheetProps> = ({
               <Text style={styles.confirmButtonText}>저장</Text>
             </TouchableOpacity>
           </View>
-        </KeyboardAvoidingView>
       </View>
     </Modal>
   );
