@@ -11,10 +11,10 @@ import {
   Modal,
   TouchableOpacity,
   Platform,
-  ScrollView,
   TextInput,
   Keyboard,
 } from 'react-native';
+import { KeyboardAwareScrollView } from 'react-native-keyboard-aware-scroll-view';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { scale, verticalScale, moderateScale } from 'react-native-size-matters';
@@ -47,18 +47,22 @@ const BodyPanelBottomSheetV2: React.FC<BodyPanelBottomSheetV2Props> = ({
 }) => {
   const insets = useSafeAreaInsets();
   const [bodyPanelData, setBodyPanelData] = useState<Record<string, PaintInspectionItem & { basePhotoArr?: string[] }>>({});
+  const [thicknessStrings, setThicknessStrings] = useState<Record<string, string>>({});
 
   useEffect(() => {
     if (visible) {
       const dataMap: Record<string, PaintInspectionItem & { basePhotoArr?: string[] }> = {};
+      const thicknessMap: Record<string, string> = {};
       BODY_PANEL_KEYS.forEach((key) => {
         const item = initialData[key] || {};
         dataMap[key] = {
           ...item,
           basePhotoArr: item.basePhoto ? [item.basePhoto] : [],
         };
+        thicknessMap[key] = item.thickness?.toString() || '';
       });
       setBodyPanelData(dataMap);
+      setThicknessStrings(thicknessMap);
     }
   }, [visible, initialData]);
 
@@ -78,7 +82,7 @@ const BodyPanelBottomSheetV2: React.FC<BodyPanelBottomSheetV2Props> = ({
       ...prev,
       [key]: {
         ...prev[key],
-        basePhotoArr: [...(prev[key]?.basePhotoArr || []), ...uris].slice(0, 1),
+        basePhotoArr: [...(prev[key]?.basePhotoArr || []), ...uris].slice(0, 10),
         basePhoto: uris[0] || prev[key]?.basePhoto,
       },
     }));
@@ -107,13 +111,11 @@ const BodyPanelBottomSheetV2: React.FC<BodyPanelBottomSheetV2Props> = ({
   };
 
   const handleThicknessChange = (key: BodyPanelKey, thickness: string) => {
-    const numValue = thickness ? parseFloat(thickness) : undefined;
-    setBodyPanelData((prev) => ({
+    // 숫자와 소수점만 허용
+    const sanitized = thickness.replace(/[^0-9.]/g, '');
+    setThicknessStrings((prev) => ({
       ...prev,
-      [key]: {
-        ...prev[key],
-        thickness: numValue,
-      },
+      [key]: sanitized,
     }));
   };
 
@@ -163,13 +165,15 @@ const BodyPanelBottomSheetV2: React.FC<BodyPanelBottomSheetV2Props> = ({
     const result: Record<BodyPanelKey, PaintInspectionItem> = {} as Record<BodyPanelKey, PaintInspectionItem>;
     BODY_PANEL_KEYS.forEach((key) => {
       const item = bodyPanelData[key];
-      if (item?.status || item?.basePhoto || item?.basePhotoArr?.[0]) {
+      const thicknessStr = thicknessStrings[key];
+      const thicknessNum = thicknessStr ? parseFloat(thicknessStr) : undefined;
+      if (item?.status || item?.basePhoto || item?.basePhotoArr?.[0] || thicknessNum) {
         result[key] = {
-          status: item.status,
-          basePhoto: item.basePhotoArr?.[0] || item.basePhoto,
-          thickness: item.thickness,
-          issueDescription: item.issueDescription,
-          issueImageUris: item.issueImageUris,
+          status: item?.status,
+          basePhoto: item?.basePhotoArr?.[0] || item?.basePhoto,
+          thickness: thicknessNum,
+          issueDescription: item?.issueDescription,
+          issueImageUris: item?.issueImageUris,
         };
       }
     });
@@ -220,11 +224,13 @@ const BodyPanelBottomSheetV2: React.FC<BodyPanelBottomSheetV2Props> = ({
         </View>
 
         {/* Content */}
-        <ScrollView
+        <KeyboardAwareScrollView
           style={styles.content}
           contentContainerStyle={{ paddingBottom: 100 + insets.bottom }}
           showsVerticalScrollIndicator={false}
           keyboardShouldPersistTaps="handled"
+          extraScrollHeight={120}
+          enableOnAndroid={true}
         >
           {BODY_PANEL_KEYS.map((key) => {
             const item = bodyPanelData[key] || {};
@@ -247,7 +253,7 @@ const BodyPanelBottomSheetV2: React.FC<BodyPanelBottomSheetV2Props> = ({
                       onImageRemoved={(index) => handleBasePhotoRemoved(key, index)}
                       onImageEdited={(index, uri) => handleBasePhotoEdited(key, index, uri)}
                       label={label}
-                      maxImages={1}
+                      maxImages={10}
                     />
                   </View>
                 )}
@@ -269,7 +275,7 @@ const BodyPanelBottomSheetV2: React.FC<BodyPanelBottomSheetV2Props> = ({
                           style={[styles.textInput, styles.thicknessInput]}
                           placeholder="0"
                           placeholderTextColor="#9CA3AF"
-                          value={item.thickness?.toString() || ''}
+                          value={thicknessStrings[key] || ''}
                           onChangeText={(text) => handleThicknessChange(key, text)}
                           keyboardType="decimal-pad"
                         />
@@ -307,7 +313,7 @@ const BodyPanelBottomSheetV2: React.FC<BodyPanelBottomSheetV2Props> = ({
               </View>
             );
           })}
-        </ScrollView>
+        </KeyboardAwareScrollView>
       </View>
     </Modal>
   );

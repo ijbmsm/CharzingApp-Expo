@@ -11,10 +11,9 @@ import {
   Modal,
   TouchableOpacity,
   Platform,
-  ScrollView,
   TextInput,
-  Keyboard,
 } from 'react-native';
+import { KeyboardAwareScrollView } from 'react-native-keyboard-aware-scroll-view';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { scale, verticalScale, moderateScale } from 'react-native-size-matters';
@@ -160,11 +159,13 @@ const GlassInspectionBottomSheet: React.FC<GlassInspectionBottomSheetProps> = ({
         </View>
 
         {/* Content */}
-        <ScrollView
+        <KeyboardAwareScrollView
           style={styles.content}
           contentContainerStyle={{ paddingBottom: 100 + insets.bottom }}
           showsVerticalScrollIndicator={false}
           keyboardShouldPersistTaps="handled"
+          extraScrollHeight={120}
+          enableOnAndroid={true}
         >
           {GLASS_KEYS.map((key) => {
             const item = glassData[key] || {};
@@ -209,7 +210,7 @@ const GlassInspectionBottomSheet: React.FC<GlassInspectionBottomSheetProps> = ({
               </View>
             );
           })}
-        </ScrollView>
+        </KeyboardAwareScrollView>
       </View>
     </Modal>
   );

@@ -63,7 +63,7 @@ const WheelInspectionBottomSheet: React.FC<WheelInspectionBottomSheetProps> = ({
       ...prev,
       [key]: {
         ...prev[key],
-        basePhotoArr: [...(prev[key]?.basePhotoArr || []), ...uris].slice(0, 1),
+        basePhotoArr: [...(prev[key]?.basePhotoArr || []), ...uris].slice(0, 10),
         basePhoto: uris[0] || prev[key]?.basePhoto,
       },
     }));
@@ -187,7 +187,7 @@ const WheelInspectionBottomSheet: React.FC<WheelInspectionBottomSheetProps> = ({
                       onImageRemoved={(index) => handleBasePhotoRemoved(key, index)}
                       onImageEdited={(index, uri) => handleBasePhotoEdited(key, index, uri)}
                       label={`휠 ${label}`}
-                      maxImages={1}
+                      maxImages={10}
                     />
                   </View>
 

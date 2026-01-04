@@ -41,14 +41,19 @@ const TireInspectionBottomSheet: React.FC<TireInspectionBottomSheetProps> = ({
 }) => {
   const insets = useSafeAreaInsets();
   const [tireData, setTireData] = useState<Record<string, TireInspectionItem>>({});
+  const [treadDepthStrings, setTreadDepthStrings] = useState<Record<string, string>>({});
 
   useEffect(() => {
     if (visible) {
       const dataMap: Record<string, TireInspectionItem> = {};
+      const depthMap: Record<string, string> = {};
       POSITION_KEYS.forEach((key) => {
-        dataMap[key] = initialData[key] || {};
+        const item = initialData[key] || {};
+        dataMap[key] = item;
+        depthMap[key] = item.treadDepth?.toString() || '';
       });
       setTireData(dataMap);
+      setTreadDepthStrings(depthMap);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [visible]);
@@ -66,10 +71,11 @@ const TireInspectionBottomSheet: React.FC<TireInspectionBottomSheetProps> = ({
   };
 
   const handleTreadDepthChange = (key: PositionKey, depth: string) => {
-    const numValue = depth ? parseFloat(depth) : undefined;
-    setTireData((prev) => ({
+    // 숫자와 소수점만 허용
+    const sanitized = depth.replace(/[^0-9.]/g, '');
+    setTreadDepthStrings((prev) => ({
       ...prev,
-      [key]: { ...prev[key], treadDepth: numValue },
+      [key]: sanitized,
     }));
   };
 
@@ -114,12 +120,14 @@ const TireInspectionBottomSheet: React.FC<TireInspectionBottomSheetProps> = ({
     const result: Record<PositionKey, TireInspectionItem> = {} as Record<PositionKey, TireInspectionItem>;
     POSITION_KEYS.forEach((key) => {
       const item = tireData[key];
-      if (item?.status || item?.treadDepth) {
+      const depthStr = treadDepthStrings[key];
+      const depthNum = depthStr ? parseFloat(depthStr) : undefined;
+      if (item?.status || depthNum) {
         result[key] = {
-          status: item.status,
-          treadDepth: item.treadDepth,
-          issueDescription: item.status === 'problem' ? item.issueDescription : undefined,
-          issueImageUris: item.status === 'problem' ? item.issueImageUris : undefined,
+          status: item?.status,
+          treadDepth: depthNum,
+          issueDescription: item?.status === 'problem' ? item?.issueDescription : undefined,
+          issueImageUris: item?.status === 'problem' ? item?.issueImageUris : undefined,
         };
       }
     });
@@ -189,7 +197,7 @@ const TireInspectionBottomSheet: React.FC<TireInspectionBottomSheetProps> = ({
                       style={[styles.textInput, styles.treadInput]}
                       placeholder="0.0"
                       placeholderTextColor="#9CA3AF"
-                      value={item.treadDepth?.toString() || ''}
+                      value={treadDepthStrings[key] || ''}
                       onChangeText={(text) => handleTreadDepthChange(key, text)}
                       keyboardType="decimal-pad"
                     />
@@ -218,7 +226,7 @@ const TireInspectionBottomSheet: React.FC<TireInspectionBottomSheetProps> = ({
                         onImageRemoved={(index) => handleImageRemoved(key, index)}
                         onImageEdited={(index, uri) => handleImageEdited(key, index, uri)}
                         label={`타이어 ${label} 문제`}
-                        maxImages={5}
+                        maxImages={10}
                       />
                     </View>
 

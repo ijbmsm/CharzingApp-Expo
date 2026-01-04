@@ -64,7 +64,7 @@ const MaterialsBottomSheet: React.FC<MaterialsBottomSheetProps> = ({
       ...prev,
       [key]: {
         ...prev[key],
-        basePhotoArr: [...(prev[key]?.basePhotoArr || []), ...uris].slice(0, 1),
+        basePhotoArr: [...(prev[key]?.basePhotoArr || []), ...uris].slice(0, 10),
         basePhoto: uris[0] || prev[key]?.basePhoto,
       },
     }));
@@ -219,7 +219,7 @@ const MaterialsBottomSheet: React.FC<MaterialsBottomSheetProps> = ({
                         onImageRemoved={(index) => handleBasePhotoRemoved(key, index)}
                         onImageEdited={(index, uri) => handleBasePhotoEdited(key, index, uri)}
                         label={label}
-                        maxImages={1}
+                        maxImages={10}
                       />
                     </View>
                   )}
