@@ -5,6 +5,7 @@ import {
   ActivityIndicator,
   StyleSheet,
   Modal,
+  TouchableWithoutFeedback,
 } from 'react-native';
 
 interface LoadingSpinnerProps {
@@ -13,6 +14,7 @@ interface LoadingSpinnerProps {
   size?: 'small' | 'large';
   overlay?: boolean;
   backgroundColor?: string;
+  onClose?: () => void;
 }
 
 const LoadingSpinner: React.FC<LoadingSpinnerProps> = ({
@@ -21,6 +23,7 @@ const LoadingSpinner: React.FC<LoadingSpinnerProps> = ({
   size = 'large',
   overlay = true,
   backgroundColor = 'rgba(0, 0, 0, 0.5)',
+  onClose,
 }) => {
   if (!visible) return null;
 
@@ -31,13 +34,21 @@ const LoadingSpinner: React.FC<LoadingSpinnerProps> = ({
         animationType="fade"
         visible={visible}
         statusBarTranslucent={true}
+        onRequestClose={onClose}
       >
-        <View style={[styles.overlay, { backgroundColor }]}>
-          <View style={styles.container}>
-            <ActivityIndicator size={size} color="#4495E8" />
-            {message && <Text style={styles.message}>{message}</Text>}
+        <TouchableWithoutFeedback onPress={onClose}>
+          <View style={[styles.overlay, { backgroundColor }]}>
+            <TouchableWithoutFeedback>
+              <View style={styles.container}>
+                <ActivityIndicator size={size} color="#4495E8" />
+                {message && <Text style={styles.message}>{message}</Text>}
+                {onClose && (
+                  <Text style={styles.closeHint}>탭하여 닫기</Text>
+                )}
+              </View>
+            </TouchableWithoutFeedback>
           </View>
-        </View>
+        </TouchableWithoutFeedback>
       </Modal>
     );
   }
@@ -89,6 +100,11 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: '#6B7280',
     fontWeight: '500',
+  },
+  closeHint: {
+    marginTop: 12,
+    fontSize: 12,
+    color: '#9CA3AF',
   },
 });
 

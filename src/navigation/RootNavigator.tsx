@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useEffect } from 'react';
 import { View, Linking, Easing, TouchableOpacity, Text } from 'react-native';
 import { NavigationContainer, createNavigationContainerRef } from '@react-navigation/native';
 import { createStackNavigator, StackScreenProps } from '@react-navigation/stack';
@@ -21,7 +21,6 @@ import SettingsScreen from '../screens/SettingsScreen';
 import PolicyListScreen from '../screens/PolicyListScreen';
 import PolicyDetailScreen from '../screens/PolicyDetailScreen';
 import LoginScreen from '../screens/LoginScreen';
-import SplashScreen from '../screens/SplashScreen';
 import SignupCompleteScreen from '../screens/SignupCompleteScreen';
 import BatteryInfoScreen from '../screens/BatteryInfoScreen';
 import OutlineTestScreen from '../screens/OutlineTestScreen';
@@ -299,12 +298,6 @@ function MainTabs() {
 // 모든 화면이 직접 Login으로 리다이렉트하는 방식으로 통일됨
 
 export default function RootNavigator() {
-  const [showSplash, setShowSplash] = useState(false); // App.tsx에서 이미 로딩 처리하므로 비활성화
-
-  const handleSplashFinish = () => {
-    setShowSplash(false);
-  };
-
   // Deep Link 처리
   useEffect(() => {
     const handleDeepLink = (url: string) => {
@@ -328,10 +321,6 @@ export default function RootNavigator() {
       subscription?.remove();
     };
   }, []);
-
-  if (showSplash) {
-    return <SplashScreen onFinish={handleSplashFinish} />;
-  }
 
   return (
     <NavigationContainer ref={navigationRef}>

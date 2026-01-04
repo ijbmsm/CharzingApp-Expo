@@ -1110,15 +1110,6 @@ export default function HomeScreen() {
           />
         }
       >
-        {/* Outline Test 버튼 (개발/테스트용) - 숨김 */}
-        {/* <TouchableOpacity
-          style={styles.outlineTestButton}
-          onPress={() => navigation.navigate('OutlineTest' as any)}
-        >
-          <Ionicons name="car-sport-outline" size={20} color="#FFFFFF" />
-          <Text style={styles.outlineTestButtonText}>차량 Outline 테스트</Text>
-        </TouchableOpacity> */}
-
         {/* 메인 상태 섹션 - "내 지갑" 스타일 */}
         <Animatable.View
           animation="fadeInUp"
@@ -1367,6 +1358,7 @@ export default function HomeScreen() {
           </Animated.View>
         </Animated.View>
       </Modal>
+
     </SafeAreaView>
   );
 }

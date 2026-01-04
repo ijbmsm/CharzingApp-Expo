@@ -183,7 +183,6 @@ function URLHandler() {
 
 function App() {
   const [isAppReady, setIsAppReady] = useState(false);
-  const [loadingMessage, setLoadingMessage] = useState('앱을 준비하고 있습니다...');
 
   // LineSeed 폰트 로드
   const [fontsLoaded] = useFonts({
@@ -197,7 +196,7 @@ function App() {
       console.log('🚀 앱 초기화 시작...');
 
       try {
-        // 0. Expo 스플래시 화면 즉시 숨기기 (최소 지연)
+        // 0. Expo 스플래시 화면 즉시 숨기기
         await SplashScreen.hideAsync();
         console.log('✅ Expo 스플래시 화면 숨김 완료');
 
@@ -213,7 +212,6 @@ function App() {
         }
 
         // 2. Firebase 초기화
-        setLoadingMessage('Firebase 연결 중...');
         console.log('🚀 Firebase 초기화 시작...');
         const success = await firebaseFacade.initialize();
 
@@ -242,11 +240,9 @@ function App() {
         }
 
         // 3. 서비스 초기화 (필요시)
-        setLoadingMessage('서비스 준비 중...');
         await new Promise(resolve => setTimeout(resolve, 500)); // 최소 로딩 시간
 
         // 4. 카카오 로그인 서비스 초기화
-        setLoadingMessage('로그인 서비스 준비 중...');
         try {
           await getKakaoLoginService().initialize();
           console.log('✅ 카카오 로그인 서비스 초기화 성공');
@@ -254,11 +250,8 @@ function App() {
           console.warn('⚠️ 카카오 로그인 서비스 초기화 실패:', error);
         }
         
-        // 6. 앱 준비 완료
-        setLoadingMessage('앱 시작 중...');
+        // 5. 앱 준비 완료
         await new Promise(resolve => setTimeout(resolve, 300));
-        
-        // 6. 커스텀 로딩 완료
         setIsAppReady(true);
         
       } catch (error) {
@@ -273,12 +266,12 @@ function App() {
 
   // 앱이 준비되지 않았다면 커스텀 로딩 화면 표시
   if (!isAppReady) {
-    return <BundlingLoadingScreen message={loadingMessage} showProgress={true} />;
+    return <BundlingLoadingScreen />;
   }
 
   // 폰트가 로드되지 않았으면 로딩 화면 표시
   if (!fontsLoaded) {
-    return <BundlingLoadingScreen message="폰트 로딩 중..." />;
+    return <BundlingLoadingScreen />;
   }
 
   return (

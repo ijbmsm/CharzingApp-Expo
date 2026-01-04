@@ -1,19 +1,11 @@
 import React, { useEffect, useRef } from 'react';
-import { View, Image, Text, StyleSheet, ActivityIndicator, Animated } from 'react-native';
-
-interface BundlingLoadingScreenProps {
-  message?: string;
-  showProgress?: boolean;
-}
+import { View, Image, StyleSheet, Animated } from 'react-native';
 
 /**
  * 스플래시 화면과 동일한 디자인의 번들링 로딩 화면
  * Metro bundler 로딩 중에 표시되는 커스텀 화면
  */
-export const BundlingLoadingScreen: React.FC<BundlingLoadingScreenProps> = ({
-  message = '앱을 준비하고 있습니다...',
-  showProgress = true
-}) => {
+export const BundlingLoadingScreen: React.FC = () => {
   const pulseAnim = useRef(new Animated.Value(1)).current;
 
   useEffect(() => {
@@ -53,7 +45,7 @@ export const BundlingLoadingScreen: React.FC<BundlingLoadingScreenProps> = ({
           ]}
         >
           <Image
-            source={require('../assets/charzingLogo/ios/AppIcon~ios-marketing.png')}
+            source={require('../../assets/bootsplash/logo.png')}
             style={styles.logo}
             resizeMode="contain"
           />
@@ -84,8 +76,8 @@ const styles = StyleSheet.create({
     zIndex: 2,
   },
   logo: {
-    width: 120,
-    height: 120,
+    width: 150,
+    height: 150,
   },
 });
 
