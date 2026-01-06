@@ -2313,6 +2313,96 @@ export const sendReservationStatusNotification = functions
         console.error(`사용자 ${userId} 자동 인앱 알림 저장 실패:`, inAppError);
       }
 
+      // 3. 예약 확정/취소 시 고객에게 SMS 발송
+      if (afterData.status === 'confirmed' || afterData.status === 'cancelled') {
+        try {
+          const customerPhone = afterData.userPhone;
+
+          if (!customerPhone) {
+            console.log(`고객 전화번호 없음, SMS 발송 건너뛰기: ${reservationId}`);
+          } else {
+            // SMS 환경 변수 검증
+            const smsConfig = validateSMSConfig();
+
+            // 예약 일시 포맷팅 (한국 시간 KST)
+            let dateStr = '정보 없음';
+            if (afterData.requestedDate) {
+              const requestedDate = afterData.requestedDate.toDate();
+              const kstFormatter = new Intl.DateTimeFormat('ko-KR', {
+                timeZone: 'Asia/Seoul',
+                year: 'numeric',
+                month: '2-digit',
+                day: '2-digit',
+                weekday: 'short',
+                hour: '2-digit',
+                minute: '2-digit',
+                hour12: false,
+              });
+              const parts = kstFormatter.formatToParts(requestedDate);
+              const year = parts.find(p => p.type === 'year')?.value;
+              const month = parts.find(p => p.type === 'month')?.value;
+              const day = parts.find(p => p.type === 'day')?.value;
+              const weekday = parts.find(p => p.type === 'weekday')?.value;
+              const hour = parts.find(p => p.type === 'hour')?.value;
+              const minute = parts.find(p => p.type === 'minute')?.value;
+              dateStr = `${year}-${month}-${day}(${weekday}) ${hour}:${minute}`;
+            }
+
+            // 장소
+            const address = afterData.address || '정보 없음';
+
+            // SMS 메시지 구성
+            let smsMessage = '';
+            if (afterData.status === 'confirmed') {
+              smsMessage = [
+                '[차징] 예약 확정 안내',
+                '고객님의 배터리 진단 예약이 확정되었습니다.',
+                `일시: ${dateStr}`,
+                `장소: ${address}`,
+                '담당 진단사가 예정 시간에 방문합니다.',
+              ].join('\n');
+            } else if (afterData.status === 'cancelled') {
+              smsMessage = [
+                '[차징] 예약 취소 안내',
+                '배터리 진단 예약이 취소되었습니다.',
+                `취소된 예약: ${dateStr}`,
+                '감사합니다.',
+              ].join('\n');
+            }
+
+            // SMS 발송
+            await sendSMS(
+              { to: customerPhone, content: smsMessage },
+              smsConfig.serviceId,
+              smsConfig.accessKey,
+              smsConfig.secretKey,
+              smsConfig.senderPhone
+            );
+
+            console.log(`✅ 고객 SMS 발송 완료 (${afterData.status}): ${reservationId} → ${customerPhone}`);
+
+            // Sentry: SMS 발송 성공 로깅
+            Sentry.addBreadcrumb({
+              category: 'sms',
+              message: `Customer SMS sent for ${afterData.status}`,
+              level: 'info',
+              data: { reservationId, status: afterData.status },
+            });
+          }
+        } catch (smsError) {
+          // SMS 발송 실패해도 예약 상태 변경에는 영향 없음
+          console.error(`❌ 고객 SMS 발송 실패 (${afterData.status}):`, smsError);
+          Sentry.captureException(smsError, {
+            tags: {
+              function: 'sendReservationStatusNotification',
+              category: 'sms',
+              status: afterData.status,
+            },
+            level: 'warning',
+          });
+        }
+      }
+
     } catch (error) {
       console.error('자동 푸시 알림 전송 실패:', error);
 
@@ -3186,22 +3276,28 @@ import { confirmPayment as confirmPaymentAPI, cancelPayment as cancelPaymentAPI 
 import { tossResponseToPaymentDocument, createCancelUpdateData } from './utils/payment-mapper';
 
 function validateConfig(): string {
-  // 프로덕션 키로 고정
-  const secretKey = process.env.TOSS_SECRET_KEY_PROD;
+  // NODE_ENV로 환경 구분: development = 테스트 키, production = 라이브 키
+  const isDevelopment = process.env.NODE_ENV === 'development';
+
+  const secretKey = isDevelopment
+    ? process.env.TOSS_SECRET_KEY_TEST
+    : process.env.TOSS_SECRET_KEY_PROD;
 
   if (!secretKey) {
+    const keyType = isDevelopment ? 'TEST' : 'PROD';
     throw new functions.https.HttpsError(
       'failed-precondition',
-      'Toss Secret Key (TOSS_SECRET_KEY_PROD)가 설정되지 않았습니다.'
+      `Toss Secret Key (TOSS_SECRET_KEY_${keyType})가 설정되지 않았습니다.`
     );
   }
 
   // 키 형식 검증 (보안)
-  if (!secretKey.startsWith('live_')) {
-    console.warn(`⚠️ 프로덕션 키가 live_로 시작하지 않습니다: ${secretKey.substring(0, 10)}...`);
+  const expectedPrefix = isDevelopment ? 'test_' : 'live_';
+  if (!secretKey.startsWith(expectedPrefix)) {
+    console.warn(`⚠️ ${isDevelopment ? '테스트' : '프로덕션'} 키가 ${expectedPrefix}로 시작하지 않습니다: ${secretKey.substring(0, 10)}...`);
   }
 
-  console.log(`🔑 Toss Secret Key 로드: 프로덕션 환경 (${secretKey.substring(0, 10)}...)`);
+  console.log(`🔑 Toss Payment Mode: ${isDevelopment ? 'TEST' : 'PRODUCTION'} (${secretKey.substring(0, 10)}...)`);
   return secretKey;
 }
 
@@ -4151,16 +4247,27 @@ export const notifyReservationCreated = functions
       const serviceType = data.serviceType || '일반 진단';
       const servicePrice = data.servicePrice || 0;
 
-      // 예약 날짜 포맷팅
+      // 예약 날짜 포맷팅 (한국 시간 KST로 변환)
       let requestedDateStr = '정보 없음';
       if (data.requestedDate) {
         const requestedDate = data.requestedDate.toDate();
-        const year = requestedDate.getFullYear();
-        const month = String(requestedDate.getMonth() + 1).padStart(2, '0');
-        const day = String(requestedDate.getDate()).padStart(2, '0');
-        const hours = String(requestedDate.getHours()).padStart(2, '0');
-        const minutes = String(requestedDate.getMinutes()).padStart(2, '0');
-        requestedDateStr = `${year}-${month}-${day} ${hours}:${minutes}`;
+        // Intl.DateTimeFormat으로 한국 시간대 변환
+        const kstFormatter = new Intl.DateTimeFormat('ko-KR', {
+          timeZone: 'Asia/Seoul',
+          year: 'numeric',
+          month: '2-digit',
+          day: '2-digit',
+          hour: '2-digit',
+          minute: '2-digit',
+          hour12: false,
+        });
+        const parts = kstFormatter.formatToParts(requestedDate);
+        const year = parts.find(p => p.type === 'year')?.value;
+        const month = parts.find(p => p.type === 'month')?.value;
+        const day = parts.find(p => p.type === 'day')?.value;
+        const hour = parts.find(p => p.type === 'hour')?.value;
+        const minute = parts.find(p => p.type === 'minute')?.value;
+        requestedDateStr = `${year}-${month}-${day} ${hour}:${minute}`;
       }
 
       // SMS 메시지 구성 (이모지 제거 - Naver SENS API 제약)
