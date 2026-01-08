@@ -33,7 +33,7 @@ export const TireAndWheelSection: React.FC<TireAndWheelSectionProps> = ({ showVa
   // ========== 휠 ==========
   const wheel = tireAndWheel?.wheel || {};
   const wheelStatusCount = Object.values(wheel).filter((item) => item?.status).length;
-  const wheelPhotoCount = POSITION_KEYS.filter((key) => wheel[key]?.basePhoto).length;
+  const wheelPhotoCount = POSITION_KEYS.filter((key) => wheel[key]?.basePhotos?.length || wheel[key]?.basePhoto).length;
 
   // ========== 핸들러 ==========
   const handleTireSave = (data: Record<PositionKey, TireInspectionItem>) => {
@@ -69,7 +69,7 @@ export const TireAndWheelSection: React.FC<TireAndWheelSectionProps> = ({ showVa
       {/* 휠 (4개) */}
       <InputButton
         label="휠 검사"
-        isCompleted={wheelStatusCount >= 2 && wheelPhotoCount >= 2}
+        isCompleted={wheelStatusCount >= 4 && wheelPhotoCount >= 4}
         value={
           wheelStatusCount > 0 || wheelPhotoCount > 0
             ? `상태 ${wheelStatusCount}/4 | 사진 ${wheelPhotoCount}/4`

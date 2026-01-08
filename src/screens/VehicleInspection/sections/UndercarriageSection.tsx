@@ -85,7 +85,7 @@ export const UndercarriageSection: React.FC<UndercarriageSectionProps> = ({ show
       {/* 배터리 팩 (4방향) */}
       <InputButton
         label="배터리 팩 검사"
-        isCompleted={batteryPackStatusCount >= 2 && batteryPackPhotoCount >= 2}
+        isCompleted={batteryPackStatusCount >= 4 && batteryPackPhotoCount >= 4}
         value={
           batteryPackStatusCount > 0 || batteryPackPhotoCount > 0
             ? `상태 ${batteryPackStatusCount}/4 | 사진 ${batteryPackPhotoCount}/4`
@@ -111,7 +111,7 @@ export const UndercarriageSection: React.FC<UndercarriageSectionProps> = ({ show
       {/* 브레이크 (5개) */}
       <InputButton
         label="브레이크 검사"
-        isCompleted={brakeCompleted >= 3}
+        isCompleted={brakeCompleted >= 5}
         value={brakeCompleted > 0 ? `${brakeCompleted}/5 완료` : '5개 항목 검사'}
         onPress={() => setIsBrakeVisible(true)}
         showError={showValidationErrors}

@@ -3581,12 +3581,7 @@ function validateConfig(): string {
 export const confirmPaymentFunction = functions
   .region("asia-northeast3")
   .runWith({
-    secrets: [
-      "NODE_ENV",
-      "TOSS_SECRET_KEY_PROD",
-      "TOSS_SECRET_KEY_TEST",
-      "SENTRY_DSN",
-    ],
+    secrets: ["SENTRY_DSN"],
     minInstances: 1, // Cold start 제거 - 결제 핵심 플로우
   })
   .https.onCall(
@@ -4057,7 +4052,6 @@ export const cancelPaymentFunction = functions
   .region("asia-northeast3")
   .runWith({
     secrets: [
-      "NODE_ENV",
       "TOSS_SECRET_KEY_PROD",
       "TOSS_SECRET_KEY_TEST",
       "SENTRY_DSN",
@@ -5373,15 +5367,15 @@ export const exportReportImageFunction = functions
 
         const page = await browser.newPage();
 
-        // 페이지 로드
+        // 페이지 로드 (타임아웃 60초, domcontentloaded로 빠르게)
         await page.goto(targetUrl, {
-          waitUntil: 'networkidle0',
-          timeout: 30000
+          waitUntil: 'domcontentloaded',
+          timeout: 60000
         });
 
-        // 이미지 로딩 대기
-        await page.waitForSelector('img', { timeout: 10000 }).catch(() => {});
-        await new Promise(resolve => setTimeout(resolve, 2000));
+        // 이미지 로딩 대기 (더 넉넉하게)
+        await page.waitForSelector('img', { timeout: 30000 }).catch(() => {});
+        await new Promise(resolve => setTimeout(resolve, 3000));
 
         Sentry.addBreadcrumb({
           category: 'function',

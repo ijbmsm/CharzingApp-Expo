@@ -136,12 +136,14 @@ const MaterialsBottomSheet: React.FC<MaterialsBottomSheetProps> = ({
     const result: Record<InteriorMaterialsKey, InteriorMaterialsItem> = {} as Record<InteriorMaterialsKey, InteriorMaterialsItem>;
     INTERIOR_MATERIALS_KEYS.forEach((key) => {
       const item = materialsData[key];
-      if (item?.status || item?.basePhoto || item?.basePhotoArr?.[0]) {
+      const photos = item?.basePhotoArr?.length ? item.basePhotoArr : (item?.basePhoto ? [item.basePhoto] : []);
+      if (item?.status || photos.length > 0) {
         result[key] = {
-          status: item.status,
-          basePhoto: item.basePhotoArr?.[0] || item.basePhoto,
-          issueDescription: item.issueDescription,
-          issueImageUris: item.issueImageUris,
+          status: item?.status,
+          basePhotos: photos,  // v2: 배열로 저장
+          basePhoto: photos[0],  // 레거시 호환용
+          issueDescription: item?.issueDescription,
+          issueImageUris: item?.issueImageUris,
         };
       }
     });

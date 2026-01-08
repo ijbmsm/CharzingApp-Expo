@@ -104,7 +104,7 @@ const BrakeInspectionBottomSheet: React.FC<BrakeInspectionBottomSheetProps> = ({
   };
 
   const completedCount = Object.values(brakeData).filter((item) => item?.status).length;
-  const isComplete = completedCount >= 3;
+  const isComplete = completedCount >= 5; // 5개 모두 필수
 
   return (
     <Modal

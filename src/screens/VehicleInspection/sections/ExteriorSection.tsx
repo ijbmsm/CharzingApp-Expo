@@ -41,7 +41,7 @@ export const ExteriorSection: React.FC<ExteriorSectionProps> = ({ showValidation
   const bodyPanel = exterior?.bodyPanel || {};
   const bodyPanelCompleted = Object.values(bodyPanel).filter((item) => item?.status).length;
   const bodyPanelBasePhotoCount = REQUIRED_BASE_PHOTO_KEYS.filter(
-    (key) => bodyPanel[key]?.basePhoto
+    (key) => bodyPanel[key]?.basePhotos?.length || bodyPanel[key]?.basePhoto
   ).length;
 
   // ========== 프레임 ==========
@@ -85,7 +85,7 @@ export const ExteriorSection: React.FC<ExteriorSectionProps> = ({ showValidation
       {/* 외판 (19개) - 기본 사진 포함 */}
       <InputButton
         label="외판 검사"
-        isCompleted={bodyPanelCompleted >= 10 && bodyPanelBasePhotoCount >= 3}
+        isCompleted={bodyPanelCompleted >= 19 && bodyPanelBasePhotoCount >= 6}
         value={
           bodyPanelCompleted > 0 || bodyPanelBasePhotoCount > 0
             ? `상태 ${bodyPanelCompleted}/19 | 사진 ${bodyPanelBasePhotoCount}/6`
@@ -98,7 +98,7 @@ export const ExteriorSection: React.FC<ExteriorSectionProps> = ({ showValidation
       {/* 프레임 (20개) */}
       <InputButton
         label="프레임 검사"
-        isCompleted={frameCompleted >= 10}
+        isCompleted={frameCompleted >= 20}
         value={frameCompleted > 0 ? `${frameCompleted}/20 완료` : '20개 항목 검사'}
         onPress={() => setIsFrameVisible(true)}
         showError={showValidationErrors}
@@ -107,7 +107,7 @@ export const ExteriorSection: React.FC<ExteriorSectionProps> = ({ showValidation
       {/* 유리 (7개) */}
       <InputButton
         label="유리 검사"
-        isCompleted={glassCompleted >= 4}
+        isCompleted={glassCompleted >= 7}
         value={glassCompleted > 0 ? `${glassCompleted}/7 완료` : '7개 항목 검사'}
         onPress={() => setIsGlassVisible(true)}
         showError={showValidationErrors}
@@ -116,7 +116,7 @@ export const ExteriorSection: React.FC<ExteriorSectionProps> = ({ showValidation
       {/* 램프 (5개) */}
       <InputButton
         label="램프 검사"
-        isCompleted={lampCompleted >= 3}
+        isCompleted={lampCompleted >= 5}
         value={lampCompleted > 0 ? `${lampCompleted}/5 완료` : '5개 항목 검사'}
         onPress={() => setIsLampVisible(true)}
         showError={showValidationErrors}

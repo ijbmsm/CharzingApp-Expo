@@ -109,11 +109,13 @@ const WheelInspectionBottomSheet: React.FC<WheelInspectionBottomSheetProps> = ({
     const result: Record<PositionKey, WheelInspectionItem> = {} as Record<PositionKey, WheelInspectionItem>;
     POSITION_KEYS.forEach((key) => {
       const item = wheelData[key];
-      if (item?.status || item?.basePhoto || item?.basePhotoArr?.[0]) {
+      const photos = item?.basePhotoArr?.length ? item.basePhotoArr : (item?.basePhoto ? [item.basePhoto] : []);
+      if (item?.status || photos.length > 0) {
         result[key] = {
-          status: item.status,
-          basePhoto: item.basePhotoArr?.[0] || item.basePhoto,
-          issueDescription: item.status === 'problem' ? item.issueDescription : undefined,
+          status: item?.status,
+          basePhotos: photos,  // v2: 배열로 저장
+          basePhoto: photos[0],  // 레거시 호환용
+          issueDescription: item?.status === 'problem' ? item?.issueDescription : undefined,
         };
       }
     });
@@ -125,7 +127,7 @@ const WheelInspectionBottomSheet: React.FC<WheelInspectionBottomSheetProps> = ({
   const basePhotoCount = POSITION_KEYS.filter(
     (key) => wheelData[key]?.basePhotoArr && wheelData[key].basePhotoArr!.length > 0
   ).length;
-  const isComplete = completedCount >= 2 && basePhotoCount >= 2; // 상태 2개 + 사진 2개 이상
+  const isComplete = completedCount >= 4 && basePhotoCount >= 4; // 4개 모두 상태 + 사진 필수
 
   return (
     <Modal

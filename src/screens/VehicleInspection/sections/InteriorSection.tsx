@@ -30,7 +30,10 @@ export const InteriorSection: React.FC<InteriorSectionProps> = ({ showValidation
   // ========== 내장재 (사진 6개 필수) ==========
   const materials = interior?.materials || {};
   const basePhotoCount = INTERIOR_MATERIALS_PHOTO_KEYS.filter(
-    (key) => materials[key as keyof typeof materials]?.basePhoto
+    (key) => {
+      const item = materials[key as keyof typeof materials];
+      return item?.basePhotos?.length || item?.basePhoto;
+    }
   ).length;
 
   // ========== 기능 ==========

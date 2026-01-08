@@ -14,7 +14,8 @@ export interface BaseInspectionItem {
 }
 
 export interface PaintInspectionItem extends BaseInspectionItem {
-  basePhoto?: string;  // 기본 사진 (6개 항목 필수: hood, doorFL-RR, trunkLid)
+  basePhoto?: string;  // 레거시 호환용
+  basePhotos?: string[];  // v2: 최대 10장
   thickness?: number;  // μm
 }
 
@@ -23,7 +24,8 @@ export interface TireInspectionItem extends BaseInspectionItem {
 }
 
 export interface WheelInspectionItem extends BaseInspectionItem {
-  basePhoto?: string;
+  basePhoto?: string;  // 레거시 호환용
+  basePhotos?: string[];  // v2: 최대 10장
 }
 
 export interface BatteryPackInspectionItem extends BaseInspectionItem {
@@ -93,7 +95,8 @@ export type InteriorMaterialsKey =
 export type MaterialsKey = 'door' | 'ceiling' | 'seat' | 'smell';
 
 export interface InteriorMaterialsItem extends BaseInspectionItem {
-  basePhoto?: string;
+  basePhoto?: string;  // 레거시 호환용
+  basePhotos?: string[];  // v2: 최대 10장
 }
 
 export type FunctionsKey =

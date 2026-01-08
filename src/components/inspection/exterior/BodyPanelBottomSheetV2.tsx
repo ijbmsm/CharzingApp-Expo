@@ -167,10 +167,12 @@ const BodyPanelBottomSheetV2: React.FC<BodyPanelBottomSheetV2Props> = ({
       const item = bodyPanelData[key];
       const thicknessStr = thicknessStrings[key];
       const thicknessNum = thicknessStr ? parseFloat(thicknessStr) : undefined;
-      if (item?.status || item?.basePhoto || item?.basePhotoArr?.[0] || thicknessNum) {
+      const photos = item?.basePhotoArr?.length ? item.basePhotoArr : (item?.basePhoto ? [item.basePhoto] : []);
+      if (item?.status || photos.length > 0 || thicknessNum) {
         result[key] = {
           status: item?.status,
-          basePhoto: item?.basePhotoArr?.[0] || item?.basePhoto,
+          basePhotos: photos,  // v2: 배열로 저장
+          basePhoto: photos[0],  // 레거시 호환용
           thickness: thicknessNum,
           issueDescription: item?.issueDescription,
           issueImageUris: item?.issueImageUris,
@@ -185,7 +187,7 @@ const BodyPanelBottomSheetV2: React.FC<BodyPanelBottomSheetV2Props> = ({
   const basePhotoCount = REQUIRED_BASE_PHOTO_KEYS.filter(
     (key) => bodyPanelData[key]?.basePhotoArr && bodyPanelData[key].basePhotoArr!.length > 0
   ).length;
-  const isComplete = completedCount >= 10 && basePhotoCount >= 3; // 상태 10개 + 기본사진 3개 이상
+  const isComplete = completedCount >= 19 && basePhotoCount >= 6; // 19개 상태 + 기본사진 6개 모두 필수
 
   return (
     <Modal

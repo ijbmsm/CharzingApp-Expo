@@ -104,6 +104,11 @@ const VehicleInspectionScreen: React.FC = () => {
   // 유효성 검사 에러 표시 (제출 시도 후)
   const [showValidationErrors, setShowValidationErrors] = useState(false);
 
+  // 미완료 항목 모달
+  const [isIncompleteModalVisible, setIsIncompleteModalVisible] = useState(false);
+  const [incompleteItems, setIncompleteItems] = useState<Array<{ name: string; key: InspectionSection; completion: SectionCompletion }>>([]);
+  const [isDiagnosticianMissing, setIsDiagnosticianMissing] = useState(false);
+
   // 🔍 디버깅: 상태 변화 추적
   useEffect(() => {
     console.log('🔍 inspectionMode 변경:', inspectionMode);
@@ -681,29 +686,32 @@ const VehicleInspectionScreen: React.FC = () => {
   const calculateExteriorCompletion = useCallback((): SectionCompletion => {
     const exterior = watch('exterior');
 
-    // 외판 검사: 19개 중 10개 이상 (상태)
+    // 외판 검사: 19개 모두 필수 (상태)
     const bodyPanel = exterior?.bodyPanel || {};
     const bodyPanelStatusCount = Object.values(bodyPanel).filter((item) => item && item.status).length;
-    const hasBodyPanelStatus = bodyPanelStatusCount >= 10;
+    const hasBodyPanelStatus = bodyPanelStatusCount >= 19;
 
-    // 외판 기본 사진: 6개 항목 중 3개 이상 (hood, doorFL-RR, trunkLid)
+    // 외판 기본 사진: 6개 모두 필수 (hood, doorFL-RR, trunkLid)
     const requiredBasePhotoKeys = ['hood', 'doorFL', 'doorFR', 'doorRL', 'doorRR', 'trunkLid'];
     const bodyPanelBasePhotoCount = requiredBasePhotoKeys.filter(
-      (key) => bodyPanel[key as keyof typeof bodyPanel]?.basePhoto
+      (key) => {
+        const item = bodyPanel[key as keyof typeof bodyPanel];
+        return item && (item.basePhotos?.length || item.basePhoto);
+      }
     ).length;
-    const hasBodyPanelBasePhotos = bodyPanelBasePhotoCount >= 3;
+    const hasBodyPanelBasePhotos = bodyPanelBasePhotoCount >= 6;
 
-    // 프레임 검사: 20개 중 10개 이상
+    // 프레임 검사: 20개 모두 필수
     const frame = exterior?.frame || {};
-    const hasFrame = Object.values(frame).filter((item) => item && item.status).length >= 10;
+    const hasFrame = Object.values(frame).filter((item) => item && item.status).length >= 20;
 
-    // 유리 검사: 7개 중 4개 이상
+    // 유리 검사: 7개 모두 필수
     const glass = exterior?.glass || {};
-    const hasGlass = Object.values(glass).filter((item) => item && item.status).length >= 4;
+    const hasGlass = Object.values(glass).filter((item) => item && item.status).length >= 7;
 
-    // 램프 검사: 5개 중 3개 이상
+    // 램프 검사: 5개 모두 필수
     const lamp = exterior?.lamp || {};
-    const hasLamp = Object.values(lamp).filter((item) => item && item.status).length >= 3;
+    const hasLamp = Object.values(lamp).filter((item) => item && item.status).length >= 5;
 
     // 외판은 상태+사진 둘 다 충족해야 완료
     const hasBodyPanel = hasBodyPanelStatus && hasBodyPanelBasePhotos;
@@ -723,7 +731,10 @@ const VehicleInspectionScreen: React.FC = () => {
     const materials = interior?.materials || {};
     const PHOTO_KEYS = ['driverSeat', 'rearSeat', 'doorFL', 'doorFR', 'doorRL', 'doorRR'];
     const basePhotoCount = PHOTO_KEYS.filter(
-      (key) => materials[key as keyof typeof materials]?.basePhoto
+      (key) => {
+        const item = materials[key as keyof typeof materials];
+        return item && (item.basePhotos?.length || item.basePhoto);
+      }
     ).length;
     const hasMaterials = basePhotoCount >= 6;
 
@@ -749,11 +760,11 @@ const VehicleInspectionScreen: React.FC = () => {
     const tireStatusCount = Object.values(tire).filter((item) => item && item.status).length;
     const hasTire = tireStatusCount >= 4;
 
-    // 휠 검사: 상태 2개 + 사진 2개 필수
+    // 휠 검사: 4개 모두 상태 + 사진 필수
     const wheel = tireAndWheel?.wheel || {};
     const wheelStatusCount = Object.values(wheel).filter((item) => item && item.status).length;
-    const wheelPhotoCount = Object.values(wheel).filter((item) => item && item.basePhoto).length;
-    const hasWheel = wheelStatusCount >= 2 && wheelPhotoCount >= 2;
+    const wheelPhotoCount = Object.values(wheel).filter((item) => item && (item.basePhotos?.length || item.basePhoto)).length;
+    const hasWheel = wheelStatusCount >= 4 && wheelPhotoCount >= 4;
 
     const items = [hasTire, hasWheel];
 
@@ -767,11 +778,11 @@ const VehicleInspectionScreen: React.FC = () => {
   const calculateUndercarriageCompletion = useCallback((): SectionCompletion => {
     const undercarriage = watch('undercarriage');
 
-    // 배터리 팩 검사: 상태 2개 + 사진 2개 필수
+    // 배터리 팩 검사: 4개 모두 상태 + 사진 필수
     const batteryPack = undercarriage?.batteryPack || {};
     const batteryStatusCount = Object.values(batteryPack).filter((item) => item && item.status).length;
-    const batteryPhotoCount = Object.values(batteryPack).filter((item) => item && item.basePhoto).length;
-    const hasBatteryPack = batteryStatusCount >= 2 && batteryPhotoCount >= 2;
+    const batteryPhotoCount = Object.values(batteryPack).filter((item) => item && (item.basePhotos?.length || item.basePhoto)).length;
+    const hasBatteryPack = batteryStatusCount >= 4 && batteryPhotoCount >= 4;
 
     // 서스펜션 검사: 4개 위치 모두 상태 + 기본사진 필수
     const suspension = undercarriage?.suspension || {};
@@ -779,9 +790,9 @@ const VehicleInspectionScreen: React.FC = () => {
     const suspensionPhotoCount = Object.values(suspension).filter((item) => item && item.basePhotos?.length).length;
     const hasSuspension = suspensionStatusCount >= 4 && suspensionPhotoCount >= 4;
 
-    // 브레이크 검사: 5개 중 3개 이상
+    // 브레이크 검사: 5개 모두 필수
     const brake = undercarriage?.brake || {};
-    const hasBrake = Object.values(brake).filter((item) => item && item.status).length >= 3;
+    const hasBrake = Object.values(brake).filter((item) => item && item.status).length >= 5;
 
     const items = [hasBatteryPack, hasSuspension, hasBrake];
 
@@ -880,36 +891,13 @@ const VehicleInspectionScreen: React.FC = () => {
       const incompleteList: string[] = [];
 
       // 섹션별 미완성 항목
-      incompleteSections.forEach((s) => {
-        incompleteList.push(`• ${s.name} (${s.completion.completed}/${s.completion.total})`);
-      });
-
-      // 진단사 확인 미완성
-      if (!isDiagnosticianComplete) {
-        incompleteList.push('• 진단사 서명 확인');
-      }
-
       // 유효성 에러 표시 활성화
       setShowValidationErrors(true);
 
-      Alert.alert(
-        '미완성 항목',
-        `다음 항목을 완료해주세요:\n\n${incompleteList.join('\n')}`,
-        [
-          {
-            text: '확인',
-            onPress: () => {
-              // 첫 번째 미완성 섹션 자동으로 펼치기
-              if (incompleteSections.length > 0) {
-                const firstIncomplete = incompleteSections[0]!.key;
-                if (!expandedSections[firstIncomplete]) {
-                  toggleSection(firstIncomplete);
-                }
-              }
-            },
-          },
-        ]
-      );
+      // 미완료 모달 표시
+      setIncompleteItems(incompleteSections);
+      setIsDiagnosticianMissing(!isDiagnosticianComplete);
+      setIsIncompleteModalVisible(true);
       return;
     }
 
@@ -944,6 +932,48 @@ const VehicleInspectionScreen: React.FC = () => {
       await imageStorage.clearUserImages(selectedUser.uid);
 
       sentryLogger.log('✅ Draft 삭제 (제출 성공)', {
+        userId: selectedUser.uid,
+        userName: selectedUser.displayName,
+      });
+
+      handleBackToList();
+    }
+  };
+
+  // 강제 제출 (미완료 항목 무시)
+  const handleForceSubmit = async () => {
+    setIsIncompleteModalVisible(false);
+
+    if (!selectedUser) return;
+
+    const formData = methods.getValues();
+    const success = await submitInspection(
+      formData,
+      selectedUser.uid,
+      selectedUser.displayName || '',
+      selectedUser.phoneNumber || '',
+      selectedReservation?.id,
+      currentUser?.uid,
+      currentUser?.displayName || currentUser?.realName
+    );
+
+    if (success) {
+      if (selectedReservation?.id) {
+        try {
+          await firebaseService.updateDiagnosisReservationStatus(
+            selectedReservation.id,
+            'pending_review'
+          );
+          console.log('✅ 예약 상태 업데이트 완료: pending_review');
+        } catch (error) {
+          console.error('❌ 예약 상태 업데이트 실패:', error);
+        }
+      }
+
+      await draftStorage.clearDraft(selectedUser.uid);
+      await imageStorage.clearUserImages(selectedUser.uid);
+
+      sentryLogger.log('✅ Draft 삭제 (강제 제출 성공)', {
         userId: selectedUser.uid,
         userName: selectedUser.displayName,
       });
@@ -1459,6 +1489,59 @@ const VehicleInspectionScreen: React.FC = () => {
           initialData={watch('diagnosticianConfirmation')}
         />
 
+        {/* 미완료 항목 확인 모달 */}
+        <Modal
+          visible={isIncompleteModalVisible}
+          transparent={true}
+          animationType="fade"
+          onRequestClose={() => setIsIncompleteModalVisible(false)}
+        >
+          <View style={styles.incompleteModalOverlay}>
+            <View style={styles.incompleteModalContent}>
+              <View style={styles.incompleteModalHeader}>
+                <Ionicons name="alert-circle-outline" size={32} color="#F59E0B" />
+                <Text style={styles.incompleteModalTitle}>미완료 항목 확인</Text>
+              </View>
+
+              <View style={styles.incompleteItemsList}>
+                {incompleteItems.map((item, index) => (
+                  <View key={index} style={styles.incompleteItemRow}>
+                    <Ionicons name="ellipse" size={6} color="#6B7280" />
+                    <Text style={styles.incompleteItemText}>
+                      {item.name} ({item.completion.completed}/{item.completion.total})
+                    </Text>
+                  </View>
+                ))}
+                {isDiagnosticianMissing && (
+                  <View style={styles.incompleteItemRow}>
+                    <Ionicons name="ellipse" size={6} color="#6B7280" />
+                    <Text style={styles.incompleteItemText}>진단사 서명 확인</Text>
+                  </View>
+                )}
+              </View>
+
+              <Text style={styles.incompleteModalMessage}>
+                입력되지 않은 항목이 있습니다.{'\n'}이대로 제출하시겠습니까?
+              </Text>
+
+              <View style={styles.incompleteModalButtons}>
+                <TouchableOpacity
+                  style={styles.incompleteModalCancelButton}
+                  onPress={() => setIsIncompleteModalVisible(false)}
+                >
+                  <Text style={styles.incompleteModalCancelText}>취소</Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={styles.incompleteModalSubmitButton}
+                  onPress={handleForceSubmit}
+                >
+                  <Text style={styles.incompleteModalSubmitText}>제출하기</Text>
+                </TouchableOpacity>
+              </View>
+            </View>
+          </View>
+        </Modal>
+
         {/* 업로드 진행률 모달 */}
         <Modal
           visible={isSubmitting}
@@ -1893,6 +1976,82 @@ const styles = StyleSheet.create({
   modalButtonConfirmText: {
     fontSize: moderateScale(16),
     fontWeight: '700',
+    color: '#FFFFFF',
+  },
+  // 미완료 항목 모달
+  incompleteModalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.6)',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  incompleteModalContent: {
+    backgroundColor: '#FFFFFF',
+    borderRadius: 16,
+    padding: scale(24),
+    width: scale(320),
+    maxWidth: '90%',
+  },
+  incompleteModalHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: verticalScale(16),
+    gap: scale(8),
+  },
+  incompleteModalTitle: {
+    fontSize: moderateScale(18),
+    fontWeight: '700',
+    color: '#1F2937',
+  },
+  incompleteItemsList: {
+    backgroundColor: '#F9FAFB',
+    borderRadius: 8,
+    padding: scale(12),
+    marginBottom: verticalScale(16),
+  },
+  incompleteItemRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: verticalScale(4),
+    gap: scale(8),
+  },
+  incompleteItemText: {
+    fontSize: moderateScale(14),
+    color: '#4B5563',
+  },
+  incompleteModalMessage: {
+    fontSize: moderateScale(14),
+    color: '#6B7280',
+    textAlign: 'center',
+    marginBottom: verticalScale(20),
+    lineHeight: moderateScale(20),
+  },
+  incompleteModalButtons: {
+    flexDirection: 'row',
+    gap: scale(12),
+  },
+  incompleteModalCancelButton: {
+    flex: 1,
+    paddingVertical: verticalScale(12),
+    borderRadius: 8,
+    backgroundColor: '#F3F4F6',
+    alignItems: 'center',
+  },
+  incompleteModalCancelText: {
+    fontSize: moderateScale(14),
+    fontWeight: '600',
+    color: '#6B7280',
+  },
+  incompleteModalSubmitButton: {
+    flex: 1,
+    paddingVertical: verticalScale(12),
+    borderRadius: 8,
+    backgroundColor: '#F59E0B',
+    alignItems: 'center',
+  },
+  incompleteModalSubmitText: {
+    fontSize: moderateScale(14),
+    fontWeight: '600',
     color: '#FFFFFF',
   },
   // 업로드 진행률 모달
