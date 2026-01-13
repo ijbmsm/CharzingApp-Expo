@@ -6,6 +6,7 @@ const NAVER_SENS_API_BASE_URL = 'https://sens.apigw.ntruss.com';
 export interface SendSMSRequest {
   to: string;           // 수신자 전화번호 (예: '01012345678')
   content: string;      // 메시지 내용
+  subject?: string;     // LMS 제목 (선택, LMS일 때만 사용)
   from?: string;        // 발신자 전화번호 (미설정 시 환경변수 사용)
 }
 
@@ -14,6 +15,7 @@ interface NaverSENSMessageRequest {
   contentType: 'COMM' | 'AD';
   countryCode: string;
   from: string;
+  subject?: string;     // LMS/MMS 제목
   content: string;
   messages: Array<{
     to: string;
@@ -102,6 +104,7 @@ export async function sendSMS(
     contentType: 'COMM',  // 일반 메시지 (AD: 광고 메시지)
     countryCode: '82',    // 대한민국
     from: request.from || senderPhone,
+    ...(messageType === 'LMS' && { subject: request.subject || '[차징]' }),
     content: request.content,
     messages: [
       {

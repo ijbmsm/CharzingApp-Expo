@@ -25,6 +25,7 @@ service cloud.firestore {
     // 사용자 role 조회 (없으면 'user'로 간주)
     function getUserRole() {
       return isAuthenticated()
+        && exists(/databases/$(database)/documents/users/$(request.auth.uid))
         ? get(/databases/$(database)/documents/users/$(request.auth.uid)).data.get('role', 'user')
         : null;
     }
@@ -180,6 +181,25 @@ service cloud.firestore {
       allow create: if true;
 
       // 수정: Admin만 (환불 처리 등)
+      allow update: if isAdmin();
+
+      // 삭제: Admin만
+      allow delete: if isAdmin();
+    }
+
+
+    // ============================================
+    // 8. coupons - 쿠폰 정보
+    // ============================================
+    match /coupons/{couponId} {
+      // 읽기: 쿠폰 소유자 또는 Admin
+      allow read: if (isAuthenticated() && resource.data.userId == request.auth.uid)
+        || isAdmin();
+
+      // 생성: Admin만
+      allow create: if isAdmin();
+
+      // 수정: Admin만
       allow update: if isAdmin();
 
       // 삭제: Admin만

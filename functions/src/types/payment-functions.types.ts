@@ -4,6 +4,7 @@ export interface ReservationInfo {
     model: string;     // 모델명
     year: number;      // 연식
   };
+  vehiclePlateNumber?: string;  // 차량번호
   address: string;
   detailAddress?: string;
   requestedDate: string;  // ISO string

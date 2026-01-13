@@ -247,6 +247,9 @@ export default {
       GOOGLE_WEB_CLIENT_ID: process.env.EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID,
       TOSS_CLIENT_KEY: process.env.EXPO_PUBLIC_TOSS_CLIENT_KEY,
 
+      // 🔧 에뮬레이터 사용 여부 (개발 환경)
+      useEmulator: process.env.EXPO_PUBLIC_USE_EMULATOR === 'true',
+
       SENTRY_DSN:
         process.env.SENTRY_DSN || "https://2b93a60c59c8ba7748ac8f06159206d8@o4510316675989504.ingest.us.sentry.io/4510316677169152",
       eas: { projectId: "0a4659e9-07ec-460c-a1ce-6d6bf87b9aa7" },

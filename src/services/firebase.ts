@@ -1,13 +1,21 @@
 // Firebase 웹 SDK (Expo 호환)
 import { Auth } from 'firebase/auth';
-import { Firestore, getFirestore, collection } from 'firebase/firestore';
-import { FirebaseStorage, getStorage } from 'firebase/storage';
+import { Firestore, getFirestore, collection, connectFirestoreEmulator } from 'firebase/firestore';
+import { FirebaseStorage, getStorage, connectStorageEmulator } from 'firebase/storage';
 import { getApp } from 'firebase/app';
 import { firebaseFacade } from './firebase/config';
+import Constants from 'expo-constants';
+
+// 에뮬레이터 사용 여부 (Expo 환경변수)
+const USE_EMULATOR = Constants.expoConfig?.extra?.useEmulator === true;
 
 // Lazy initialization으로 Firebase가 준비될 때까지 대기
 let _db: Firestore | null = null;
 let _storage: FirebaseStorage | null = null;
+
+// 에뮬레이터 연결 상태 추적
+let _firestoreEmulatorConnected = false;
+let _storageEmulatorConnected = false;
 
 // 🔧 수정: Auth는 별도 persistence 설정으로 초기화되므로 직접 가져오지 않음
 // Firebase 인스턴스들 (Auth 제외) - Lazy initialization
@@ -16,6 +24,12 @@ export const db = new Proxy({} as Firestore, {
     if (!_db) {
       const app = getApp();
       _db = getFirestore(app);
+      // 🔧 에뮬레이터 연결 (개발 환경에서만)
+      if (USE_EMULATOR && !_firestoreEmulatorConnected) {
+        connectFirestoreEmulator(_db, 'localhost', 8080);
+        _firestoreEmulatorConnected = true;
+        console.log('🔧 Firestore Emulator 연결됨 (localhost:8080)');
+      }
     }
     return (_db as any)[prop];
   }
@@ -26,6 +40,12 @@ export const storage = new Proxy({} as FirebaseStorage, {
     if (!_storage) {
       const app = getApp();
       _storage = getStorage(app);
+      // 🔧 에뮬레이터 연결 (개발 환경에서만)
+      if (USE_EMULATOR && !_storageEmulatorConnected) {
+        connectStorageEmulator(_storage, 'localhost', 9199);
+        _storageEmulatorConnected = true;
+        console.log('🔧 Storage Emulator 연결됨 (localhost:9199)');
+      }
     }
     return (_storage as any)[prop];
   }

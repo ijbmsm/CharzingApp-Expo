@@ -10,6 +10,7 @@ export interface ConfirmPaymentRequest {
       model: string;
       year: number;
     };
+    vehiclePlateNumber?: string;  // 차량번호
     address: string;
     detailAddress: string;
     serviceType: string;

@@ -5,7 +5,7 @@ import cors from "cors";
 import { google } from "googleapis";
 import * as Sentry from "@sentry/node";
 import { v4 as uuidv4 } from "uuid";
-import { FieldValue } from "firebase-admin/firestore";
+import { FieldValue, Timestamp } from "firebase-admin/firestore";
 import chromium from "@sparticuz/chromium";
 import puppeteer from "puppeteer-core";
 import {
@@ -21,6 +21,13 @@ import { generateUniqueReferralCode } from "./utils/referralCode";
 if (admin.apps.length === 0) {
   admin.initializeApp();
 }
+
+// 🧪 디버그: 환경변수 로깅
+console.log("🔧 Functions 환경 설정:", {
+  NODE_ENV: process.env.NODE_ENV,
+  FIRESTORE_EMULATOR_HOST: process.env.FIRESTORE_EMULATOR_HOST,
+  isDevMode: process.env.NODE_ENV === "development" || !!process.env.FIRESTORE_EMULATOR_HOST,
+});
 
 // Sentry 초기화 (프로덕션 환경에서만)
 if (process.env.SENTRY_DSN) {
@@ -160,8 +167,8 @@ export const kakaoLoginHttp = functions
             userInfo.nickname ||
             userInfo.email?.split("@")[0] ||
             "카카오 사용자",
-          lastLoginAt: admin.firestore.FieldValue.serverTimestamp(),
-          updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+          lastLoginAt: FieldValue.serverTimestamp(),
+          updatedAt: FieldValue.serverTimestamp(),
         };
 
         if (userInfo.email) {
@@ -188,13 +195,13 @@ export const kakaoLoginHttp = functions
           kakaoId: userInfo.id,
           displayName:
             userInfo.nickname || emailQuery.docs[0].data().displayName,
-          lastLoginAt: admin.firestore.FieldValue.serverTimestamp(),
-          updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+          lastLoginAt: FieldValue.serverTimestamp(),
+          updatedAt: FieldValue.serverTimestamp(),
           "providers.kakao": {
             id: userInfo.id,
             nickname: userInfo.nickname,
             profileImageUrl: userInfo.profileImageUrl || null, // providers 내부는 null 허용
-            linkedAt: admin.firestore.FieldValue.serverTimestamp(),
+            linkedAt: FieldValue.serverTimestamp(),
           },
         };
 
@@ -499,8 +506,8 @@ export const googleLoginHttp = functions
         const updatePayload: Record<string, any> = {
           displayName:
             userInfo.name || userInfo.email?.split("@")[0] || "Google 사용자",
-          lastLoginAt: admin.firestore.FieldValue.serverTimestamp(),
-          updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+          lastLoginAt: FieldValue.serverTimestamp(),
+          updatedAt: FieldValue.serverTimestamp(),
         };
 
         if (userInfo.email) {
@@ -526,13 +533,13 @@ export const googleLoginHttp = functions
         const updatePayload: Record<string, any> = {
           googleId: userInfo.id,
           displayName: userInfo.name || emailQuery.docs[0].data().displayName,
-          lastLoginAt: admin.firestore.FieldValue.serverTimestamp(),
-          updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+          lastLoginAt: FieldValue.serverTimestamp(),
+          updatedAt: FieldValue.serverTimestamp(),
           "providers.google": {
             id: userInfo.id,
             name: userInfo.name,
             picture: userInfo.picture || null, // providers 내부는 null 허용
-            linkedAt: admin.firestore.FieldValue.serverTimestamp(),
+            linkedAt: FieldValue.serverTimestamp(),
           },
         };
 
@@ -823,7 +830,7 @@ export const kakaoLoginWebHttp = functions
 
         await db.collection("users").doc(firebaseUID).update({
           kakaoId: userInfo.id,
-          updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+          updatedAt: FieldValue.serverTimestamp(),
         });
       } else {
         firebaseUID = db.collection("users").doc().id;
@@ -847,7 +854,7 @@ export const kakaoLoginWebHttp = functions
               referralCode,
               isRegistrationComplete: false,
               isActive: false,
-              createdAt: admin.firestore.FieldValue.serverTimestamp(),
+              createdAt: FieldValue.serverTimestamp(),
             });
 
           // referralCodes 컬렉션에도 문서 생성
@@ -856,7 +863,7 @@ export const kakaoLoginWebHttp = functions
             ownerUserId: firebaseUID,
             ownerType: "user",
             status: "inactive",
-            createdAt: admin.firestore.FieldValue.serverTimestamp(),
+            createdAt: FieldValue.serverTimestamp(),
           });
 
           console.log("✅ [WEB] 신규 사용자 문서 생성 완료");
@@ -1042,7 +1049,7 @@ export const googleLoginWebHttp = functions
 
         await db.collection("users").doc(firebaseUID).update({
           googleId: userInfo.id,
-          updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+          updatedAt: FieldValue.serverTimestamp(),
         });
       } else {
         firebaseUID = db.collection("users").doc().id;
@@ -1066,7 +1073,7 @@ export const googleLoginWebHttp = functions
               referralCode,
               isRegistrationComplete: false,
               isActive: false,
-              createdAt: admin.firestore.FieldValue.serverTimestamp(),
+              createdAt: FieldValue.serverTimestamp(),
             });
 
           // referralCodes 컬렉션에도 문서 생성
@@ -1075,7 +1082,7 @@ export const googleLoginWebHttp = functions
             ownerUserId: firebaseUID,
             ownerType: "user",
             status: "inactive",
-            createdAt: admin.firestore.FieldValue.serverTimestamp(),
+            createdAt: FieldValue.serverTimestamp(),
           });
 
           console.log("✅ [WEB] 신규 사용자 문서 생성 완료");
@@ -1186,8 +1193,8 @@ export const createKakaoCustomToken = functions
               photoURL: photoURL || null,
               provider: "kakao",
               kakaoId: kakaoId,
-              createdAt: admin.firestore.FieldValue.serverTimestamp(),
-              updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+              createdAt: FieldValue.serverTimestamp(),
+              updatedAt: FieldValue.serverTimestamp(),
             },
             { merge: true }
           );
@@ -1250,7 +1257,7 @@ export const updateUserProfile = functions
           phoneNumber,
           address,
           isRegistrationComplete: isRegistrationComplete || true,
-          updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+          updatedAt: FieldValue.serverTimestamp(),
         });
 
       console.log("✅ 프로필 업데이트 완료:", uid);
@@ -1343,8 +1350,8 @@ export const googleLogin = functions
           userInfo.name || userInfo.email?.split("@")[0] || "Google 사용자",
         photoURL: userInfo.photo,
         provider: "google",
-        lastLoginAt: admin.firestore.FieldValue.serverTimestamp(),
-        updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+        lastLoginAt: FieldValue.serverTimestamp(),
+        updatedAt: FieldValue.serverTimestamp(),
       };
 
       if (!isNewUser) {
@@ -1497,8 +1504,8 @@ export const createCustomTokenFromApple = functions
             displayName: userInfo.displayName,
             photoURL: userInfo.photoURL,
             provider: "apple",
-            lastLoginAt: admin.firestore.FieldValue.serverTimestamp(),
-            updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+            lastLoginAt: FieldValue.serverTimestamp(),
+            updatedAt: FieldValue.serverTimestamp(),
           };
 
           await userDocRef.update(userData);
@@ -1743,8 +1750,8 @@ export const createDiagnosisReservation = functions
               isGuest: true,
               provider: "email",
               isRegistrationComplete: false,
-              createdAt: admin.firestore.FieldValue.serverTimestamp(),
-              updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+              createdAt: FieldValue.serverTimestamp(),
+              updatedAt: FieldValue.serverTimestamp(),
             });
 
           console.log("✅ Guest user 문서 생성 완료:", uid);
@@ -1814,7 +1821,7 @@ export const createDiagnosisReservation = functions
           longitude: Number(longitude),
           status: status || "pending", // 🔥 클라이언트에서 보낸 status 사용
           paymentStatus: paymentStatus || null, // 🔥 paymentStatus 추가
-          requestedDate: admin.firestore.Timestamp.fromDate(requestedDateTime),
+          requestedDate: Timestamp.fromDate(requestedDateTime),
           estimatedDuration: "약 30분",
           serviceType: serviceType || "방문 배터리 진단 및 상담",
           servicePrice: servicePrice || 100000,
@@ -1823,8 +1830,8 @@ export const createDiagnosisReservation = functions
           vehicleYear: vehicleYear || "",
           notes: notes || "",
           adminNotes: "",
-          createdAt: admin.firestore.FieldValue.serverTimestamp(),
-          updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+          createdAt: FieldValue.serverTimestamp(),
+          updatedAt: FieldValue.serverTimestamp(),
         };
 
         // Firestore에 저장
@@ -1976,7 +1983,7 @@ export const addUserVehicle = functions
       existingVehicles.docs.forEach((doc) => {
         batch.update(doc.ref, {
           isActive: false,
-          updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+          updatedAt: FieldValue.serverTimestamp(),
         });
       });
 
@@ -1990,8 +1997,8 @@ export const addUserVehicle = functions
         range: range || null,
         nickname: nickname || null,
         isActive: true,
-        createdAt: admin.firestore.FieldValue.serverTimestamp(),
-        updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+        createdAt: FieldValue.serverTimestamp(),
+        updatedAt: FieldValue.serverTimestamp(),
       };
 
       const newVehicleRef = db.collection("userVehicles").doc();
@@ -2183,7 +2190,7 @@ export const sendPushNotification = functions
                 body,
                 data: notificationData || {},
                 response: response.data,
-                sentAt: admin.firestore.FieldValue.serverTimestamp(),
+                sentAt: FieldValue.serverTimestamp(),
                 status: "sent",
               });
             } catch (pushErr) {
@@ -2203,7 +2210,7 @@ export const sendPushNotification = functions
               category: notificationData?.category || "announcement",
               data: notificationData || {},
               isRead: false,
-              createdAt: admin.firestore.FieldValue.serverTimestamp(),
+              createdAt: FieldValue.serverTimestamp(),
               id: `notification_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
             };
 
@@ -2444,7 +2451,7 @@ export const sendReservationStatusNotification = functions
             body,
             data: message.data,
             response: response.data,
-            sentAt: admin.firestore.FieldValue.serverTimestamp(),
+            sentAt: FieldValue.serverTimestamp(),
             status: "sent",
             trigger: "reservation_status_change",
             reservationId,
@@ -2468,7 +2475,7 @@ export const sendReservationStatusNotification = functions
             status: afterData.status,
           },
           isRead: false,
-          createdAt: admin.firestore.FieldValue.serverTimestamp(),
+          createdAt: FieldValue.serverTimestamp(),
           id: `notification_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
         };
 
@@ -2622,7 +2629,10 @@ export const sendReservationStatusNotification = functions
   });
 
 /**
- * 진단 리포트 상태 변경 시 자동 푸시 알림 (published 상태로 변경 시)
+ * 진단 리포트 상태 변경 시 자동 알림 (published 상태로 변경 시)
+ * - 푸시 알림
+ * - 인앱 알림
+ * - SMS 알림 (고객 전화번호로)
  */
 export const sendReportPublishedNotification = functions
   .region("asia-northeast3") // ⭐ 중복 알림 방지: 단일 리전만 사용
@@ -2731,7 +2741,7 @@ export const sendReportPublishedNotification = functions
             body,
             data: message.data,
             response: response.data,
-            sentAt: admin.firestore.FieldValue.serverTimestamp(),
+            sentAt: FieldValue.serverTimestamp(),
             status: "sent",
             trigger: "report_published",
             reportId,
@@ -2755,7 +2765,7 @@ export const sendReportPublishedNotification = functions
             status: afterData.status,
           },
           isRead: false,
-          createdAt: admin.firestore.FieldValue.serverTimestamp(),
+          createdAt: FieldValue.serverTimestamp(),
           id: `notification_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
         };
 
@@ -2793,8 +2803,83 @@ export const sendReportPublishedNotification = functions
       } catch (inAppError) {
         console.error(`사용자 ${userId} 자동 인앱 알림 저장 실패:`, inAppError);
       }
+
+      // 3. SMS 알림 발송 (고객 전화번호가 있는 경우)
+      const customerPhone = afterData.userPhone || userData?.phoneNumber;
+      const customerName = afterData.userName || userData?.realName || userData?.displayName || "고객";
+
+      if (customerPhone) {
+        try {
+          const serviceId = process.env.NAVER_SENS_SERVICE_ID;
+          const accessKey = process.env.NAVER_SENS_ACCESS_KEY;
+          const secretKey = process.env.NAVER_SENS_SECRET_KEY;
+          const senderPhone = process.env.NAVER_SENS_SENDER_PHONE;
+
+          if (serviceId && accessKey && secretKey && senderPhone) {
+            const baseUrl = "https://charzing.co.kr";
+            const reportUrl = `${baseUrl}/mypage/reports/${reportId}`;
+            const reviewUrl = `${baseUrl}/review/${reportId}`;
+
+            const smsContent = `안녕하세요 ${customerName}님,
+요청하신 배터리 진단이 완료되었습니다.
+
+▶ 내 리포트 확인하기
+${reportUrl}
+
+진단 결과가 차량 구매 결정에 도움이 되셨길 바랍니다.
+
+서비스가 만족스러우셨다면,
+소중한 리뷰 부탁드립니다.
+
+▶ 리뷰 작성하기
+${reviewUrl}
+
+감사합니다.
+- 차징 드림`;
+
+            const { sendSMS } = await import("./utils/naver-sens-sms");
+            const smsResult = await sendSMS(
+              {
+                to: customerPhone.replace(/[^0-9]/g, ""),
+                content: smsContent,
+                subject: "[차징] 배터리 진단 리포트 안내",
+              },
+              serviceId,
+              accessKey,
+              secretKey,
+              senderPhone
+            );
+
+            console.log(`SMS 발송 성공: ${userId}, requestId: ${smsResult.requestId}`);
+
+            // SMS 발송 기록 저장
+            await change.after.ref.update({
+              smsNotification: {
+                sent: true,
+                sentAt: FieldValue.serverTimestamp(),
+                requestId: smsResult.requestId,
+              },
+            });
+          } else {
+            console.warn("SMS 환경변수가 설정되지 않아 SMS 발송 건너뜀");
+          }
+        } catch (smsError) {
+          console.error(`SMS 발송 실패: ${userId}`, smsError);
+
+          // SMS 실패 기록 저장
+          await change.after.ref.update({
+            smsNotification: {
+              sent: false,
+              error: smsError instanceof Error ? smsError.message : "Unknown error",
+              attemptedAt: FieldValue.serverTimestamp(),
+            },
+          });
+        }
+      } else {
+        console.log(`사용자 ${userId}에게 전화번호가 없어 SMS 발송 건너뜀`);
+      }
     } catch (error) {
-      console.error("자동 푸시 알림 전송 실패:", error);
+      console.error("자동 알림 전송 실패:", error);
 
       // Sentry: 에러 로깅
       Sentry.captureException(error, {
@@ -2839,7 +2924,7 @@ export const savePushToken = functions
       // 사용자 문서에 푸시 토큰 저장
       await db.collection("users").doc(uid).update({
         pushToken,
-        pushTokenUpdatedAt: admin.firestore.FieldValue.serverTimestamp(),
+        pushTokenUpdatedAt: FieldValue.serverTimestamp(),
       });
 
       console.log(`푸시 토큰 저장 완료: ${uid}`);
@@ -3015,7 +3100,7 @@ export const sendPushNotificationAdmin = functions
               category: notificationData?.category || "announcement",
               data: notificationData || {},
               isRead: false,
-              createdAt: admin.firestore.FieldValue.serverTimestamp(),
+              createdAt: FieldValue.serverTimestamp(),
               id: `notification_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
             };
 
@@ -3185,8 +3270,8 @@ interface VehicleTrimData {
   endYear?: number;
   battery: VehicleBattery;
   specs: VehicleSpecs;
-  createdAt?: admin.firestore.Timestamp;
-  updatedAt?: admin.firestore.Timestamp;
+  createdAt?: Timestamp;
+  updatedAt?: Timestamp;
 }
 
 interface VehicleTrim {
@@ -3916,6 +4001,7 @@ export const confirmPaymentFunction = functions
             vehicleBrand: data.reservationInfo.vehicle.make,
             vehicleModel: data.reservationInfo.vehicle.model,
             vehicleYear: String(data.reservationInfo.vehicle.year),
+            vehiclePlateNumber: data.reservationInfo.vehiclePlateNumber || "",
 
             // 주소 정보
             address: data.reservationInfo.address,
@@ -3925,7 +4011,7 @@ export const confirmPaymentFunction = functions
 
             // 날짜/시간
             requestedDate:
-              admin.firestore.Timestamp.fromDate(requestedDateTime),
+              Timestamp.fromDate(requestedDateTime),
 
             // 서비스 정보
             serviceType: data.reservationInfo.serviceType,
@@ -4051,11 +4137,7 @@ export const confirmPaymentFunction = functions
 export const cancelPaymentFunction = functions
   .region("asia-northeast3")
   .runWith({
-    secrets: [
-      "TOSS_SECRET_KEY_PROD",
-      "TOSS_SECRET_KEY_TEST",
-      "SENTRY_DSN",
-    ],
+    // secrets 제거 - .env 파일에서 직접 읽음
   })
   .https.onCall(
     async (
@@ -4424,7 +4506,7 @@ export const cleanupPendingPayments = functions
 
     try {
       // 1️⃣ 1시간 전 타임스탬프 계산
-      const oneHourAgo = admin.firestore.Timestamp.fromMillis(
+      const oneHourAgo = Timestamp.fromMillis(
         Date.now() - 1 * 60 * 60 * 1000
       );
 
@@ -4777,7 +4859,7 @@ export const sendVerificationCode = functions
         if (currentSendCount >= 3) {
           // 3회 초과 - 30분 차단 설정
           await docRef.update({
-            blockedUntil: admin.firestore.Timestamp.fromDate(
+            blockedUntil: Timestamp.fromDate(
               new Date(now + 30 * 60 * 1000)
             ),
           });
@@ -4788,14 +4870,19 @@ export const sendVerificationCode = functions
         }
       }
 
-      // SMS 설정 검증
-      const config = validateSMSConfig();
+      // 🧪 개발/에뮬레이터 모드 체크
+      const isDevMode =
+        process.env.NODE_ENV === "development" ||
+        !!process.env.FIRESTORE_EMULATOR_HOST;
 
-      // 6자리 랜덤 인증번호 생성
-      const verificationCode = Math.floor(
-        100000 + Math.random() * 900000
-      ).toString();
-      const expiresAt = admin.firestore.Timestamp.fromDate(
+      // 개발 모드에서는 테스트 인증번호 사용 (SMS 발송 안 함)
+      const TEST_VERIFICATION_CODE = "000000";
+
+      // 6자리 랜덤 인증번호 생성 (개발 모드에서는 테스트 코드 사용)
+      const verificationCode = isDevMode
+        ? TEST_VERIFICATION_CODE
+        : Math.floor(100000 + Math.random() * 900000).toString();
+      const expiresAt = Timestamp.fromDate(
         new Date(Date.now() + 5 * 60 * 1000) // 5분 후 만료
       );
 
@@ -4806,36 +4893,59 @@ export const sendVerificationCode = functions
       const currentSendCount =
         lastSendAt < thirtyMinutesAgo ? 0 : existingData?.sendCount || 0;
 
-      // 🚀 성능 최적화: Firestore 저장과 SMS 발송을 병렬로 실행
-      await Promise.all([
-        // Firestore에 인증번호 저장 (발송 횟수 포함)
-        docRef.set({
+      if (isDevMode) {
+        // 🧪 개발 모드: SMS 발송 없이 Firestore에만 저장
+        console.log(
+          "🧪 [개발 모드] 테스트 인증번호 사용:",
+          TEST_VERIFICATION_CODE
+        );
+
+        await docRef.set({
           code: verificationCode,
           phoneNumber,
           expiresAt,
           verified: false,
           sendCount: currentSendCount + 1,
-          lastSendAt: admin.firestore.FieldValue.serverTimestamp(),
-          blockedUntil: null, // 차단 해제
-          createdAt: admin.firestore.FieldValue.serverTimestamp(),
-        }),
-        // SMS 발송
-        sendSMS(
-          {
-            to: phoneNumber,
-            content: `[차징] 인증번호는 ${verificationCode} 입니다. 5분 내에 입력해주세요.`,
-          },
-          config.serviceId,
-          config.accessKey,
-          config.secretKey,
-          config.senderPhone
-        ),
-      ]);
+          lastSendAt: FieldValue.serverTimestamp(),
+          blockedUntil: null,
+          createdAt: FieldValue.serverTimestamp(),
+        });
+      } else {
+        // 🚀 프로덕션 모드: SMS 설정 검증 및 발송
+        const config = validateSMSConfig();
+
+        // 🚀 성능 최적화: Firestore 저장과 SMS 발송을 병렬로 실행
+        await Promise.all([
+          // Firestore에 인증번호 저장 (발송 횟수 포함)
+          docRef.set({
+            code: verificationCode,
+            phoneNumber,
+            expiresAt,
+            verified: false,
+            sendCount: currentSendCount + 1,
+            lastSendAt: FieldValue.serverTimestamp(),
+            blockedUntil: null, // 차단 해제
+            createdAt: FieldValue.serverTimestamp(),
+          }),
+          // SMS 발송
+          sendSMS(
+            {
+              to: phoneNumber,
+              content: `[차징] 인증번호는 ${verificationCode} 입니다. 5분 내에 입력해주세요.`,
+            },
+            config.serviceId,
+            config.accessKey,
+            config.secretKey,
+            config.senderPhone
+          ),
+        ]);
+      }
 
       console.log(
-        "✅ SMS 인증번호 발송 완료:",
+        `${isDevMode ? "🧪" : "✅"} SMS 인증번호 발송 완료:`,
         phoneNumber,
-        `(${currentSendCount + 1}/3)`
+        `(${currentSendCount + 1}/3)`,
+        isDevMode ? "[개발 모드]" : ""
       );
 
       return {
@@ -4845,7 +4955,12 @@ export const sendVerificationCode = functions
         remainingCount: 3 - (currentSendCount + 1), // 남은 발송 횟수
       };
     } catch (error: any) {
-      console.error("❌ SMS 인증번호 발송 실패:", error);
+      console.error("❌ SMS 인증번호 발송 실패:", {
+        message: error.message,
+        stack: error.stack,
+        code: error.code,
+        name: error.name,
+      });
 
       if (error instanceof functions.https.HttpsError) {
         throw error;
@@ -4853,7 +4968,7 @@ export const sendVerificationCode = functions
 
       throw new functions.https.HttpsError(
         "internal",
-        "인증번호 발송에 실패했습니다. 잠시 후 다시 시도해주세요."
+        `인증번호 발송에 실패했습니다: ${error.message || "잠시 후 다시 시도해주세요."}`
       );
     }
   });
@@ -4919,7 +5034,7 @@ export const verifyPhoneCode = functions
       }
 
       // 만료 시간 확인
-      const now = admin.firestore.Timestamp.now();
+      const now = Timestamp.now();
       if (verificationData.expiresAt.toMillis() < now.toMillis()) {
         throw new functions.https.HttpsError(
           "deadline-exceeded",
@@ -4946,7 +5061,7 @@ export const verifyPhoneCode = functions
       // 검증 완료 표시
       await docRef.update({
         verified: true,
-        verifiedAt: admin.firestore.FieldValue.serverTimestamp(),
+        verifiedAt: FieldValue.serverTimestamp(),
       });
 
       console.log("✅ SMS 인증번호 검증 완료:", phoneNumber);
@@ -5049,7 +5164,7 @@ export const validateReferralCode = functions
       }
 
       // 5. 기간 체크
-      const now = admin.firestore.Timestamp.now();
+      const now = Timestamp.now();
       if (
         referralPricing.startDate &&
         now.toMillis() < referralPricing.startDate.toMillis()
@@ -5223,9 +5338,9 @@ export const applyReferralCode = functions
       }
 
       // 5. 사용자에게 쿠폰 발급
-      const now = admin.firestore.Timestamp.now();
+      const now = Timestamp.now();
       // 추천 쿠폰은 유효기간 없음 (10년 후로 설정)
-      const expiresAt = admin.firestore.Timestamp.fromMillis(
+      const expiresAt = Timestamp.fromMillis(
         now.toMillis() + 10 * 365 * 24 * 60 * 60 * 1000
       );
 
